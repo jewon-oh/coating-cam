@@ -1,0 +1,217 @@
+// src/hooks/useCanvasInteractions.ts
+
+import React, { useRef, useCallback, useEffect } from 'react';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import type Konva from 'konva';
+import {KonvaShape, useShapeContext} from '@/contexts/shape-context';
+import { useHistory } from '@/contexts/history-context';
+import { useTool } from '@/contexts/tool-context';
+import { useToolActions } from './use-tool-actions';
+
+// 이 훅은 CanvasStage에 필요한 모든 상호작용 로직을 캡슐화합니다.
+export const useCanvasInteractions = (
+    stageRef: React.RefObject<Konva.Stage>,
+    setStage: React.Dispatch<React.SetStateAction<{ scale: number; x: number; y: number }>>,
+    setSelectedId: React.Dispatch<React.SetStateAction<string | null>>
+) => {
+    const { shapes, addShape, updateShape, removeShape } = useShapeContext();
+    const shapesRef = useRef<KonvaShape[]>();
+    shapesRef.current = shapes;
+
+    const { saveHistory } = useHistory();
+    const { tool, setTool } = useTool();
+    const { handleInsertImage } = useToolActions();
+
+    const isDrawingRef = useRef(false);
+    const isPanningRef = useRef(false);
+    const clipboardRef = useRef<KonvaShape | null>(null);
+    const mouseDownPos = useRef({ x: 0, y: 0 });
+    const lastPointerPosition = useRef({ x: 0, y: 0 });
+
+
+    // Cursor Style Management
+    useEffect(() => {
+        const stageNode = stageRef.current;
+        if (!stageNode) return;
+        const container = stageNode.container();
+        switch (tool) {
+            case 'select': container.style.cursor = 'grab'; break;
+            case 'circle':
+            case 'rectangle': container.style.cursor = 'crosshair'; break;
+            case 'insert-image': container.style.cursor = 'copy'; break;
+            default: container.style.cursor = 'default';
+        }
+    }, [tool, stageRef]);
+
+
+    const handleDelete = useCallback((id: string | null) => {
+        if (!id) return;
+        removeShape(id, (updatedShapes) => {
+            saveHistory(updatedShapes);
+        });
+        setSelectedId(null);
+    }, [removeShape, saveHistory, setSelectedId]);
+
+
+    const handleCopy = useCallback((id: string | null) => {
+        if (!id) return;
+        const shapeToCopy = shapes.find(shape => shape.id === id);
+        if (shapeToCopy) {
+            clipboardRef.current = shapeToCopy;
+            console.log('Copied to clipboard:', shapeToCopy);
+        }
+    }, [shapes]);
+
+    const handlePaste = useCallback(() => {
+        const shapeToPaste = clipboardRef.current;
+        if (!shapeToPaste) return;
+
+        const newShape: Omit<KonvaShape, 'id'> = {
+            ...shapeToPaste,
+            x: shapeToPaste.x + 20,
+            y: shapeToPaste.y + 20,
+        };
+
+        addShape(newShape, (updatedShapes: KonvaShape[]) => {
+            saveHistory(updatedShapes);
+            const pastedShape = updatedShapes.find(s => s.x === newShape.x && s.y === newShape.y);
+            if (pastedShape) {
+                setSelectedId(pastedShape.id);
+            }
+        });
+    }, [addShape, saveHistory, setSelectedId]);
+
+    const handleCut = useCallback((id: string | null) => {
+        if (!id) return;
+        handleCopy(id);
+        handleDelete(id);
+    }, [handleCopy, handleDelete]);
+
+    const getRelativePointerPosition = (stage: Konva.Stage) => {
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return null;
+        const transform = stage.getAbsoluteTransform().copy();
+        transform.invert();
+        return transform.point(pointer);
+    };
+
+    const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        if (e.target !== e.target.getStage()) return;
+        const stageNode = e.target.getStage();
+        if (!stageNode) return;
+
+        setSelectedId(null);
+
+        switch (tool) {
+            case 'select':
+                isPanningRef.current = true;
+                lastPointerPosition.current = stageNode.getPointerPosition() || { x: 0, y: 0 };
+                stageNode.container().style.cursor = 'grabbing';
+                break;
+            case 'insert-image':
+                handleInsertImage();
+                setTool('select');
+                break;
+            case 'circle':
+            case 'rectangle':
+                if (!stageNode) return;
+                const pos = getRelativePointerPosition(stageNode);
+                if (!pos) return;
+
+                isDrawingRef.current = true;
+                mouseDownPos.current = pos;
+
+                const commonProps = {
+                    x: pos.x,
+                    y: pos.y,
+                    fill: 'rgba(59,130,246,0.2)',
+                    stroke: '#3b82f6',
+                    strokeWidth: 2,
+                    draggable: true,
+                };
+
+                if (tool === 'circle') {
+                    addShape({ type: 'circle', radius: 0, ...commonProps });
+                } else {
+                    addShape({ type: 'rect', width: 0, height: 0, ...commonProps });
+                }
+                break;
+        }
+    }, [tool, addShape, handleInsertImage, setTool, setSelectedId]);
+
+    const handleMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        const stageNode = e.target.getStage();
+        if (!stageNode) return;
+
+        if (isPanningRef.current) {
+            const newPointerPos = stageNode.getPointerPosition();
+            if (!newPointerPos) return;
+            const dx = newPointerPos.x - lastPointerPosition.current.x;
+            const dy = newPointerPos.y - lastPointerPosition.current.y;
+            setStage(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+            lastPointerPosition.current = newPointerPos;
+            return;
+        }
+
+        if (isDrawingRef.current) {
+            const stageNode = e.target.getStage();
+            if (!stageNode) return;
+
+            const pos = getRelativePointerPosition(stageNode);
+            const currentShapes = shapesRef.current;
+            if (!pos || !currentShapes || currentShapes.length === 0) return;
+
+            const lastShape = currentShapes[currentShapes.length - 1];
+            if (!lastShape) return;
+
+            if (lastShape.type === 'circle') {
+                const newRadius = Math.hypot(pos.x - mouseDownPos.current.x, pos.y - mouseDownPos.current.y);
+                updateShape(lastShape.id, { radius: newRadius });
+            } else if (lastShape.type === 'rect') {
+                const newWidth = pos.x - mouseDownPos.current.x;
+                const newHeight = pos.y - mouseDownPos.current.y;
+                updateShape(lastShape.id, {
+                    x: newWidth < 0 ? pos.x : mouseDownPos.current.x,
+                    y: newHeight < 0 ? pos.y : mouseDownPos.current.y,
+                    width: Math.abs(newWidth),
+                    height: Math.abs(newHeight),
+                });
+            }
+        }
+    }, [updateShape, setStage]);
+
+    const handleMouseUp = useCallback(() => {
+        if (isPanningRef.current) {
+            isPanningRef.current = false;
+            const stageNode = stageRef.current;
+            if (stageNode) stageNode.container().style.cursor = 'grab';
+            return;
+        }
+        if (isDrawingRef.current) {
+            isDrawingRef.current = false;
+            const currentShapes = shapesRef.current;
+            if (!currentShapes) return;
+
+            const lastShape = currentShapes[currentShapes.length - 1];
+            if (lastShape) {
+                if ((lastShape.type === 'circle' && lastShape.radius === 0) || (lastShape.type === 'rect' && (lastShape.width === 0 || lastShape.height === 0))) {
+                    removeShape(lastShape.id);
+                } else {
+                    saveHistory(currentShapes);
+                    setSelectedId(lastShape.id);
+                    setTool('select');
+                }
+            }
+        }
+    }, [removeShape, saveHistory, setTool, setSelectedId, stageRef]);
+
+    return {
+        handleMouseDown,
+        handleMouseMove,
+        handleMouseUp,
+        handleDelete,
+        handleCopy,
+        handlePaste,
+        handleCut
+    };
+};

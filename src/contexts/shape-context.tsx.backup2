@@ -1,0 +1,115 @@
+import React, { createContext, useState, useContext, useCallback, ReactNode } from 'react';
+import type Konva from "konva";
+
+// --- Type Definitions ---
+export interface BaseShape {
+    id: string;
+    type: 'rect' | 'circle' | 'line' | 'image';
+}
+export type RectShape = Omit<Konva.RectConfig, 'id'> & BaseShape & { type: 'rect' };
+export type CircleShape = Omit<Konva.CircleConfig, 'id'> & BaseShape & { type: 'circle' };
+export type LineShape = Omit<Konva.LineConfig, 'id'> & BaseShape & { type: 'line' };
+export type ImageShape = Omit<Konva.ImageConfig, 'id' | 'crop'> & BaseShape & {
+    type: 'image';
+    crop?: { x: number; y: number; width: number; height: number };
+};
+export type KonvaShape = RectShape | CircleShape | LineShape | ImageShape;
+type ShapeCreationData = Omit<KonvaShape, 'id'>;
+
+// --- Context Type ---
+interface KonvaShapeContextType {
+    shapes: KonvaShape[];
+    selectedShape: KonvaShape | null; // 선택된 도형 객체
+    setSelectedShapeId: (id: string | null) => void; // 선택을 설정/해제하는 함수
+    addShape: (shapeData: ShapeCreationData, callback?: (updatedShapes: KonvaShape[]) => void) => void;
+    addShapeToBack: (shape: Omit<KonvaShape, 'id'>, callback: (updatedShapes: KonvaShape[]) => void) => void;
+    updateShape: (id: string, updatedProps: Partial<KonvaShape>, callback?: (updatedShapes: KonvaShape[]) => void) => void;
+    removeShape: (id: string, callback?: (updatedShapes: KonvaShape[]) => void) => void;
+    setAllShapes: (newShapes: KonvaShape[]) => void;
+}
+
+// --- Context Creation ---
+export const KonvaShapeContext = createContext<KonvaShapeContextType | undefined>(undefined);
+
+// --- Provider Component ---
+export const KonvaShapeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [shapes, setShapes] = useState<KonvaShape[]>([]);
+    const [selectedShape, setSelectedShape] = useState<KonvaShape | null>(null);
+
+    const setSelectedShapeId = useCallback((id: string | null) => {
+        const shape = shapes.find((s) => s.id === id) || null;
+        setSelectedShape(shape);
+    }, [shapes]);
+
+    const addShape = useCallback((shapeData: ShapeCreationData, callback?: (updatedShapes: KonvaShape[]) => void) => {
+        const newShape = { ...shapeData, id: crypto.randomUUID() } as KonvaShape;
+        setShapes((prev) => {
+            const newShapes = [...prev, newShape];
+            if (callback) setTimeout(() => callback(newShapes), 0);
+            return newShapes;
+        });
+    }, []);
+
+    const addShapeToBack = useCallback((shape: Omit<KonvaShape, 'id'>, callback: (updatedShapes: KonvaShape[]) => void) => {
+        const newShape = { ...shape, id: crypto.randomUUID() } as KonvaShape;
+        setShapes(prev => {
+            const updated = [newShape, ...prev];
+            if (callback) callback(updated);
+            return updated;
+        });
+    }, []);
+
+    const updateShape = useCallback((id: string, updatedProps: Partial<KonvaShape>, callback?: (updatedShapes: KonvaShape[]) => void) => {
+        setShapes((prev) => {
+            const newShapes = prev.map((s) => s.id === id ? { ...s, ...updatedProps } as KonvaShape : s);
+            // 만약 업데이트된 도형이 현재 선택된 도형이라면, 선택된 도형 상태도 업데이트합니다.
+            if (selectedShape?.id === id) {
+                setSelectedShape({ ...selectedShape, ...updatedProps });
+            }
+            if (callback) setTimeout(() => callback(newShapes), 0);
+            return newShapes;
+        });
+    }, [selectedShape]);
+
+    const removeShape = useCallback((id: string, callback?: (updatedShapes: KonvaShape[]) => void) => {
+        setShapes((prev) => {
+            const newShapes = prev.filter((s) => s.id !== id);
+            if (selectedShape?.id === id) {
+                setSelectedShape(null); // 삭제된 도형이면 선택 해제
+            }
+            if (callback) setTimeout(() => callback(newShapes), 0);
+            return newShapes;
+        });
+    }, [selectedShape]);
+
+    const setAllShapes = useCallback((newShapes: KonvaShape[]) => {
+        setShapes(newShapes);
+        setSelectedShape(null); // 전체 도형이 바뀌면 선택 해제
+    }, []);
+
+    const contextValue: KonvaShapeContextType = {
+        shapes,
+        selectedShape,
+        setSelectedShapeId,
+        addShape,
+        addShapeToBack,
+        updateShape,
+        removeShape,
+        setAllShapes,
+    };
+
+    return (
+        <KonvaShapeContext.Provider value={contextValue}>
+            {children}
+        </KonvaShapeContext.Provider>
+    );
+};
+
+// --- Hook ---
+export const useShapeContext = () => {
+    const context = useContext(KonvaShapeContext);
+    if (context === undefined) {
+        throw new Error('useKonvaShapes must be used within a KonvaShapeProvider');
+    }
+    return context;
+};

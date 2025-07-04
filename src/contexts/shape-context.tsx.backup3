@@ -1,0 +1,104 @@
+import React, { createContext, useState, useContext, useCallback, ReactNode } from 'react';
+import type Konva from "konva";
+
+// --- Type Definitions ---
+export interface BaseShape {
+    id: string;
+    type: 'rect' | 'circle' | 'line' | 'image';
+}
+export type RectShape = Omit<Konva.RectConfig, 'id'> & BaseShape & { type: 'rect' };
+export type CircleShape = Omit<Konva.CircleConfig, 'id'> & BaseShape & { type: 'circle' };
+export type LineShape = Omit<Konva.LineConfig, 'id'> & BaseShape & { type: 'line' };
+export type ImageShape = Omit<Konva.ImageConfig, 'id' | 'crop'> & BaseShape & {
+    type: 'image';
+    crop?: { x: number; y: number; width: number; height: number };
+};
+export type KonvaShape = RectShape | CircleShape | LineShape | ImageShape;
+type ShapeCreationData = Omit<KonvaShape, 'id'>;
+
+// --- Context Type ---
+interface KonvaShapeContextType {
+    shapes: KonvaShape[];
+    selectedShapeIds: string[]; // Changed from selectedShape
+    setSelectedShapeIds: (ids: string[]) => void; // Changed from setSelectedShapeId
+    addShape: (shapeData: ShapeCreationData, callback?: (updatedShapes: KonvaShape[]) => void) => void;
+    addShapeToBack: (shape: Omit<KonvaShape, 'id'>, callback: (updatedShapes: KonvaShape[]) => void) => void;
+    updateShape: (id: string, updatedProps: Partial<KonvaShape>, callback?: (updatedShapes: KonvaShape[]) => void) => void;
+    removeShapes: (ids: string[], callback?: (updatedShapes: KonvaShape[]) => void) => void; // Changed from removeShape
+    setAllShapes: (newShapes: KonvaShape[]) => void;
+}
+
+// --- Context Creation ---
+export const KonvaShapeContext = createContext<KonvaShapeContextType | undefined>(undefined);
+
+// --- Provider Component ---
+export const KonvaShapeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [shapes, setShapes] = useState<KonvaShape[]>([]);
+    const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
+
+    const addShape = useCallback((shapeData: ShapeCreationData, callback?: (updatedShapes: KonvaShape[]) => void) => {
+        const newShape = { ...shapeData, id: crypto.randomUUID() } as KonvaShape;
+        setShapes((prev) => {
+            const newShapes = [...prev, newShape];
+            if (callback) setTimeout(() => callback(newShapes), 0);
+            return newShapes;
+        });
+    }, []);
+
+    const addShapeToBack = useCallback((shape: Omit<KonvaShape, 'id'>, callback: (updatedShapes: KonvaShape[]) => void) => {
+        const newShape = { ...shape, id: crypto.randomUUID() } as KonvaShape;
+        setShapes(prev => {
+            const updated = [newShape, ...prev];
+            if (callback) callback(updated);
+            return updated;
+        });
+    }, []);
+
+    const updateShape = useCallback((id: string, updatedProps: Partial<KonvaShape>, callback?: (updatedShapes: KonvaShape[]) => void) => {
+        setShapes((prev) => {
+            const newShapes = prev.map((s) => s.id === id ? { ...s, ...updatedProps } as KonvaShape : s);
+            if (callback) setTimeout(() => callback(newShapes), 0);
+            return newShapes;
+        });
+    }, []);
+
+    const removeShapes = useCallback((ids: string[], callback?: (updatedShapes: KonvaShape[]) => void) => {
+        setShapes((prev) => {
+            const newShapes = prev.filter((s) => !ids.includes(s.id));
+            setSelectedShapeIds([]); // Clear selection after removing
+            if (callback) setTimeout(() => callback(newShapes), 0);
+            return newShapes;
+        });
+    }, []);
+
+    const setAllShapes = useCallback((newShapes: KonvaShape[]) => {
+        setShapes(newShapes);
+        setSelectedShapeIds([]); // Clear selection on loading new project
+    }, []);
+
+    const contextValue: KonvaShapeContextType = {
+        shapes,
+        selectedShapeIds,
+        setSelectedShapeIds,
+        addShape,
+        addShapeToBack,
+        updateShape,
+        removeShapes,
+        setAllShapes,
+    };
+
+    return (
+        <KonvaShapeContext.Provider value={contextValue}>
+            {children}
+        </KonvaShapeContext.Provider>
+    );
+};
+
+// --- Hook ---
+export const useShapeContext = () => {
+    const context = useContext(KonvaShapeContext);
+    if (context === undefined) {
+        throw new Error('useKonvaShapes must be used within a KonvaShapeProvider');
+    }
+    return context;
+};

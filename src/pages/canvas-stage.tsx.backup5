@@ -1,0 +1,220 @@
+'use client';
+
+import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { Stage, Layer, Rect, Transformer } from 'react-konva';
+import type Konva from 'konva';
+
+import { useShapeContext, KonvaShape, RectShape, CircleShape, ImageShape } from '@/contexts/shape-context';
+import { useHistory } from '@/contexts/history-context';
+import { useTool } from '@/contexts/tool-context';
+import { useCanvasView } from '@/hooks/use-canvas-view';
+import { useCanvasInteractions } from '@/hooks/use-canvas-interactions';
+import { useSettings } from '@/contexts/settings-context';
+import { useGrid } from '@/hooks/use-grid';
+
+import { TransformableRectangle } from '@/components/shapes/transformable-rect';
+import { TransformableCircle } from '@/components/shapes/transformable-circle';
+import { TransformableImage } from "@/components/shapes/transformable-image";
+import { GCodeSettingsDialog } from "@/components/gcode/gcode-settings-dialog";
+import { Toolbar } from "@/components/tool/toolbar";
+
+export default function CanvasStage() {
+    const { shapes, selectedShapeIds, setSelectedShapeIds, updateShape } = useShapeContext();
+    const { saveHistory, undo, redo } = useHistory();
+    const { tool } = useTool();
+    const stageRef = useRef<Konva.Stage>(null);
+    const transformerRef = useRef<Konva.Transformer>(null);
+    const cropTransformerRef = useRef<Konva.Transformer>(null);
+    const selectionRectRef = useRef<Konva.Rect>(null);
+    const cropRectRef = useRef<Konva.Rect>(null);
+    const shapeNodesRef = useRef<Map<string, Konva.Shape>>(new Map());
+
+    const { isGridVisible, gridSize } = useSettings();
+    const { stage, setStage, canvasSize, handleWheel } = useCanvasView();
+    const gridLayer = useGrid(stage, gridSize, canvasSize);
+    const [isGCodeDialogOpen, setGCodeDialogOpen] = useState(false);
+
+    const selectedShape = shapes.find(s => s.id === selectedShapeIds[0]);
+
+    useEffect(() => {
+        const selectedNodes = selectedShapeIds.map(id => shapeNodesRef.current.get(id)!).filter(Boolean);
+        const isImageSelected = selectedShapeIds.length === 1 && selectedShape?.type === 'image';
+
+        const tr1 = transformerRef.current;
+        const tr2 = cropTransformerRef.current;
+
+        if (isImageSelected) {
+            if (tr1) tr1.nodes([]);
+            if (tr2 && cropRectRef.current) {
+                tr2.nodes([cropRectRef.current]);
+                const imageNode = shapeNodesRef.current.get(selectedShape.id) as Konva.Image;
+                if (imageNode) {
+                    const { x, y, width, height } = imageNode.getClientRect();
+                    cropRectRef.current?.setAttrs({ x, y, width, height, visible: true });
+                }
+            }
+        } else {
+            if (tr1) tr1.nodes(selectedNodes);
+            if (tr2) tr2.nodes([]);
+            if (cropRectRef.current) cropRectRef.current.visible(false);
+        }
+        
+        requestAnimationFrame(() => {
+            tr1?.getLayer()?.batchDraw();
+            tr2?.getLayer()?.batchDraw();
+        });
+
+    }, [selectedShapeIds, selectedShape]);
+
+    const {
+        handleMouseDown,
+        handleMouseMove,
+        handleMouseUp,
+        handleDragStart,
+        handleDragEnd,
+        handleDelete,
+        handleCopy,
+        handlePaste,
+        handleCut,
+        handleContextMenu,
+        handleTransformStart,
+        handleTransform,
+        handleTransformEnd,
+    } = useCanvasInteractions(stageRef, setStage, selectionRectRef, transformerRef, shapeNodesRef);
+
+    const handleSelect = useCallback((e: Konva.KonvaEventObject<MouseEvent>, id: string) => {
+        if (tool !== 'select') return;
+        
+        const isShiftPressed = e.evt.shiftKey;
+        const isSelected = selectedShapeIds.includes(id);
+
+        if (isShiftPressed) {
+            if (isSelected) {
+                setSelectedShapeIds(selectedShapeIds.filter((selectedId) => selectedId !== id));
+            } else {
+                setSelectedShapeIds([...selectedShapeIds, id]);
+            }
+        } else {
+            if (!isSelected) {
+                setSelectedShapeIds([id]);
+            }
+        }
+    }, [tool, selectedShapeIds, setSelectedShapeIds]);
+
+    const handleShapeChange = useCallback((id: string, newAttrs: Partial<KonvaShape>) => {
+        updateShape(id, newAttrs, saveHistory);
+    }, [updateShape, saveHistory]);
+
+    const onCropTransform = () => {
+        const cropNode = cropRectRef.current;
+        const imageNode = shapeNodesRef.current.get(selectedShapeIds[0]) as Konva.Image;
+        if (!cropNode || !imageNode) return;
+
+        const { x, y, width, height } = cropNode.attrs;
+        const scaleX = imageNode.scaleX();
+        const scaleY = imageNode.scaleY();
+
+        const crop = {
+            x: (x - imageNode.x()) / scaleX,
+            y: (y - imageNode.y()) / scaleY,
+            width: width / scaleX,
+            height: height / scaleY,
+        };
+        imageNode.crop(crop);
+    };
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+            const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+            if (e.key === 'Delete' || e.key === 'Backspace') handleDelete();
+            else if (isCtrlOrCmd && e.key.toLowerCase() === 'c') handleCopy();
+            else if (isCtrlOrCmd && e.key.toLowerCase() === 'v') handlePaste();
+            else if (isCtrlOrCmd && e.key.toLowerCase() === 'x') handleCut();
+            else if (isCtrlOrCmd && e.key.toLowerCase() === 'z') undo();
+            else if (isCtrlOrCmd && e.key.toLowerCase() === 'y') redo();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleDelete, handleCopy, handlePaste, handleCut, undo, redo]);
+
+    return (
+        <div className="flex h-screen">
+            <Toolbar onGenerateGCode={() => setGCodeDialogOpen(true)} />
+            <div className="flex-1">
+                <Stage
+                    ref={stageRef}
+                    width={canvasSize.width}
+                    height={canvasSize.height}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onWheel={handleWheel}
+                    onContextMenu={handleContextMenu}
+                    x={stage.x}
+                    y={stage.y}
+                    scaleX={stage.scale}
+                    scaleY={stage.scale}
+                >
+                    <Layer>
+                        <Rect x={-stage.x / stage.scale} y={-stage.y / stage.scale} width={canvasSize.width / stage.scale} height={canvasSize.height / stage.scale} fill="#f0f0f0" listening={false} />
+                    </Layer>
+                    {isGridVisible && gridLayer}
+                    <Layer>
+                        {shapes.map((shape) => {
+                            const isSelected = selectedShapeIds.includes(shape.id);
+                            const commonProps = {
+                                key: shape.id,
+                                shapeProps: shape,
+                                isSelected: isSelected,
+                                onSelect: (e: Konva.KonvaEventObject<MouseEvent>) => handleSelect(e, shape.id),
+                                onNodeRef: (node: Konva.Shape) => {
+                                    if (node) shapeNodesRef.current.set(shape.id, node);
+                                    else shapeNodesRef.current.delete(shape.id);
+                                },
+                                onDragStart: handleDragStart,
+                                onDragEnd: handleDragEnd,
+                            };
+
+                            switch (shape.type) {
+                                case 'rect': return <TransformableRectangle {...commonProps} />;
+                                case 'circle': return <TransformableCircle {...commonProps} />;
+                                case 'image': return <TransformableImage {...commonProps} />;
+                                default: return null;
+                            }
+                        })}
+                        <Transformer ref={transformerRef} onTransformEnd={(e) => handleTransformEnd(e.target.nodes())} />
+                        <Rect ref={selectionRectRef} fill="rgba(0,0,255,0.2)" stroke="blue" strokeWidth={1} dash={[4, 2]} visible={false} />
+                        <Rect ref={cropRectRef} visible={false} stroke="blue" strokeWidth={2} dash={[4, 2]} draggable onDragEnd={(e) => handleTransformEnd(cropTransformerRef)} />
+                        <Transformer
+                            ref={cropTransformerRef}
+                            onTransformStart={handleTransformStart}
+                            onTransform={onCropTransform}
+                            onTransformEnd={() => handleTransformEnd(cropTransformerRef)}
+                            anchorStyleFunc={(anchor) => {
+                                const name = anchor.name();
+                                if (name.includes('center') || name.includes('middle')) {
+                                    anchor.width(name.includes('center') ? 20 : 8);
+                                    anchor.height(name.includes('middle') ? 20 : 8);
+                                    anchor.offsetX(name.includes('center') ? 10 : 4);
+                                    anchor.offsetY(name.includes('middle') ? 10 : 4);
+                                } else {
+                                    anchor.width(10);
+                                    anchor.height(10);
+                                    anchor.offsetX(5);
+                                    anchor.offsetY(5);
+                                }
+                                return anchor;
+                            }}
+                        />
+                    </Layer>
+                </Stage>
+            </div>
+            <GCodeSettingsDialog
+                isOpen={isGCodeDialogOpen}
+                onClose={() => setGCodeDialogOpen(false)}
+            />
+        </div>
+    );
+}

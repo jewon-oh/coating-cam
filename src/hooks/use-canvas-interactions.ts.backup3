@@ -1,0 +1,222 @@
+import React, { useRef, useCallback, useEffect } from 'react';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import type Konva from 'konva';
+import { KonvaShape, useShapeContext } from '@/contexts/shape-context';
+import { useHistory } from '@/contexts/history-context';
+import { useTool } from '@/contexts/tool-context';
+import { useToolActions } from './use-tool-actions';
+
+export const useCanvasInteractions = (
+    stageRef: React.RefObject<Konva.Stage>,
+    setStage: React.Dispatch<React.SetStateAction<{ scale: number; x: number; y: number }>>,
+    selectionRectRef: React.RefObject<Konva.Rect>
+) => {
+    const { shapes, addShape, updateShape, removeShapes, selectedShapeIds, setSelectedShapeIds } = useShapeContext();
+    const shapesRef = useRef<KonvaShape[]>();
+    shapesRef.current = shapes;
+
+    const { saveHistory } = useHistory();
+    const { tool, setTool } = useTool();
+    const { handleInsertImage } = useToolActions();
+
+    const isDrawingRef = useRef(false);
+    const isPanningRef = useRef(false);
+    const clipboardRef = useRef<KonvaShape[]>([]);
+    const mouseDownPos = useRef({ x: 0, y: 0 });
+    const lastPointerPosition = useRef({ x: 0, y: 0 });
+    const selectionStartPos = useRef({ x: 0, y: 0 });
+
+    useEffect(() => {
+        const stageNode = stageRef.current;
+        if (!stageNode) return;
+        const container = stageNode.container();
+        if (isPanningRef.current) {
+            container.style.cursor = 'grabbing';
+        } else {
+            switch (tool) {
+                case 'select': container.style.cursor = 'grab'; break;
+                case 'circle':
+                case 'rectangle': container.style.cursor = 'crosshair'; break;
+                case 'insert-image': container.style.cursor = 'copy'; break;
+                default: container.style.cursor = 'default';
+            }
+        }
+    }, [tool, stageRef, isPanningRef.current]);
+
+    const handleDelete = useCallback(() => {
+        if (selectedShapeIds.length === 0) return;
+        removeShapes(selectedShapeIds, (updatedShapes) => {
+            saveHistory(updatedShapes);
+        });
+    }, [selectedShapeIds, removeShapes, saveHistory]);
+
+    const handleCopy = useCallback(() => {
+        if (selectedShapeIds.length === 0) return;
+        const shapesToCopy = shapes.filter(shape => selectedShapeIds.includes(shape.id));
+        clipboardRef.current = shapesToCopy;
+    }, [selectedShapeIds, shapes]);
+
+    const handlePaste = useCallback(() => {
+        if (clipboardRef.current.length === 0) return;
+        const newShapes = clipboardRef.current.map(shape => ({
+            ...shape,
+            id: crypto.randomUUID(),
+            x: shape.x + 20,
+            y: shape.y + 20,
+        }));
+        
+        let currentShapes = shapesRef.current || [];
+        newShapes.forEach(shape => {
+            addShape(shape, (updated) => {
+                currentShapes = updated;
+            });
+        });
+
+        setTimeout(() => {
+            saveHistory(currentShapes);
+            setSelectedShapeIds(newShapes.map(s => s.id));
+        }, 100);
+
+    }, [addShape, saveHistory, setSelectedShapeIds]);
+
+    const handleCut = useCallback(() => {
+        handleCopy();
+        handleDelete();
+    }, [handleCopy, handleDelete]);
+
+    const getRelativePointerPosition = (stage: Konva.Stage) => {
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return null;
+        const transform = stage.getAbsoluteTransform().copy();
+        transform.invert();
+        return transform.point(pointer);
+    };
+
+    const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        const stageNode = stageRef.current;
+        if (!stageNode) return;
+
+        // Right-click for panning
+        if (e.evt.button === 2) {
+            isPanningRef.current = true;
+            lastPointerPosition.current = stageNode.getPointerPosition() || { x: 0, y: 0 };
+            stageNode.container().style.cursor = 'grabbing';
+            return;
+        }
+
+        if (e.target !== stageNode) {
+            return;
+        }
+
+        const pos = getRelativePointerPosition(stageNode);
+        if (!pos) return;
+
+        switch (tool) {
+            case 'select':
+                selectionStartPos.current = pos;
+                selectionRectRef.current?.visible(true);
+                selectionRectRef.current?.width(0);
+                selectionRectRef.current?.height(0);
+                break;
+            case 'insert-image':
+                handleInsertImage();
+                setTool('select');
+                break;
+            case 'circle':
+            case 'rectangle':
+                isDrawingRef.current = true;
+                mouseDownPos.current = pos;
+                const commonProps = {
+                    x: pos.x, y: pos.y, fill: 'rgba(59,130,246,0.2)', stroke: '#3b82f6', strokeWidth: 2, draggable: true,
+                };
+                if (tool === 'circle') addShape({ type: 'circle', radius: 0, ...commonProps });
+                else addShape({ type: 'rect', width: 0, height: 0, ...commonProps });
+                break;
+        }
+    }, [tool, addShape, handleInsertImage, setTool, selectionRectRef, stageRef]);
+
+    const handleMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        const stageNode = stageRef.current;
+        if (!stageNode) return;
+
+        if (isPanningRef.current) {
+            const newPointerPos = stageNode.getPointerPosition();
+            if (!newPointerPos) return;
+            const dx = newPointerPos.x - lastPointerPosition.current.x;
+            const dy = newPointerPos.y - lastPointerPosition.current.y;
+            setStage(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+            lastPointerPosition.current = newPointerPos;
+            return;
+        }
+
+        const pos = getRelativePointerPosition(stageNode);
+        if (!pos) return;
+
+        if (selectionRectRef.current?.visible()) {
+            const { x, y } = selectionStartPos.current;
+            selectionRectRef.current.setAttrs({
+                x: Math.min(x, pos.x),
+                y: Math.min(y, pos.y),
+                width: Math.abs(pos.x - x),
+                height: Math.abs(pos.y - y),
+            });
+        } else if (isDrawingRef.current) {
+            const currentShapes = shapesRef.current;
+            if (!currentShapes || currentShapes.length === 0) return;
+            const lastShape = currentShapes[currentShapes.length - 1];
+            if (!lastShape) return;
+
+            if (lastShape.type === 'circle') {
+                const newRadius = Math.hypot(pos.x - mouseDownPos.current.x, pos.y - mouseDownPos.current.y);
+                updateShape(lastShape.id, { radius: newRadius });
+            } else if (lastShape.type === 'rect') {
+                const newWidth = pos.x - mouseDownPos.current.x;
+                const newHeight = pos.y - mouseDownPos.current.y;
+                updateShape(lastShape.id, {
+                    x: newWidth < 0 ? pos.x : mouseDownPos.current.x,
+                    y: newHeight < 0 ? pos.y : mouseDownPos.current.y,
+                    width: Math.abs(newWidth),
+                    height: Math.abs(newHeight),
+                });
+            }
+        }
+    }, [updateShape, setStage, selectionRectRef]);
+
+    const handleMouseUp = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        if (isPanningRef.current && e.evt.button === 2) {
+            isPanningRef.current = false;
+            const stageNode = stageRef.current;
+            if (stageNode) stageNode.container().style.cursor = 'grab';
+            return;
+        }
+
+        if (selectionRectRef.current?.visible()) {
+            const selBox = selectionRectRef.current.getClientRect();
+            const selected = shapes.filter((shape) =>
+                Konva.Util.haveIntersection(selBox, (stageRef.current?.findOne('#' + shape.id) as Konva.Shape).getClientRect())
+            );
+            setSelectedShapeIds(selected.map((s) => s.id));
+            selectionRectRef.current.visible(false);
+        } else if (isDrawingRef.current) {
+            isDrawingRef.current = false;
+            const currentShapes = shapesRef.current;
+            if (!currentShapes) return;
+            const lastShape = currentShapes[currentShapes.length - 1];
+            if (lastShape) {
+                if ((lastShape.type === 'circle' && lastShape.radius === 0) || (lastShape.type === 'rect' && (lastShape.width === 0 || lastShape.height === 0))) {
+                    removeShapes([lastShape.id]);
+                } else {
+                    saveHistory(currentShapes);
+                    setSelectedShapeIds([lastShape.id]);
+                    setTool('select');
+                }
+            }
+        }
+    }, [shapes, removeShapes, saveHistory, setTool, setSelectedShapeIds, selectionRectRef, stageRef]);
+
+    const handleContextMenu = useCallback((e: Konva.KonvaEventObject<PointerEvent>) => {
+        e.evt.preventDefault();
+    }, []);
+
+    return { handleMouseDown, handleMouseMove, handleMouseUp, handleDelete, handleCopy, handlePaste, handleCut, handleContextMenu };
+};
