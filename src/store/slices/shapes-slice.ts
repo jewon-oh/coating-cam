@@ -1,0 +1,187 @@
+import {createSelector, createSlice, PayloadAction} from '@reduxjs/toolkit';
+import {AnyNodeConfig} from '@/types/custom-konva-config';
+
+interface ShapesState {
+    shapes: AnyNodeConfig[];      // 모든 도형들
+    selectedShapeIds: string[];       // 선택된 도형 ID들
+    isGroupSelected: boolean;         // 그룹 선택 여부
+    lastUpdateTimestamp: number;      // 성능 최적화용 캐시
+}
+
+const initialState: ShapesState = {
+    shapes: [],
+    selectedShapeIds: [],
+    isGroupSelected: false,
+    lastUpdateTimestamp: Date.now(),
+};
+
+// Selectors for better performance
+export const selectShapes = (state: { shapes: ShapesState }) => state.shapes.shapes;
+export const selectSelectedShapeIds = (state: { shapes: ShapesState }) => state.shapes.selectedShapeIds;
+
+// 기존 SerializableShapePayload 유지...
+interface SerializableShapePayload extends Omit<AnyNodeConfig, 'image'> {
+    imageDataUrl?: string;
+}
+
+const shapesSlice = createSlice({
+    name: 'shapes',
+    initialState,
+    reducers: {
+        // addShape: Object.assign으로 배열 교체 금지 → push 사용
+        addShape: (state, action: PayloadAction<SerializableShapePayload>) => {
+            // shapes 안에 있는 같은 타입의 shape 개수를 세어 이름에 사용
+            const sameTypeCount = state.shapes.filter(s => s.type === action.payload.type).length;
+            const newShape: AnyNodeConfig = {
+                ...action.payload,
+                type: action.payload.type,
+                id: action.payload.id,
+                parentId: action.payload.parentId,
+                name: `${action.payload.type} #${sameTypeCount + 1}`,
+                listening: action.payload.listening ?? false,
+                x: action.payload.x ?? 0,
+                y: action.payload.y ?? 0,
+            };
+            Object.assign(state, {
+                shapes: [...state.shapes, newShape]
+            });
+
+            // state.shapes.push(newShape);
+        },
+
+        // addShapeToBack: 배열 맨 앞에 추가 → unshift 사용
+        addShapeToBack: (state, action: PayloadAction<SerializableShapePayload>) => {
+            const sameTypeCount = state.shapes.filter(s => s.type === action.payload.type).length;
+            const newShape: AnyNodeConfig = {
+                ...action.payload,
+                type: action.payload.type,
+                id: action.payload.id,
+                parentId: action.payload.parentId,
+                name: `${action.payload.type} #${sameTypeCount + 1}`,
+                listening: action.payload.listening ?? false,
+                x: action.payload.x ?? 0,
+                y: action.payload.y ?? 0,
+            };
+            Object.assign(state, {
+                shapes: [newShape, ...state.shapes]
+            });
+
+            // state.shapes.unshift(newShape);
+        },
+
+        // updateShape는 Immer가 있으니 현재 형태 유지 가능
+        updateShape: (state, action: PayloadAction<{ id: string; updatedProps: Partial<AnyNodeConfig> }>) => {
+            const index = state.shapes.findIndex(s => s.id === action.payload.id);
+            if (index !== -1) {
+                Object.assign(state.shapes[index], {...state.shapes[index], ...action.payload.updatedProps});
+                // state.shapes[index] = { ...state.shapes[index], ...action.payload.updatedProps };
+            }
+        },
+        // 배치 작업을 위한 새 리듀서
+        batchUpdateShapes: (state, action: PayloadAction<Array<{ id: string; props: Partial<AnyNodeConfig> }>>) => {
+            const updateMap = new Map(action.payload.map(update => [update.id, update.props]));
+
+            Object.assign(state, {
+                shapes: state.shapes.map(shape => {
+                    const update = updateMap.get(shape.id!);
+                    return update ? {...shape, ...update} : shape;
+                }),
+                lastUpdateTimestamp: Date.now()
+            });
+
+            // state.shapes = state.shapes.map(shape => {
+            //     const update = updateMap.get(shape.id!);
+            //     return update ? { ...shape, ...update } : shape;
+            // });
+            // state.lastUpdateTimestamp = Date.now();
+        },
+        updateMultipleShapes: (state, action: PayloadAction<{ id: string; props: Partial<AnyNodeConfig> }[]>) => {
+            // action.payload.forEach(update => {
+            //     const index = state.shapes.findIndex(s => s.id === update.id);
+            //     if (index !== -1) {
+            //         state.shapes[index] = { ...state.shapes[index], ...update.props };
+            //     }
+            // });
+            const updateMap = new Map(action.payload.map(update => [update.id, update.props]));
+
+            Object.assign(state, {
+                shapes: state.shapes.map(shape => {
+                    const update = updateMap.get(shape.id!);
+                    return update ? {...shape, ...update} : shape;
+                })
+            });
+
+        },
+        removeShapes: (state, action: PayloadAction<string[]>) => {
+            state.shapes = state.shapes.filter(s => !action.payload.includes(s.id || ''));
+            state.selectedShapeIds = [];
+            state.isGroupSelected = false;
+        },
+        setAllShapes: (state, action: PayloadAction<AnyNodeConfig[]>) => {
+            Object.assign(state, {
+                shapes: action.payload.map((s, i) => ({
+                    ...s,
+                    name: s.name || `${s.type || 'Shape'} #${i + 1}`,
+                    visible: s.visible ?? true,
+                    listening: s.listening ?? false,
+                })),
+                selectedShapeIds: [],
+                isGroupSelected: false
+            });
+
+            // state.shapes = action.payload.map((s, i) => ({
+            //     ...s,
+            //     name: s.name || `${s.type || 'Shape'} #${i + 1}`,
+            //     visible: s.visible ?? true,
+            //     listening: s.listening ?? false,
+            // }));
+            // state.selectedShapeIds = [];
+            // state.isGroupSelected = false;
+        },
+        selectShape: (state, action: PayloadAction<string>) => {
+            state.selectedShapeIds = [action.payload];
+            state.isGroupSelected = false;
+        },
+        selectGroup: (state, action: PayloadAction<string[]>) => {
+            state.selectedShapeIds = action.payload;
+            state.isGroupSelected = true;
+        },
+        unselectShape: (state, action: PayloadAction<string>) => {
+            state.selectedShapeIds = state.selectedShapeIds.filter(id => id !== action.payload);
+        },
+        unselectAllShapes: (state) => {
+            state.selectedShapeIds = [];
+            state.isGroupSelected = false;
+        },
+        toggleShapeVisibility: (state, action: PayloadAction<string>) => {
+            const shape = state.shapes.find(s => s.id === action.payload);
+            if (shape) {
+                shape.visible = !(shape.visible ?? true);
+            }
+        },
+        toggleShapeLock: (state, action: PayloadAction<string>) => {
+            const shape = state.shapes.find(s => s.id === action.payload);
+            if (shape) {
+                shape.listening = !(shape.listening ?? false);
+            }
+        },
+    },
+});
+
+export const {
+    addShape,
+    addShapeToBack,
+    updateShape,
+    batchUpdateShapes,
+    updateMultipleShapes,
+    removeShapes,
+    setAllShapes,
+    selectShape,
+    selectGroup,
+    unselectShape,
+    unselectAllShapes,
+    toggleShapeVisibility,
+    toggleShapeLock,
+} = shapesSlice.actions;
+
+export default shapesSlice.reducer;

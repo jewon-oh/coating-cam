@@ -1,1 +1,1 @@
-export type Tool = 'select' | 'circle' | 'rectangle' | 'insert-image';
+export type Tool = 'select' | 'circle' | 'rectangle' ;

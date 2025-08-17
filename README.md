@@ -1,40 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
 
-## Getting Started
 
-First, run the development server:
+# Image to G-code 변환기
 
+## 프로젝트 개요
+
+이 프로젝트는 사용자가 이미지를 업로드하고, 캔버스 위에서 다양한 도형을 사용하여 마스킹 영역을 지정한 후, 이를 기반으로 G-코드를 생성할 수 있도록 돕는 웹 기반 애플리케이션입니다. 생성된 G-코드는 CNC 라우터나 3D 프린터와 같은 장비에서 활용될 수 있습니다. 사용자 친화적인 인터페이스를 통해 이미지 처리 및 G-코드 생성 과정을 시각적으로 쉽게 제어할 수 있도록 설계되었습니다.
+
+## 시작하기
+
+이 프로젝트를 로컬 환경에서 실행하려면 다음 단계를 따르세요.
+
+### 🛠️ 설치
+
+1.  저장소를 클론합니다:
+    ```bash
+    git clone [저장소_URL]
+    cd image-to-gcode
+    ```
+2.  의존성을 설치합니다:
+    ```bash
+    yarn install
+    # 또는 npm install
+    ```
+
+### 🚀 실행
+
+개발 서버를 시작합니다:
 ```bash
-npm run dev
-# or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 또는 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 엽니다.
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+### 🧪 테스트
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+프로젝트의 모든 테스트를 실행하려면 다음 명령어를 사용합니다:
+```bash
+yarn preflight
+```
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+이 명령어는 빌드, 테스트, 타입 체크, 린트 검사를 모두 수행합니다.
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 기능 목록
 
-## Learn More
+### ✅ 구현된 기능
 
-To learn more about Next.js, take a look at the following resources:
+- [x] **이미지 업로드 및 미리보기**: 사용자가 이미지를 업로드하고 캔버스에서 미리 볼 수 있습니다.
+- [x] **도형 추가 및 조작**: 사각형, 원과 같은 도형을 캔버스에 추가하고 이동, 크기 조절, 회전 등의 변형을 할 수 있습니다.
+- [x] **마스킹 기능**: 특정 영역을 마스킹하여 G-코드 생성 시 해당 영역을 피하거나 Z축을 들어 올리도록 설정할 수 있습니다.
+- [x] **G-코드 설정**: 노즐 직경, 채우기 간격, 이송 속도, 작업 속도, 안전 높이, 작업 높이 등 G-코드 생성에 필요한 다양한 설정을 조절할 수 있습니다.
+- [x] **G-코드 생성 및 다운로드**: 설정된 이미지와 마스킹 도형을 기반으로 G-코드를 생성하고 `.gcode` 파일로 다운로드할 수 있습니다.
+- [x] **실행 취소/다시 실행**: 작업 내역을 관리하여 실행 취소 및 다시 실행 기능을 제공합니다.
+- [x] **파일 저장/불러오기**: 현재 캔버스 상태(도형, 설정 등)를 JSON 파일로 저장하고 불러올 수 있습니다.
+- [x] **격자 및 스냅 기능**: 캔버스에 격자를 표시하고, 도형을 이동하거나 크기 조절 시 격자에 스냅되도록 설정할 수 있습니다.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+### 🚧 구현 예정 기능
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [ ] **다양한 도형 지원**: 현재 사각형과 원만 지원하며, 향후 다각형, 자유 곡선(펜 툴), 텍스트 등 더 다양한 도형을 추가할 예정입니다.
+- [ ] **G-코드 미리보기**: 생성된 G-코드를 캔버스에서 시뮬레이션하여 공구 경로를 시각적으로 확인할 수 있는 기능을 추가할 예정입니다. 이를 통해 사용자는 실제 장비에서 실행하기 전에 G-코드의 정확성을 검증할 수 있습니다.
+- [ ] **레이어 관리**: 캔버스에 추가된 도형들의 레이어를 시각적으로 관리하고, 각 레이어의 순서 변경, 가시성 토글, 잠금/잠금 해제 등의 기능을 제공할 예정입니다.
+- [ ] **성능 최적화**: 대용량 이미지 처리 및 복잡한 도형이 많아질 경우 발생할 수 있는 성능 저하를 개선하기 위한 최적화 작업을 진행할 예정입니다. (예: 가상화, Web Workers 활용)
+- [ ] **사용자 인터페이스 개선**: 전반적인 UI/UX를 개선하여 사용자가 더욱 직관적이고 편리하게 애플리케이션을 사용할 수 있도록 할 예정입니다. (예: 속성 패널, 컨텍스트 메뉴 확장)
+- [ ] **G-코드 고급 설정**: G-코드 생성 시 윤곽선(outline)만 생성하는 옵션, 다양한 채우기 패턴(예: 선, 교차선, 나선형) 등 고급 설정을 추가할 예정입니다.
+- [ ] **이미지 전처리**: 이미지의 명암, 대비, 임계값 조절 등 G-코드 생성 전에 이미지를 전처리할 수 있는 기능을 추가할 예정입니다.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.

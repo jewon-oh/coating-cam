@@ -110,7 +110,7 @@ Use functional components with Hooks: Do not generate class components or use ol
 
 Keep components pure and side-effect-free during rendering: Do not produce code that performs side effects (like subscriptions, network requests, or modifying external variables) directly inside the component's function body. Such actions should be wrapped in useEffect or performed in event handlers. Ensure your render logic is a pure function of props and state.
 
-Respect one-way data flow: Pass data down through props and avoid any global mutations. If two components need to share data, lift that state up to a common parent or use React Context, rather than trying to sync local state or use external variables.
+Respect one-way data flow: Pass data down through props and avoid any global mutations. If two components need to share data, skip that state up to a common parent or use React Context, rather than trying to sync local state or use external variables.
 
 Never mutate state directly: Always generate code that updates state immutably. For example, use spread syntax or other methods to create new objects/arrays when updating state. Do not use assignments like state.someValue = ... or array mutations like array.push() on state variables. Use the state setter (setState from useState, etc.) to update state.
 
@@ -147,3 +147,4 @@ Side effects should be isolated and dependencies clearly defined
 Comments policy
 Only write high-value comments if at all. Avoid talking to the user through comments.
 그리고 가능한 답변은 한국어로 한다.
+대화 시작전 모든 코드 베이스를 컨텍스트에 추가
