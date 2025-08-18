@@ -286,6 +286,30 @@ const shapesSlice = createSlice({
             });
         },
 
+        // 그룹 잠금 일괄 토글
+        toggleGroupLock: (state, action: PayloadAction<string>) => {
+            const groupId = action.payload;
+            const group = state.shapes.find(s => s.id === groupId && s.type === 'group');
+            if (!group) return;
+
+            const newLockState = !(group.listening ?? false);
+            const memberIds = state.shapes
+                .filter(s => s.parentId === groupId)
+                .map(s => s.id!)
+                .filter(Boolean);
+
+            // 그룹과 모든 멤버의 잠금 상태 일괄 변경
+            Object.assign(state, {
+                shapes: state.shapes.map(shape => {
+                    if (shape.id === groupId || memberIds.includes(shape.id!)) {
+                        return { ...shape, listening: newLockState };
+                    }
+                    return shape;
+                }),
+                lastUpdateTimestamp: Date.now()
+            });
+        },
+
     },
 });
 
@@ -307,6 +331,7 @@ export const {
     ungroupShapes,
     renameGroup,
     toggleGroupVisibility,
+    toggleGroupLock,
 
 } = shapesSlice.actions;
 

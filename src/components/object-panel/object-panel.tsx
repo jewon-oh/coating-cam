@@ -15,6 +15,10 @@ import {
     selectGroup,
     unselectAllShapes,
     setAllShapes,
+    ungroupShapes,
+    removeShapes,
+    toggleGroupVisibility,
+    toggleGroupLock,
 } from "@/store/slices/shapes-slice";
 import { setPresent } from "@/store/slices/history-slice";
 import type { AnyNodeConfig } from "@/types/custom-konva-config";
@@ -66,11 +70,6 @@ function useDebounced<T>(value: T, delay = 200) {
 }
 
 
-
-
-
-
-
 // -------------------------------------- 패널 본체 컴포넌트 --------------------------------------
 
 export function ObjectPanel() {
@@ -83,10 +82,24 @@ export function ObjectPanel() {
     const [openGroupIds, setOpenGroupIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
-        const next = new Set(openGroupIds);
-        shapes.forEach(s => { if (s.type === 'group' && s.id) next.add(s.id); });
-        if (next.size !== openGroupIds.size) setOpenGroupIds(next);
-    }, [shapes, openGroupIds]);
+        // 새로 생성된 그룹들만 자동으로 열기
+        const existingGroupIds = new Set([...openGroupIds]);
+        const currentGroupIds = new Set(shapes.filter(s => s.type === 'group' && s.id).map(s => s.id!));
+
+        // 새로 생성된 그룹 ID 찾기
+        const newGroupIds = [...currentGroupIds].filter(id => !existingGroupIds.has(id) && !openGroupIds.has(id));
+
+        if (newGroupIds.length > 0) {
+            setOpenGroupIds(prev => new Set([...prev, ...newGroupIds]));
+        }
+
+        // 삭제된 그룹 ID 제거
+        const validGroupIds = [...openGroupIds].filter(id => currentGroupIds.has(id));
+        if (validGroupIds.length !== openGroupIds.size) {
+            setOpenGroupIds(new Set(validGroupIds));
+        }
+    }, [shapes]); // openGroupIds 의존성 제거
+
 
     const panelRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -231,6 +244,64 @@ export function ObjectPanel() {
         debouncedUpdate({ id, patch });
     }, [debouncedUpdate]);
 
+    // Group item callbacks
+    const onUngroup = useCallback((groupId: string) => {
+        dispatch(ungroupShapes(groupId));
+        dispatch(setPresent(shapes.filter(s => s.id !== groupId).map(s => s.parentId === groupId ? { ...s, parentId: null } : s)));
+    }, [dispatch, shapes]);
+
+    const onDuplicate = useCallback((groupId: string) => {
+        const group = shapes.find(s => s.id === groupId && s.type === 'group');
+        const members = shapes.filter(s => s.parentId === groupId);
+        if (!group || !members.length) return;
+
+        const newGroupId = crypto.randomUUID();
+        const memberIdMap = new Map<string, string>();
+        
+        // Create new IDs for all members
+        members.forEach(member => {
+            memberIdMap.set(member.id!, crypto.randomUUID());
+        });
+
+        // Create duplicated group
+        const newGroup: AnyNodeConfig = {
+            ...group,
+            id: newGroupId,
+            name: `${group.name} 복사`,
+            x: (group.x || 0) + 20,
+            y: (group.y || 0) + 20,
+        };
+
+        // Create duplicated members
+        const newMembers = members.map(member => ({
+            ...member,
+            id: memberIdMap.get(member.id!)!,
+            parentId: newGroupId,
+            x: (member.x || 0) + 20,
+            y: (member.y || 0) + 20,
+        }));
+
+        const allNewShapes = [newGroup, ...newMembers];
+        dispatch(setAllShapes([...shapes, ...allNewShapes]));
+        dispatch(setPresent([...shapes, ...allNewShapes]));
+    }, [dispatch, shapes]);
+
+    const onDelete = useCallback((groupId: string) => {
+        const membersToDelete = shapes.filter(s => s.parentId === groupId).map(s => s.id!);
+        const allIdsToDelete = [groupId, ...membersToDelete];
+        dispatch(removeShapes(allIdsToDelete));
+        dispatch(setPresent(shapes.filter(s => !allIdsToDelete.includes(s.id!))));
+    }, [dispatch, shapes]);
+
+    // Group visibility and lock callbacks
+    const onToggleGroupVisibility = useCallback((groupId: string) => {
+        dispatch(toggleGroupVisibility(groupId));
+    }, [dispatch]);
+
+    const onToggleGroupLock = useCallback((groupId: string) => {
+        dispatch(toggleGroupLock(groupId));
+    }, [dispatch]);
+
     const processedIdsSet = useMemo(() => new Set(processedShapes.map(s => s.id!)), [processedShapes]);
     const childrenByParent = useMemo(() => {
         const m = new Map<string | null, AnyNodeConfig[]>();
@@ -252,16 +323,28 @@ export function ObjectPanel() {
                 return (
                     <div key={node.id} style={{ marginLeft: depth * 16 }}>
                         <GroupItem
-                            shape={node} isSelected={selectedShapeIds.includes(node.id!)} isOpen={isOpen}
+                            shape={node}
+                            isSelected={selectedShapeIds.includes(node.id!)}
+                            isOpen={isOpen}
+                            memberCount={children.length}
                             onToggleOpen={() => setOpenGroupIds(prev => {
                                 const next = new Set(prev);
                                 if (isOpen) next.delete(node.id!); else next.add(node.id!);
                                 return next;
                             })}
-                            onSelect={handleSelect} onPatch={onPatch}
-                        >
-                            {children.length > 0 && <div className="mt-1">{renderTreeNodes(children, depth + 1)}</div>}
-                        </GroupItem>
+                            onSelect={handleSelect}
+                            onPatch={onPatch}
+                            onUngroup={onUngroup}
+                            onDuplicate={onDuplicate}
+                            onDelete={onDelete}
+                            onToggleVisibility={onToggleGroupVisibility}
+                            onToggleLock={onToggleGroupLock}
+                        />
+                        {isOpen && children.length > 0 && (
+                            <div className="mt-1">
+                                {renderTreeNodes(children, depth + 1)}
+                            </div>
+                        )}
                     </div>
                 );
             }
@@ -275,8 +358,7 @@ export function ObjectPanel() {
                 </div>
             );
         });
-    }, [childrenByParent, handleSelect, onPatch, openItemId, selectedShapeIds, openGroupIds]);
-
+    }, [childrenByParent, handleSelect, onPatch, openItemId, selectedShapeIds, openGroupIds, onUngroup, onDuplicate, onDelete, onToggleGroupVisibility, onToggleGroupLock]);
     const panelWidthClass = panelCollapsed ? "w-16" : "w-80";
     const showContent = !panelCollapsed;
 

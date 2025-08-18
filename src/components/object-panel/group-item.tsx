@@ -43,6 +43,9 @@ interface GroupItemProps {
     onPatch: (id: string, patch: Partial<AnyNodeConfig>) => void;
     onUngroup?: (groupId: string) => void;
     onDuplicate?: (groupId: string) => void;
+    onDelete?: (groupId: string) => void;
+    onToggleVisibility?: (groupId: string) => void;
+    onToggleLock?: (groupId: string) => void;
     children?: React.ReactNode;
     depth?: number;
 }
@@ -57,7 +60,9 @@ export const GroupItem = memo<GroupItemProps>(({
                                                             onPatch,
                                                             onUngroup,
                                                             onDuplicate,
-                                                            children,
+                                                            onDelete,
+                                                            onToggleVisibility,
+                                                            onToggleLock,
                                                             depth = 0,
                                                         }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -93,14 +98,22 @@ export const GroupItem = memo<GroupItemProps>(({
     // 가시성 토글
     const toggleVisibility = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        onPatch(shape.id!, { visible: !(shape.visible ?? true) });
-    }, [shape.id, shape.visible, onPatch]);
+        if (onToggleVisibility) {
+            onToggleVisibility(shape.id!);
+        } else {
+            onPatch(shape.id!, { visible: !(shape.visible ?? true) });
+        }
+    }, [shape.id, shape.visible, onPatch, onToggleVisibility]);
 
     // 잠금 토글
     const toggleLock = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        onPatch(shape.id!, { listening: !(shape.listening ?? false) });
-    }, [shape.id, shape.listening, onPatch]);
+        if (onToggleLock) {
+            onToggleLock(shape.id!);
+        } else {
+            onPatch(shape.id!, { listening: !(shape.listening ?? false) });
+        }
+    }, [shape.id, shape.listening, onPatch, onToggleLock]);
 
     // 선택 처리
     const handleSelect = useCallback((e: React.MouseEvent) => {
@@ -241,7 +254,7 @@ export const GroupItem = memo<GroupItemProps>(({
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                    onClick={() => onUngroup?.(shape.id!)}
+                                    onClick={() => onDelete?.(shape.id!)}
                                     className="text-red-600"
                                 >
                                     <Trash2 className="w-4 h-4 mr-2" />
@@ -268,13 +281,6 @@ export const GroupItem = memo<GroupItemProps>(({
                     그룹 해제
                 </ContextMenuItem>
             </ContextMenuContent>
-
-            {/* 자식 요소들 */}
-            {isOpen && children && (
-                <div className="border-l border-muted ml-3 pl-2">
-                    {children}
-                </div>
-            )}
         </ContextMenu>
     );
 });

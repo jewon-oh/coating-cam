@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import Konva from 'konva';
 import type {KonvaEventObject} from 'konva/lib/Node';
 import {useAppDispatch, useAppSelector} from '@/hooks/redux';
@@ -35,7 +35,7 @@ export function useCanvasInteractions(
     useEffect(() => {
         shapesRef.current = shapes;
     }, [shapes]);
-    
+
 
     // 패닝 종료: 마우스 업/리브 시 draggable 해제
     const stopPan = useCallback(() => {
@@ -220,9 +220,9 @@ export function useCanvasInteractions(
             dispatch(selectShape(id));
         } else if (meta && isSelected) {
             const remain = selectedShapeIds.filter(x => x !== id);
-            if(remain.length){
+            if (remain.length) {
                 dispatch(selectGroup(remain))
-            }else{
+            } else {
                 dispatch(unselectAllShapes());
             }
         } else if (meta && !isSelected) {
@@ -257,7 +257,10 @@ export function useCanvasInteractions(
     const handleCopy = useCallback(() => {
         const current = shapesRef.current || [];
         const selectedSet = new Set(selectedShapeIds);
-        if (!selectedSet.size) { clipboardRef.current = null; return; }
+        if (!selectedSet.size) {
+            clipboardRef.current = null;
+            return;
+        }
 
         // Build children map to compute group memberships (descendants)
         const childrenByParent = new Map<string | null, AnyNodeConfig[]>();
@@ -295,22 +298,25 @@ export function useCanvasInteractions(
             if (isSubset) {
                 // Only accept if we can subtract them from remaining (to allow multi-group selection)
                 let canTake = true;
-                for (const id of memberIds) if (!remaining.has(id)) { canTake = false; break; }
+                for (const id of memberIds) if (!remaining.has(id)) {
+                    canTake = false;
+                    break;
+                }
                 if (canTake) {
                     for (const id of memberIds) remaining.delete(id);
-                    matchedGroups.push({ group: g, members });
+                    matchedGroups.push({group: g, members});
                 }
             }
         }
 
         if (matchedGroups.length > 0 && remaining.size === 0) {
-            clipboardRef.current = { kind: 'groups', groups: matchedGroups };
+            clipboardRef.current = {kind: 'groups', groups: matchedGroups};
             return;
         }
 
         // Fallback: copy raw selected shapes (non-groups only)
         const items = current.filter((s) => selectedSet.has(s.id!) && s.type !== 'group');
-        clipboardRef.current = { kind: 'shapes', items };
+        clipboardRef.current = {kind: 'shapes', items};
     }, [selectedShapeIds]);
 
     const handlePaste = useCallback(() => {
@@ -322,7 +328,10 @@ export function useCanvasInteractions(
         if (payload.kind === 'groups') {
             const additions: AnyNodeConfig[] = [];
             const newSelectIds: string[] = [];
-            for (const { group, members } of payload.groups as Array<{ group: AnyNodeConfig; members: AnyNodeConfig[] }>) {
+            for (const {group, members} of payload.groups as Array<{
+                group: AnyNodeConfig;
+                members: AnyNodeConfig[]
+            }>) {
                 const newGroupId = crypto.randomUUID();
                 const newGroup: AnyNodeConfig = {
                     id: newGroupId,
@@ -501,7 +510,10 @@ export function useCanvasInteractions(
     const handleMouseUp = useCallback((e: KonvaEventObject<MouseEvent>) => {
         void e;
         const stage = stageRef.current;
-        if (!stage) { stopPan(); return; }
+        if (!stage) {
+            stopPan();
+            return;
+        }
 
         // 박스 선택 종료
         if (isDragSelectingRef.current && dragSelectStartClientRef.current && tool === 'select') {
@@ -601,44 +613,80 @@ export function useCanvasInteractions(
         updateSelectionRect(0, 0, 0, 0, false);
     }, [stopPan, destroyTempShape, updateSelectionRect])
 
-    // 드래그 시작/끝 (선택 도형 이동 완료 시 상태 반영)
-    const handleDragStart = useCallback(() => {
+// 드래그 시작 위치 저장용
+    const dragStartPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
+    // 드래그 시작 핸들러
+    const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
+        const node = e.target;
+        dragStartPositionsRef.current.set(node.id(), {
+            x: node.x(),
+            y: node.y()
+        });
     }, []);
 
+    // 드래그 종료 핸들러 - 실제 이동했을 때만 히스토리 기록
     const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
-        const stage = stageRef.current;
-        // 스테이지가 없거나 선택된 도형이 없으면 아무 작업도 하지 않습니다.
-        if (!stage || selectedShapeIds.length === 0) return;
+        const node = e.target;
+        const shape = shapesRef.current.find(s => s.id === node.id());
 
-        // 1. 선택된 모든 도형의 최종 위치를 수집합니다.
-        const updates = selectedShapeIds
-            .map(id => {
-                const node = stage.findOne(`#${id}`); // ID로 Konva 노드를 찾습니다.
-                if (node) {
-                    return { id, props: { x: node.x(), y: node.y() } };
+        if (!shape) return;
+
+        const startPos = dragStartPositionsRef.current.get(node.id());
+        const currentPos = {x: node.x(), y: node.y()};
+
+        // 실제로 이동했는지 확인 (최소 1픽셀 이상)
+        const hasMoved = !startPos ||
+            Math.abs(currentPos.x - startPos.x) > 0.5 ||
+            Math.abs(currentPos.y - startPos.y) > 0.5;
+
+        if (!hasMoved) {
+            dragStartPositionsRef.current.delete(node.id());
+            return;
+        }
+
+        // 위치 업데이트 및 히스토리 기록 로직 (위와 동일)
+        const updates: { id: string; props: Partial<AnyNodeConfig> }[] = [];
+
+        if (selectedShapeIds.includes(shape.id!)) {
+            selectedShapeIds.forEach(shapeId => {
+                const targetShape = shapesRef.current.find(s => s.id === shapeId);
+                if (targetShape) {
+                    const stageNode = stageRef.current?.findOne(`#${shapeId}`);
+                    if (stageNode) {
+                        updates.push({
+                            id: shapeId,
+                            props: {
+                                x: stageNode.x(),
+                                y: stageNode.y(),
+                            }
+                        });
+                    }
                 }
-                return null;
-            })
-            .filter((u): u is { id: string; props: { x: number; y: number } } => u !== null);
+            });
+        } else {
+            updates.push({
+                id: shape.id!,
+                props: currentPos
+            });
+        }
 
-        // 유효한 업데이트가 있을 경우에만 상태를 변경합니다.
         if (updates.length > 0) {
-            // 2. batchUpdateShapes로 현재 캔버스 상태를 업데이트합니다. (UI 즉시 반영)
             dispatch(batchUpdateShapes(updates));
 
-            // 3. 히스토리에 저장할 '완전한 다음 상태'를 만듭니다.
-            const updatesMap = new Map(updates.map(u => [u.id, u.props]));
-            const nextShapesState = shapesRef.current.map(shape =>
-                updatesMap.has(shape.id!)
-                    ? { ...shape, ...updatesMap.get(shape.id!) } // 변경된 도형은 새 위치를 적용
-                    : shape // 변경되지 않은 도형은 그대로 유지
-            );
+            const updatedShapes = shapesRef.current.map(shape => {
+                const update = updates.find(u => u.id === shape.id);
+                return update ? {...shape, ...update.props} : shape;
+            });
 
-            // 4. 단 한 번의 호출로 모든 변경사항이 포함된 상태를 히스토리에 저장합니다.
-            dispatch(setPresent(nextShapesState));
+            dispatch(setPresent(updatedShapes));
         }
-    }, [dispatch, selectedShapeIds, stageRef]); // useCallback의 의존성 배열을 업데이트합니다.
+
+        // 시작 위치 정리
+        dragStartPositionsRef.current.delete(node.id());
+
+    }, [dispatch, selectedShapeIds, stageRef]);
+
 
     // Stage 전용 드래그 시작 핸들러 (그리기 용)
     const handleStageDragStart = useCallback((e: KonvaEventObject<MouseEvent>, layerRef?: React.RefObject<Konva.Layer | null>) => {
@@ -646,7 +694,7 @@ export function useCanvasInteractions(
         if (!stage) return;
 
         const layer = layerRef?.current;
-        if(!layer) return;
+        if (!layer) return;
 
         const client = getPointerClient(stage);
         if (!client) return;
@@ -661,7 +709,7 @@ export function useCanvasInteractions(
             return;
         }
     }, [createTempShape, getPointerClient, snapPoint, stageRef, toStagePoint, tool]);
-    
+
     // Stage 전용 드래그 이동 핸들러
     const handleStageDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
         const stage = stageRef.current;
@@ -708,7 +756,7 @@ export function useCanvasInteractions(
         }
     }, [stageRef, isPanning, setStage, tool, toStagePoint, updateSelectionRect, getPointerClient, updateTempShape]);
 
-    const handleStageDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>)=>{
+    const handleStageDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
         const stage = stageRef.current;
         if (!stage) return;
 
@@ -722,7 +770,7 @@ export function useCanvasInteractions(
             }));
             stopPan();
         }
-        
+
         // 박스 선택 종료
         if (isDragSelectingRef.current && dragSelectStartClientRef.current && tool === 'select') {
             const endClient = getPointerClient(stage);
@@ -769,7 +817,7 @@ export function useCanvasInteractions(
 
                 const rect: AnyNodeConfig = {
                     id: crypto.randomUUID(),
-                    parentId:null,
+                    parentId: null,
                     type: 'rectangle',
                     name: 'Rectangle',
                     x, y, width, height,
@@ -790,7 +838,7 @@ export function useCanvasInteractions(
 
                 const circle: AnyNodeConfig = {
                     id: crypto.randomUUID(),
-                    parentId:null,
+                    parentId: null,
                     type: 'circle',
                     name: 'Circle',
                     x: cx,
@@ -810,7 +858,7 @@ export function useCanvasInteractions(
 
             dispatch(setTool('select'));
         }
-    },[destroyTempShape, dispatch, getPointerClient, isPanning, performDragSelection, setStage, snapPoint, stageRef, stopPan, toStagePoint, tool, updateSelectionRect])
+    }, [destroyTempShape, dispatch, getPointerClient, isPanning, performDragSelection, setStage, snapPoint, stageRef, stopPan, toStagePoint, tool, updateSelectionRect])
 
     // 휠 줌: rAF 스로틀 + 스케일 클램프 (Stage 중심이 아닌 포인터 중심 줌)
     const rafIdRef = useRef<number | null>(null);
@@ -873,7 +921,10 @@ export function useCanvasInteractions(
         if (existingGroupIds.size === 1) {
             // Merge: add all selected (non-group) shapes into the existing single group
             const targetGroupId = Array.from(existingGroupIds)[0];
-            next = current.map(s => (memberIds.includes(s.id!) ? { ...s, parentId: targetGroupId } : s)) as AnyNodeConfig[];
+            next = current.map(s => (memberIds.includes(s.id!) ? {
+                ...s,
+                parentId: targetGroupId
+            } : s)) as AnyNodeConfig[];
             dispatch(setAllShapes(next));
             dispatch(setPresent(next));
             dispatch(selectGroup(memberIds));
@@ -896,14 +947,17 @@ export function useCanvasInteractions(
             scaleY: 1,
         } as unknown as AnyNodeConfig;
 
-        next = [...current.map(s => (memberIds.includes(s.id!) ? { ...s, parentId: groupId } : s)), groupNode] as AnyNodeConfig[];
+        next = [...current.map(s => (memberIds.includes(s.id!) ? {
+            ...s,
+            parentId: groupId
+        } : s)), groupNode] as AnyNodeConfig[];
         dispatch(setAllShapes(next));
         dispatch(setPresent(next));
         // Select member shapes rather than the logical group node (Transformer usability)
         dispatch(selectGroup(memberIds));
     }, [dispatch, selectedShapeIds]);
 
-    return {
+    return useMemo(() => ({
         handleMouseDown,
         handleMouseMove,
         handleMouseUp,
@@ -923,5 +977,5 @@ export function useCanvasInteractions(
         handleStageDragEnd,
         handleWheel,
         handleGroup,
-    };
+    }), [handleContextMenu, handleCopy, handleCut, handleDelete, handleDragEnd, handleDragMove, handleDragStart, handleGroup, handleMouseDown, handleMouseLeave, handleMouseMove, handleMouseUp, handlePaste, handleSelect, handleSelectAll, handleStageDragEnd, handleStageDragMove, handleStageDragStart, handleWheel]);
 }
