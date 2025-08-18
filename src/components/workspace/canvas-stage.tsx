@@ -7,22 +7,29 @@ import type Konva from 'konva';
 import {
     unselectAllShapes,
     updateShape,
-    batchUpdateShapes,
 } from '@/store/slices/shapes-slice';
-import {setPresent} from '@/store/slices/history-slice';
 import {redoWithSync, undoWithSync} from "@/store/thunks/history-thunk";
 
 // 컨텍스트 및 훅 임포트
 import {useAppDispatch, useAppSelector} from '@/hooks/redux';
 import {useCanvasInteractions} from '@/hooks/use-canvas-interactions';
+import {useTransformerHandlers} from '@/hooks/use-transformer-handlers';
 import {useSettings} from '@/contexts/settings-context';
 import {useCanvas} from '@/contexts/canvas-context';
 
 // 컴포넌트 임포트
-import {ShapeConfig} from "konva/lib/Shape";
 import {TransformerConfig} from "konva/lib/shapes/Transformer";
 import {AnyNodeConfig} from '@/types/custom-konva-config';
 import CanvasGrid from "@/components/workspace/canvas-grid";
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    ContextMenuLabel,
+    ContextMenuShortcut
+} from "@/components/ui/context-menu";
 
 
 export default function CanvasStage() {
@@ -31,8 +38,7 @@ export default function CanvasStage() {
     const selectedShapeIds = useAppSelector((state) => state.shapes.selectedShapeIds);
     const tool = useAppSelector((state) => state.tool.tool);
 
-    // 패닝
-    const isPanningRef = useRef(false);
+    // === Stage 드래그 기반 패닝 ===
     const [isPanning, setIsPanning] = useState(false);
 
     // 호버링
@@ -40,7 +46,6 @@ export default function CanvasStage() {
 
     // 캐시 관련 상태
     const [isCacheEnabled, setIsCacheEnabled] = useState(false);
-    const [isTransforming, setIsTransforming] = useState(false);
 
     const transformerConfig: TransformerConfig = {
         anchorStyleFunc: (anchor) => {
@@ -74,38 +79,45 @@ export default function CanvasStage() {
     const {
         stageRef,
         canvasContainerRef,
-        canvasSize,
-        stage,
+        stage: stageState,
         setStage,
-        handleWheel,
         setIsLoading,
         setLoadingMessage
     } = useCanvas();
+
+    const stage = stageRef.current!;
+
+    // Context menu target state
+    const [isContextOnShape, setIsContextOnShape] = useState(false);
+
+    // Apply stage transform (scale and position) from CanvasContext state to Konva Stage
+    useEffect(() => {
+        const s = stageRef.current;
+        if (!s) return;
+        try {
+            s.scale({ x: stageState.scale, y: stageState.scale });
+            s.position({ x: stageState.x, y: stageState.y });
+            s.batchDraw();
+        } catch (err) {
+            console.error('Failed to apply stage transform:', err);
+        }
+    }, [stageRef, stageState.scale, stageState.x, stageState.y]);
 
     const layerRef = useRef<Konva.Layer>(null);
     const transformerRef = useRef<Konva.Transformer>(null);
     const selectionRectRef = useRef<Konva.Rect>(null);
 
+    // 변형 관련 훅으로 캡슐화 (transformerRef 준비 후 호출)
+    const { isTransforming, imageCache, handleTransformStart, handleTransform, handleTransformEnd } = useTransformerHandlers(transformerRef);
+
     // 캐시용 그룹 ref들 - 이미지와 다른 도형을 분리
     const imageGroupRef = useRef<Konva.Group>(null);
     const shapeGroupRef = useRef<Konva.Group>(null);
 
-    // 이미지 변형 시작 시의 캐시 (크롭 기능에 사용)
-    const transformStartCache = useRef<{
-        nodeX: number;
-        nodeY: number;
-        nodeWidth: number;
-        nodeHeight: number;
-        crop: { x: number; y: number; width: number; height: number };
-        originalImageWidth: number;
-        originalImageHeight: number;
-    } | null>(null);
 
     // SettingsContext에서 그리드 및 작업 영역 설정 가져오기
     const {isGridVisible, gridSize, workArea,} = useSettings();
 
-    // 이미지 캐시를 위한 ref 추가
-    const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
     // 캐시 자동 활성화 로직 - 조건을 더 보수적으로 변경
     useEffect(() => {
@@ -258,7 +270,7 @@ export default function CanvasStage() {
         imageCache.current.set(imageDataUrl, img);
 
         return img.complete ? img : null;
-    }, [shapes, dispatch, setIsLoading, setLoadingMessage]);
+    }, [imageCache, setLoadingMessage, setIsLoading, shapes, dispatch]);
 
 
     const [isCanvasFocused, setIsCanvasFocused] = useState(false);
@@ -284,18 +296,6 @@ export default function CanvasStage() {
         }
     }, [canvasContainerRef, dispatch]);
 
-
-    const fitToWorkArea = useCallback(() => {
-        // workArea가 캔버스에 들어오도록 대략 맞춤
-        const margin = 40;
-        const scaleX = (canvasSize.width - margin) / workArea.width;
-        const scaleY = (canvasSize.height - margin) / workArea.height;
-        const scale = Math.min(8, Math.max(0.1, Math.min(scaleX, scaleY)));
-        const centeredX = (canvasSize.width - workArea.width * scale) / 2;
-        const centeredY = (canvasSize.height - workArea.height * scale) / 2;
-        setStage({ scale, x: centeredX, y: centeredY });
-    }, [canvasSize.width, canvasSize.height, workArea.width, workArea.height, setStage]);
-
     /**
      * 선택된 도형이 변경될 때마다 Transformer를 업데이트합니다.
      * Transformer는 선택된 도형 주위에 크기 조절 및 회전 핸들을 표시합니다.
@@ -319,6 +319,7 @@ export default function CanvasStage() {
         handleMouseDown,
         handleMouseMove,
         handleMouseUp,
+        handleMouseLeave,
         handleDragStart,
         handleDragMove,
         handleDragEnd,
@@ -329,228 +330,25 @@ export default function CanvasStage() {
         handlePaste,
         handleCut,
         handleContextMenu,
-    } = useCanvasInteractions(stageRef, setStage, selectionRectRef,isPanningRef,setIsPanning);
+        handleGroup,
+         handleStageDragStart,
+        handleStageDragMove,
+        handleStageDragEnd,
+        handleWheel,
+    } = useCanvasInteractions(stageRef, setStage, selectionRectRef, isPanning, setIsPanning);
 
 
-    /**
-     * 도형 변형(크기 조절, 회전)이 끝났을 때 호출되는 콜백 함수.
-     * 변형된 도형의 속성을 업데이트하고 히스토리에 저장합니다.
-     */
-    const handleTransformStart = useCallback(() => {
-        const nodes = transformerRef.current?.nodes() || [];
-        if (nodes.length === 0) return;
+    // Wrap context menu to detect target (stage vs shape)
+    const onStageContextMenu = useCallback((e: Konva.KonvaEventObject<PointerEvent>) => {
+        const s = stageRef.current;
+        if (!s) return;
+        // If the target is the Stage itself, it's a stage contextmenu; otherwise it's on a shape
+        setIsContextOnShape(e.target !== s);
+        // Delegate to hook to maintain selection behavior
+        handleContextMenu(e);
+    }, [handleContextMenu, stageRef]);
 
-        setIsTransforming(true);
-        console.log('🔧 변형 시작');
-
-        const node = nodes[0];
-        const shape = shapes.find(s => s.id === node.id());
-
-        if (shape && shape.type === 'image') {
-            const imageNode = node as Konva.Image;
-
-            // 1. 이미지 객체 가져오기 (여러 방법 시도)
-            let originalImage: HTMLImageElement | undefined = imageNode.image() as HTMLImageElement;
-
-            // 이미지가 없으면 캐시에서 찾기
-            if (!originalImage && shape.imageDataUrl) {
-                originalImage = imageCache.current.get(shape.imageDataUrl);
-            }
-
-            if (!originalImage || !originalImage.complete) {
-                console.warn('❌ Transform 시작 시 이미지를 찾을 수 없음:', shape.id);
-                return; // transform 취소
-            }
-
-            // 2. 현재 crop 정보 확인 (우선순위: Konva노드 > shape데이터 > 기본값)
-            let currentCrop = imageNode.crop();
-
-            if (!currentCrop && shape.crop) {
-                currentCrop = shape.crop;
-                imageNode.crop(currentCrop); // 노드에 적용
-            }
-
-            if (!currentCrop) {
-                // 기본 crop 설정 (전체 이미지)
-                currentCrop = {
-                    x: 0,
-                    y: 0,
-                    width: originalImage.width,
-                    height: originalImage.height
-                };
-                imageNode.crop(currentCrop);
-            }
-
-            console.log('🎯 Transform 시작:', {
-                shapeId: shape.id,
-                imageSize: {width: originalImage.width, height: originalImage.height},
-                currentCrop,
-                nodeSize: {width: node.width(), height: node.height()}
-            });
-
-            transformStartCache.current = {
-                nodeX: node.x(),
-                nodeY: node.y(),
-                nodeWidth: node.width() * node.scaleX(),
-                nodeHeight: node.height() * node.scaleY(),
-                crop: {...currentCrop}, // 깊은 복사
-                originalImageWidth: originalImage.width,
-                originalImageHeight: originalImage.height,
-            };
-
-            // 즉시 리렌더링
-            node.getLayer()?.batchDraw();
-        }
-    }, [shapes, imageCache]);
-
-    const handleTransform = useCallback(() => {
-        const nodes = transformerRef.current?.nodes() || [];
-        if (nodes.length === 0 || !transformStartCache.current) return;
-
-        const node = nodes[0];
-        const shape = shapes.find(s => s.id === node.id());
-
-        if (shape && shape.type === 'image') {
-            const anchor = transformerRef.current?.getActiveAnchor();
-
-            const isCropping = anchor
-                && ['top-center', 'middle-right', 'bottom-center', 'middle-left'].includes(anchor);
-
-            if (isCropping) {
-                const cache = transformStartCache.current;
-
-                // 안전성 검사
-                if (!cache.crop || cache.originalImageWidth <= 0 || cache.originalImageHeight <= 0) {
-                    console.warn('❌ Transform cache가 잘못됨:', cache);
-                    return;
-                }
-
-                const newCrop = {...cache.crop};
-                const currentDisplayedWidth = node.width() * node.scaleX();
-                const currentDisplayedHeight = node.height() * node.scaleY();
-
-                const widthChange = currentDisplayedWidth - cache.nodeWidth;
-                const heightChange = currentDisplayedHeight - cache.nodeHeight;
-
-                const originalDisplayRatioX = cache.nodeWidth / cache.crop.width;
-                const originalDisplayRatioY = cache.nodeHeight / cache.crop.height;
-
-                // 0으로 나누기 방지
-                if (originalDisplayRatioX <= 0 || originalDisplayRatioY <= 0) {
-                    console.warn('❌ Display ratio가 잘못됨');
-                    return;
-                }
-
-                const cropWidthChange = widthChange / originalDisplayRatioX;
-                const cropHeightChange = heightChange / originalDisplayRatioY;
-
-                switch (anchor) {
-                    case 'middle-right':
-                        newCrop.width = Math.max(1, cache.crop.width + cropWidthChange);
-                        break;
-                    case 'middle-left':
-                        newCrop.x = Math.max(0, cache.crop.x - cropWidthChange);
-                        newCrop.width = Math.max(1, cache.crop.width + cropWidthChange);
-                        break;
-                    case 'bottom-center':
-                        newCrop.height = Math.max(1, cache.crop.height + cropHeightChange);
-                        break;
-                    case 'top-center':
-                        newCrop.y = Math.max(0, cache.crop.y - cropHeightChange);
-                        newCrop.height = Math.max(1, cache.crop.height + cropHeightChange);
-                        break;
-                }
-
-                // 범위 검증
-                newCrop.x = Math.max(0, Math.min(newCrop.x, cache.originalImageWidth - 1));
-                newCrop.y = Math.max(0, Math.min(newCrop.y, cache.originalImageHeight - 1));
-                newCrop.width = Math.max(1, Math.min(newCrop.width, cache.originalImageWidth - newCrop.x));
-                newCrop.height = Math.max(1, Math.min(newCrop.height, cache.originalImageHeight - newCrop.y));
-
-                console.log('🔄 Crop 안전 업데이트:', {
-                    anchor,
-                    oldCrop: cache.crop,
-                    newCrop,
-                    imageSize: {width: cache.originalImageWidth, height: cache.originalImageHeight}
-                });
-
-                try {
-                    (node as Konva.Image).crop(newCrop);
-                    node.getLayer()?.batchDraw();
-                } catch (error) {
-                    console.error('❌ Crop 적용 실패:', error);
-                }
-            }
-        }
-    }, [shapes]);
-
-    const handleTransformEnd = useCallback(() => {
-        const nodes = transformerRef.current?.nodes() || [];
-        const updates = nodes.map(node => {
-            const shape = shapes.find(s => s.id === node.id());
-            if (!shape) return null;
-
-            const oldScaleX = node.scaleX();
-            const oldScaleY = node.scaleY();
-            const newRotation = node.rotation();
-            const newWidth = node.width() * oldScaleX;
-            const newHeight = node.height() * oldScaleY;
-
-            // 새로운 속성 객체
-            const newAttrs: AnyNodeConfig = {
-                ...shape,
-                y: node.y(),
-                rotation: newRotation,
-                width: newWidth,
-                height: newHeight,
-                scaleX: 1,
-                scaleY: 1,
-            };
-
-            // 이미지의 경우 현재 크롭 정보를 저장
-            if (shape.type === 'image') {
-                const currentCrop = (node as Konva.Image).crop();
-                if (currentCrop) {
-                    newAttrs.crop = {
-                        x: currentCrop.x,
-                        y: currentCrop.y,
-                        width: currentCrop.width,
-                        height: currentCrop.height
-                    };
-                }
-            }
-
-            // 도형 종류에 따라 x 좌표와 반지름(원)을 다르게 계산
-            if (shape.type === 'rectangle' || shape.type === 'image') {
-                // Konva의 x는 offsetX가 width로 설정되어 있으므로 이미 오른쪽 상단 기준
-                newAttrs.x = node.x();
-            } else if (shape.type === 'circle') {
-                newAttrs.x = node.x();
-                newAttrs.radius = (newWidth / 2);
-            }
-
-            // Konva 노드의 스케일을 리셋
-            node.scaleX(1);
-            node.scaleY(1);
-
-            return {id: shape.id, props: newAttrs};
-        }).filter((update): update is { id: string; props: AnyNodeConfig } => update !== null);
-
-        if (updates.length > 0) {
-            // updateMultipleShapes
-            dispatch(batchUpdateShapes(updates as { id: string; props: Partial<ShapeConfig> }[]));
-            const updatedShapesForHistory = shapes.map(s => {
-                const update = updates.find(u => u.id === s.id);
-                return update ? {...s, ...update.props} : s;
-            });
-            dispatch(setPresent(updatedShapesForHistory));
-        }
-
-        transformStartCache.current = null;
-        setIsTransforming(false);
-        console.log('✅ 변형 완료');
-    }, [shapes, dispatch]);
-
+    
     // 향상된 키보드 이벤트 핸들러
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -562,7 +360,7 @@ export default function CanvasStage() {
             // 화면맞춤
             if (isCtrlOrCmd && e.key === "0") {
                 e.preventDefault();
-                fitToWorkArea();
+                // fitToWorkArea();
                 return;
             }
 
@@ -591,7 +389,7 @@ export default function CanvasStage() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleDelete, handleCopy, handlePaste, handleCut, dispatch, handleSelectAll, isCanvasFocused, fitToWorkArea]);
+    }, [handleDelete, handleCopy, handlePaste, handleCut, dispatch, handleSelectAll, isCanvasFocused]);
 
 
     // 렌더 순서: 이미지 먼저(항상 뒤), 그 다음 다른 도형(항상 위)
@@ -601,28 +399,30 @@ export default function CanvasStage() {
 
     // 공통 프로퍼티
     const makeCommonProps = (shape: Partial<AnyNodeConfig>) => ({
-        draggable: tool === 'select' && !shape.listening && !isPanning,
+        draggable: tool === 'select' && !shape.listening ,
         onClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
-            if (isPanning) return;
             e.evt.preventDefault();
             handleSelect(e);
         },
-        onMouseEnter: () => !isPanning && setIsHoveringShape(shape.id!),
+        onMouseEnter: () => setIsHoveringShape(shape.id!),
         onMouseLeave: () => setIsHoveringShape(null),
         onDragStart: handleDragStart,
         onDragMove: handleDragMove,
         onDragEnd: handleDragEnd,
-        shadowColor: isHoveringShape === shape.id && !isPanning ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
-        shadowBlur: isHoveringShape === shape.id && !isPanning ? 10 : 0,
+        shadowColor: isHoveringShape === shape.id  ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
+        shadowBlur: isHoveringShape === shape.id  ? 10 : 0,
         shadowOffset: isHoveringShape === shape.id ? {x: 0, y: 0} : {x: 0, y: 0},
         perfectDrawEnabled: false,
-        listening: !isPanning && tool === 'select'
+        listening: tool === 'select'
     });
 
+
     return (
-        <div
-            ref={canvasContainerRef}
-            className="absolute inset-0"
+        <ContextMenu>
+            <ContextMenuTrigger asChild>
+                <div
+                    ref={canvasContainerRef}
+                    className="absolute inset-0"
             tabIndex={0} // 포커스 가능하도록 설정
             onFocus={handleCanvasFocus}
             onBlur={handleCanvasBlur}
@@ -639,32 +439,29 @@ export default function CanvasStage() {
 
             <Stage
                 ref={stageRef}
-                width={canvasSize.width}
-                height={canvasSize.height}
                 onMouseDown={(e) => handleMouseDown(e, layerRef)}
-                // onDragMove={handleDragMove}
+                onDragStart={(e) => handleStageDragStart(e, layerRef)}
+                onDragMove={handleStageDragMove}
+                onDragEnd={handleStageDragEnd}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
                 onWheel={handleWheel}
-                onContextMenu={handleContextMenu}
-                x={stage.x}
-                y={stage.y}
-                scaleX={stage.scale}
-                scaleY={stage.scale}
                 onClick={handleCanvasClick}
-                listening={!isPanning}
+                onContextMenu={onStageContextMenu}
+                listening={!isTransforming}
+                draggable={isPanning}
             >
-
                 {/* 배경 */}
                 <Layer
                     listening={false}
                 >
                     {/* 캔버스 배경*/}
                     <Rect
-                        x={-stage.x / stage.scale}
-                        y={-stage.y / stage.scale}
-                        width={canvasSize.width / stage.scale}
-                        height={canvasSize.height / stage.scale}
+                        x={- (stage?.x() ?? 0) / (stage?.scaleX() || 1)}
+                        y={- (stage?.y() ?? 0) / (stage?.scaleY() || 1)}
+                        width={(stage?.width() ?? 0) / (stage?.scaleX() || 1)}
+                        height={(stage?.height() ?? 0) / (stage?.scaleY() || 1)}
                         fill="#f0f0f0"
                         listening={false}
                     />
@@ -675,30 +472,30 @@ export default function CanvasStage() {
                         width={workArea.width}
                         height={workArea.height}
                         stroke="black"
-                        strokeWidth={1 / stage.scale}
-                        dash={[4 / stage.scale, 2 / stage.scale]}
+                        strokeWidth={1 / Math.hypot(stage?.scaleX(), stage?.scaleY())}
+                        dash={[4 / Math.hypot(stage?.scaleX(), stage?.scaleY()), 2 / Math.hypot(stage?.scaleX(), stage?.scaleY())]}
                         listening={false}
                     />
                     {/* 그리드 표시 */}
                     <CanvasGrid
-                        stage={stage}
+                        stageRef={stageRef}
                         gridSize={gridSize}
                         workArea={workArea}
                         visible={isGridVisible}
                         isPanning={isPanning}
-                        viewportWidth={canvasSize.width}
-                        viewportHeight={canvasSize.height}
+                        stageScale={stageState.scale}
+                        stageX={stageState.x}
+                        stageY={stageState.y}
+                        viewportWidth={stage?.width()}
+                        viewportHeight={stage?.height()}
                     />
-
                 </Layer>
-
 
                 <Layer ref={layerRef}>
                     {/* 이미지 그룹 (캐시 가능) */}
                     <Group
                         ref={imageGroupRef}
-                        listening={tool === 'select' && !isPanning} // 선택 도구일 때만 이벤트 수신
-
+                        listening={tool === 'select'} // 선택 도구일 때만 이벤트 수신
                     >
                         {imageShapes.map((shape) => {
                             const imageElement = shape.imageDataUrl ? loadImage(shape.imageDataUrl, shape.id) : null;
@@ -760,7 +557,7 @@ export default function CanvasStage() {
                     {/* 일반 도형 그룹 (캐시 가능) */}
                     <Group
                         ref={shapeGroupRef}
-                        listening={!isPanning} // 항상 이벤트 수신
+                        listening={true} // 항상 이벤트 수신
                     >
                         {otherShapes.map((shape) => {
                             const commonProps = makeCommonProps(shape);
@@ -819,7 +616,7 @@ export default function CanvasStage() {
                             'top-left', 'top-right', 'bottom-left', 'bottom-right',
                             'top-center', 'middle-right', 'bottom-center', 'middle-left'
                         ]}
-                        visible={!isPanning}
+                        visible={selectedShapeIds.length > 0}
                         {...transformerConfig}
                     />
 
@@ -830,9 +627,40 @@ export default function CanvasStage() {
                         strokeWidth={1}
                         dash={[4, 2]}
                         visible={false}
+                        listening={false}
                     />
                 </Layer>
             </Stage>
-        </div>
+                </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-56">
+                <ContextMenuLabel>Canvas</ContextMenuLabel>
+                <ContextMenuItem onSelect={(e) => { e.preventDefault(); handleSelectAll(); }}>
+                    Select All
+                    <ContextMenuShortcut>Ctrl+A</ContextMenuShortcut>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem disabled={selectedShapeIds.length < 2} onSelect={(e) => { e.preventDefault(); handleGroup(); }}>
+                    Group
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem disabled={!isContextOnShape} onSelect={(e) => { e.preventDefault(); handleCopy(); }}>
+                    Copy
+                    <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={(e) => { e.preventDefault(); handlePaste(); }}>
+                    Paste
+                    <ContextMenuShortcut>Ctrl+V</ContextMenuShortcut>
+                </ContextMenuItem>
+                <ContextMenuItem disabled={!isContextOnShape} onSelect={(e) => { e.preventDefault(); handleCut(); }}>
+                    Cut
+                    <ContextMenuShortcut>Ctrl+X</ContextMenuShortcut>
+                </ContextMenuItem>
+                <ContextMenuItem disabled={!isContextOnShape} variant="destructive" onSelect={(e) => { e.preventDefault(); handleDelete(); }}>
+                    Delete
+                    <ContextMenuShortcut>Del</ContextMenuShortcut>
+                </ContextMenuItem>
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }

@@ -19,6 +19,42 @@ const initialState: ShapesState = {
 export const selectShapes = (state: { shapes: ShapesState }) => state.shapes.shapes;
 export const selectSelectedShapeIds = (state: { shapes: ShapesState }) => state.shapes.selectedShapeIds;
 
+// 그룹 관련 최적화된 셀렉터 추가
+export const selectGroupsWithMembers = createSelector(
+    [selectShapes],
+    (shapes) => {
+        const groups = shapes.filter(s => s.type === 'group');
+        const membersByGroup = new Map<string, AnyNodeConfig[]>();
+
+        groups.forEach(group => {
+            const members = shapes.filter(s => s.parentId === group.id && s.type !== 'group');
+            membersByGroup.set(group.id!, members);
+        });
+
+        return { groups, membersByGroup };
+    }
+);
+
+export const selectShapeHierarchy = createSelector(
+    [selectShapes],
+    (shapes) => {
+        const childrenMap = new Map<string | null, AnyNodeConfig[]>();
+        const parentMap = new Map<string, string | null>();
+
+        shapes.forEach(shape => {
+            const parentId = shape.parentId || null;
+            parentMap.set(shape.id!, parentId);
+
+            if (!childrenMap.has(parentId)) {
+                childrenMap.set(parentId, []);
+            }
+            childrenMap.get(parentId)!.push(shape);
+        });
+
+        return { childrenMap, parentMap };
+    }
+);
+
 // 기존 SerializableShapePayload 유지...
 interface SerializableShapePayload extends Omit<AnyNodeConfig, 'image'> {
     imageDataUrl?: string;
@@ -165,6 +201,91 @@ const shapesSlice = createSlice({
                 shape.listening = !(shape.listening ?? false);
             }
         },
+        // 그룹 관련 최적화된 액션들
+        createGroup: (state, action: PayloadAction<{ memberIds: string[]; name?: string; groupId?: string }>) => {
+            const memberIds = action.payload.memberIds || [];
+            if (!memberIds.length) return;
+
+            const groupId = action.payload.groupId || crypto.randomUUID();
+            const sameTypeCount = state.shapes.filter(s => s.type === 'group').length;
+            const groupName = action.payload.name || `그룹 #${sameTypeCount + 1}`;
+
+            // 배치 업데이트로 성능 향상
+            const updates = memberIds.map(id => ({ id, props: { parentId: groupId } }));
+            const updateMap = new Map(updates.map(update => [update.id, update.props]));
+
+            // 그룹 노드 생성
+            const groupNode: AnyNodeConfig = {
+                id: groupId,
+                parentId: null,
+                type: 'group',
+                name: groupName,
+                x: 0,
+                y: 0,
+                listening: false,
+                visible: true,
+            } as AnyNodeConfig;
+
+            Object.assign(state, {
+                shapes: [
+                    ...state.shapes.map(shape => {
+                        const update = updateMap.get(shape.id!);
+                        return update ? { ...shape, ...update } : shape;
+                    }),
+                    groupNode
+                ],
+                selectedShapeIds: memberIds,
+                isGroupSelected: true,
+                lastUpdateTimestamp: Date.now()
+            });
+        },
+
+        ungroupShapes: (state, action: PayloadAction<string>) => {
+            const groupId = action.payload;
+            const groupIndex = state.shapes.findIndex(s => s.id === groupId && s.type === 'group');
+            if (groupIndex === -1) return;
+
+            // 그룹 멤버들의 parentId를 null로 변경
+            Object.assign(state, {
+                shapes: state.shapes
+                    .filter(s => s.id !== groupId) // 그룹 노드 제거
+                    .map(s => s.parentId === groupId ? { ...s, parentId: null } : s),
+                lastUpdateTimestamp: Date.now()
+            });
+        },
+
+        renameGroup: (state, action: PayloadAction<{ groupId: string; name: string }>) => {
+            const groupIndex = state.shapes.findIndex(s => s.id === action.payload.groupId && s.type === 'group');
+            if (groupIndex !== -1) {
+                state.shapes[groupIndex].name = action.payload.name;
+                state.lastUpdateTimestamp = Date.now();
+            }
+        },
+
+        // 그룹 가시성 일괄 토글
+        toggleGroupVisibility: (state, action: PayloadAction<string>) => {
+            const groupId = action.payload;
+            const group = state.shapes.find(s => s.id === groupId && s.type === 'group');
+            if (!group) return;
+
+            const newVisibility = !(group.visible ?? true);
+            const memberIds = state.shapes
+                .filter(s => s.parentId === groupId)
+                .map(s => s.id!)
+                .filter(Boolean);
+
+            // 그룹과 모든 멤버의 가시성 일괄 변경
+            Object.assign(state, {
+                shapes: state.shapes.map(shape => {
+                    if (shape.id === groupId || memberIds.includes(shape.id!)) {
+                        return { ...shape, visible: newVisibility };
+                    }
+                    return shape;
+                }),
+                lastUpdateTimestamp: Date.now()
+            });
+        },
+
     },
 });
 
@@ -182,6 +303,11 @@ export const {
     unselectAllShapes,
     toggleShapeVisibility,
     toggleShapeLock,
+    createGroup,
+    ungroupShapes,
+    renameGroup,
+    toggleGroupVisibility,
+
 } = shapesSlice.actions;
 
 export default shapesSlice.reducer;

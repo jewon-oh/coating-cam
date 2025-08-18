@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 // 애플리케이션 상태 관리를 위한 캔버스 컨텍스트
 import { CanvasProvider, useCanvas } from "@/contexts/canvas-context";
 // UI 컴포넌트들
-import { ObjectPanel } from "@/components/workspace/object-panel";
+import { ObjectPanel } from "@/components/object-panel/object-panel";
 import { GCodeSettingsDialog } from "@/components/gcode/gcode-settings-dialog";
 import { Toolbar } from "@/components/tool/toolbar";
 import React, { useEffect, useState } from "react";
@@ -37,7 +37,7 @@ const WorkspaceContent = () => {
     // G-Code 설정 다이얼로그의 열림/닫힘 상태 관리
     const [isGCodeDialogOpen, setGCodeDialogOpen] = useState(false);
     // CanvasProvider 컨텍스트에서 상태 및 함수를 가져옵니다.
-    const { canvasContainerRef, setIsLoading, setLoadingMessage } = useCanvas();
+    const { setIsLoading, setLoadingMessage } = useCanvas();
 
     const router = useRouter();
     const dispatch = useAppDispatch();
@@ -59,7 +59,7 @@ const WorkspaceContent = () => {
                 // 1) Electron 환경: URL 쿼리 'filePath'를 통한 파일 로드
                 // Electron의 IPC API가 존재하는지 확인하고, 파일 경로를 통해 파일을 읽습니다.
                 const filePath = typeof router.query.filePath === "string" ? router.query.filePath : undefined;
-                const projectApi = (window as any).projectApi;
+                const projectApi = window.projectApi;
                 if (filePath && projectApi) {
                     jsonText = await projectApi.readFile(filePath, "utf8");
                 }

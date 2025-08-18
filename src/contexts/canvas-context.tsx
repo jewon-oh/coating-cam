@@ -1,16 +1,17 @@
 // TypeScript React
-import React, { createContext, useContext, useRef, RefObject, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useRef, RefObject, useState, useEffect, useMemo, useCallback } from 'react';
 import type Konva from 'konva';
-import type { KonvaEventObject } from 'konva/lib/Node';
+
+type CanvasSize = { width: number; height: number };
+type StageState = { scale: number; x: number; y: number };
 
 interface CanvasContextType {
     stageRef: RefObject<Konva.Stage|null>
     canvasContainerRef: RefObject<HTMLDivElement|null>;
 
-    canvasSize: { width: number; height: number };
-    stage: { scale: number; x: number; y: number };
-    setStage: React.Dispatch<React.SetStateAction<{ scale: number; x: number; y: number }>>;
-    handleWheel: (e: KonvaEventObject<WheelEvent>) => void;
+    canvasSize: CanvasSize;
+    stage: StageState;
+    setStage: React.Dispatch<React.SetStateAction<StageState>>;
 
     isLoading: boolean;
     setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
@@ -24,11 +25,25 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
     const stageRef = useRef<Konva.Stage>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-    const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-    const [stage, setStage] = useState({ scale: 1, x: 0, y: 0 });
+    const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 0, height: 0 });
+    const [stage, setStageState] = useState<StageState>({ scale: 1, x: 0, y: 0 });
 
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('로딩 중...');
+
+    // setStage with epsilon guard to avoid unnecessary state updates
+    const setStage = useCallback<React.Dispatch<React.SetStateAction<StageState>>>((updater) => {
+        setStageState((prev) => {
+            const next = typeof updater === 'function' ? (updater as (p: StageState) => StageState)(prev) : updater;
+            const EPS_SCALE = 1e-4;
+            const EPS_POS = 0.25; // quarter pixel to reduce thrash
+            const noChange =
+                Math.abs((next.scale ?? 1) - (prev.scale ?? 1)) < EPS_SCALE &&
+                Math.abs((next.x ?? 0) - (prev.x ?? 0)) < EPS_POS &&
+                Math.abs((next.y ?? 0) - (prev.y ?? 0)) < EPS_POS;
+            return noChange ? prev : next;
+        });
+    }, []);
 
     // 리사이즈: ResizeObserver + window.resize 폴백(중복 이펙트 제거)
     useEffect(() => {
@@ -75,64 +90,20 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    // 휠 줌: rAF 스로틀 + 스케일 클램프
-    const rafIdRef = useRef<number | null>(null);
-    const schedule = (fn: () => void) => {
-        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = requestAnimationFrame(() => {
-            fn();
-            rafIdRef.current = null;
-        });
-    };
-    useEffect(() => () => {
-        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-    }, []);
-
-    const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
-        e.evt.preventDefault();
-        const s = e.target.getStage();
-        if (!s) return;
-
-        const pointer = s.getPointerPosition();
-        if (!pointer) return;
-
-        const scaleBy = 1.05;
-        const oldScale = s.scaleX();
-        const direction = e.evt.deltaY > 0 ? 1 : -1;
-        const unclamped = direction > 0 ? oldScale / scaleBy : oldScale * scaleBy;
-
-        const MIN_SCALE = 0.1;
-        const MAX_SCALE = 8;
-        const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, unclamped));
-        if (Math.abs(newScale - oldScale) < 1e-4) return;
-
-        const mousePointTo = {
-            x: (pointer.x - s.x()) / oldScale,
-            y: (pointer.y - s.y()) / oldScale,
-        };
-
-        schedule(() => {
-            setStage({
-                scale: newScale,
-                x: pointer.x - mousePointTo.x * newScale,
-                y: pointer.y - mousePointTo.y * newScale,
-            });
-        });
-    }, []);
+    const providerValue = useMemo<CanvasContextType>(() => ({
+        stageRef,
+        canvasContainerRef,
+        canvasSize,
+        stage,
+        setStage,
+        isLoading,
+        setIsLoading,
+        loadingMessage,
+        setLoadingMessage,
+    }), [canvasSize, isLoading, loadingMessage, setStage, stage]);
 
     return (
-        <CanvasContext.Provider value={{
-            stageRef,
-            canvasContainerRef,
-            canvasSize,
-            stage,
-            setStage,
-            handleWheel,
-            isLoading,
-            setIsLoading,
-            loadingMessage,
-            setLoadingMessage
-        }}>
+        <CanvasContext.Provider value={providerValue}>
             {children}
         </CanvasContext.Provider>
     );

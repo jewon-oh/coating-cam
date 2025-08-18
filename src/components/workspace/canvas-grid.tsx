@@ -1,40 +1,44 @@
 // src/components/canvas/grid-layer.tsx
 
-import React, {JSX, useMemo} from 'react';
+import React, {JSX, RefObject, useMemo} from 'react';
 import {  Line, Group, Text } from 'react-konva';
+import Konva from "konva";
 
 interface CanvasGridProps {
-    stage: { x: number; y: number; scale: number };
+    stageRef: RefObject<Konva.Stage|null>
     gridSize: number;
     workArea: { width: number; height: number };
     visible?: boolean;
     isPanning?: boolean;
+    // 외부에서 Stage 변환 상태를 전달하면 React.memo가 변화를 감지해 재렌더합니다.
+    stageScale?: number;
+    stageX?: number;
+    stageY?: number;
     // 성능을 위해 window 접근 대신, 캔버스 뷰포트 크기를 직접 전달받을 수 있게 옵션 제공
     viewportWidth?: number;
     viewportHeight?: number;
 }
 
-// 스냅 기반 스테이지 위치(그리드 셀 단위로 스냅) - 경계 넘어갈 때만 재계산 유도
-function quantizeStageToGrid(stage: { x: number; y: number; scale: number }, gridSize: number) {
-    const invScale = 1 / (stage.scale || 1);
-    const gx = Math.round((-stage.x * invScale) / gridSize);
-    const gy = Math.round((-stage.y * invScale) / gridSize);
-    return { gx, gy, scale: stage.scale };
-}
-
 const CanvasGrid: React.FC<CanvasGridProps> = React.memo(
     ({
-         stage,
+         stageRef,
          gridSize,
          workArea,
          visible = true,
          isPanning = false,
+         stageScale,
+         stageX: stageXProp,
+         stageY: stageYProp,
          viewportWidth,
          viewportHeight,
      }) => {
+        const stage = stageRef.current;
+        const scale = typeof stageScale === 'number' ? stageScale : (stage?.scaleX() ?? 1);
+        const stageX = typeof stageXProp === 'number' ? stageXProp : (stage?.x() ?? 0);
+        const stageY = typeof stageYProp === 'number' ? stageYProp : (stage?.y() ?? 0);
 
         const { lines, axes } = useMemo(() => {
-            if (!visible || isPanning || gridSize <= 0 || stage.scale <= 0) {
+            if (!visible || isPanning || gridSize <= 0 || scale <= 0) {
                 return { lines: [] as Array<JSX.Element>, labels: [] as Array<JSX.Element>, axes: [] as Array<JSX.Element> };
             }
 
@@ -60,7 +64,7 @@ const CanvasGrid: React.FC<CanvasGridProps> = React.memo(
             const minorLineColor = '#e0e0e0';
             const labelColor = '#666';
 
-            const invScale = 1 / stage.scale;
+            const invScale = 1 / scale;
             const lineStrokeWidth = 0.5 * invScale;
             const majorLineStrokeWidth = invScale;
             const axisWidth = 1.5 * invScale;
@@ -75,15 +79,15 @@ const CanvasGrid: React.FC<CanvasGridProps> = React.memo(
 
             // 뷰포트 컬링
             const viewportMargin = 100; // 여유 마진
-            const visibleLeft = Math.max(0, -stage.x * invScale - viewportMargin);
+            const visibleLeft = Math.max(0, -stageX * invScale - viewportMargin);
             const visibleRight = Math.min(
                 workArea.width,
-                (-stage.x + safeViewportW) * invScale + viewportMargin
+                (-stageX + safeViewportW) * invScale + viewportMargin
             );
-            const visibleTop = Math.max(0, -stage.y * invScale - viewportMargin);
+            const visibleTop = Math.max(0, -stageY * invScale - viewportMargin);
             const visibleBottom = Math.min(
                 workArea.height,
-                (-stage.y + safeViewportH) * invScale + viewportMargin
+                (-stageY + safeViewportH) * invScale + viewportMargin
             );
 
             // 줌 레벨 적응
@@ -91,13 +95,13 @@ const CanvasGrid: React.FC<CanvasGridProps> = React.memo(
             let showMinorGrid = true;
             let showLabels = true;
 
-            if (stage.scale < 0.1) {
+            if (scale< 0.1) {
                 effectiveGridSize = labelGridSize;
                 showMinorGrid = false;
-            } else if (stage.scale < 0.3) {
+            } else if (scale< 0.3) {
                 effectiveGridSize = majorGridSize;
                 showMinorGrid = false;
-            } else if (stage.scale < 0.5) {
+            } else if (scale< 0.5) {
                 showLabels = false;
             }
 
@@ -244,7 +248,7 @@ const CanvasGrid: React.FC<CanvasGridProps> = React.memo(
 
             return { lines: linesElements, labels: [], axes: axesElements };
             // 스냅된 스테이지 그리드 좌표(gx, gy)와 scale에만 의존 → 미세 이동시 재계산 회피
-        }, [visible, isPanning, gridSize, stage.scale, stage.x, stage.y, viewportWidth, workArea.width, workArea.height, viewportHeight]);
+        }, [visible, isPanning, gridSize, scale, stageX, stageY, viewportWidth, workArea.width, workArea.height, viewportHeight]);
 
         if (!visible || isPanning) return null;
 
