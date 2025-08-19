@@ -143,6 +143,24 @@ export function useTransformerHandlers(
                 } catch (error) {
                     console.error('❌ Crop 적용 실패:', error);
                 }
+            }else {
+                // ✅ 비율 유지 로직: 코너 핸들을 사용한 크기 조절 시
+                const scaleX = node.scaleX();
+                const scaleY = node.scaleY();
+
+                // 더 작은 스케일 값을 기준으로 균등 스케일 적용
+                const uniformScale = Math.min(Math.abs(scaleX), Math.abs(scaleY));
+
+                // 원래 방향 유지 (음수/양수)
+                const finalScaleX = scaleX >= 0 ? uniformScale : -uniformScale;
+                const finalScaleY = scaleY >= 0 ? uniformScale : -uniformScale;
+
+                // 노드에 균등 스케일 적용
+                node.scaleX(finalScaleX);
+                node.scaleY(finalScaleY);
+
+                // 레이어 다시 그리기
+                node.getLayer()?.batchDraw();
             }
         }
     }, [shapes, transformerRef]);

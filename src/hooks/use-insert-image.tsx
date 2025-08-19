@@ -203,7 +203,10 @@ export const useInsertImage = () => {
 
                 // 최적화된 dataURL을 저장하고, 디스플레이는 적당한 크기
                 dispatch(addShapeToBack({
+                    id: crypto.randomUUID(),
+                    parentId: null,
                     type: 'image',
+                    name: '이미지',
                     x: 150,
                     y: 50,
                     width: displaySize.width,

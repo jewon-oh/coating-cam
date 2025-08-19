@@ -28,6 +28,8 @@ export function useCanvasInteractions(
     const dispatch = useAppDispatch();
     const {shapes, selectedShapeIds} = useAppSelector((state) => state.shapes);
     const tool = useAppSelector((state) => state.tool.tool) as Tool;
+    // gcode 설정
+    const gcodeSettings = useAppSelector((state) => state.gcode.gcodeSettings);
     const {isSnappingEnabled, gridSize} = useSettings();
 
     // 최신 스냅샷 저장용
@@ -89,6 +91,7 @@ export function useCanvasInteractions(
         },
         [selectionRectRef]
     );
+
 
     // 임시 도형 생성/업데이트/파괴
     const createTempShape = useCallback((type: Tool, layer: Konva.Layer, x: number, y: number) => {
@@ -557,7 +560,7 @@ export function useCanvasInteractions(
                             id: crypto.randomUUID(),
                             parentId: null,
                             type: 'rectangle',
-                            name: 'Rectangle',
+                            name: '사각형 마스킹',
                             x, y, width, height,
                             fill: 'rgba(59,130,246,0.5)',
                             rotation: 0,
@@ -565,6 +568,7 @@ export function useCanvasInteractions(
                             scaleY: 1,
                             listening: false,
                             visible: true,
+                            coatingHeight: gcodeSettings.coatingHeight
                         };
                         const next = [...shapesRef.current, rect] as AnyNodeConfig[];
                         dispatch(addShape(rect));
@@ -578,7 +582,7 @@ export function useCanvasInteractions(
                             id: crypto.randomUUID(),
                             parentId: null,
                             type: 'circle',
-                            name: 'Circle',
+                            name: '원 마스킹',
                             x: cx,
                             y: cy,
                             radius: r,
@@ -588,6 +592,7 @@ export function useCanvasInteractions(
                             scaleY: 1,
                             listening: false,
                             visible: true,
+                            coatingHeight: gcodeSettings.coatingHeight
                         };
                         const next = [...shapesRef.current, circle] as AnyNodeConfig[];
                         dispatch(addShape(circle));
@@ -827,6 +832,7 @@ export function useCanvasInteractions(
                     scaleY: 1,
                     listening: false,
                     visible: true,
+                    coatingHeight: gcodeSettings.coatingHeight
                 };
                 const next = [...shapesRef.current, rect] as AnyNodeConfig[];
                 dispatch(addShape(rect));
@@ -850,6 +856,7 @@ export function useCanvasInteractions(
                     scaleY: 1,
                     listening: false,
                     visible: true,
+                    coatingHeight: gcodeSettings.coatingHeight
                 };
                 const next = [...shapesRef.current, circle] as AnyNodeConfig[];
                 dispatch(addShape(circle));

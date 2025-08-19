@@ -54,6 +54,17 @@ export const selectShapeHierarchy = createSelector(
         return { childrenMap, parentMap };
     }
 );
+// Helper 함수: 고유 이름 생성
+const generateUniqueName = (shapes: AnyNodeConfig[], baseName: string): string => {
+    let count = 1;
+    let newName = baseName;
+    const existingNames = shapes.map(shape => shape.name);
+    while (existingNames.includes(newName)) {
+        newName = `${baseName} #${count}`;
+        count++;
+    }
+    return newName;
+};
 
 // 기존 SerializableShapePayload 유지...
 interface SerializableShapePayload extends Omit<AnyNodeConfig, 'image'> {
@@ -67,13 +78,15 @@ const shapesSlice = createSlice({
         // addShape: Object.assign으로 배열 교체 금지 → push 사용
         addShape: (state, action: PayloadAction<SerializableShapePayload>) => {
             // shapes 안에 있는 같은 타입의 shape 개수를 세어 이름에 사용
-            const sameTypeCount = state.shapes.filter(s => s.type === action.payload.type).length;
+            const baseName = action.payload.name || action.payload.type || 'Shape';
+            const uniqueName = generateUniqueName(state.shapes, baseName);
+
             const newShape: AnyNodeConfig = {
                 ...action.payload,
                 type: action.payload.type,
                 id: action.payload.id,
                 parentId: action.payload.parentId,
-                name: `${action.payload.type} #${sameTypeCount + 1}`,
+                name: uniqueName,
                 listening: action.payload.listening ?? false,
                 x: action.payload.x ?? 0,
                 y: action.payload.y ?? 0,
@@ -87,13 +100,15 @@ const shapesSlice = createSlice({
 
         // addShapeToBack: 배열 맨 앞에 추가 → unshift 사용
         addShapeToBack: (state, action: PayloadAction<SerializableShapePayload>) => {
-            const sameTypeCount = state.shapes.filter(s => s.type === action.payload.type).length;
+            const baseName = action.payload.name || action.payload.type || 'Shape';
+            const uniqueName = generateUniqueName(state.shapes, baseName);
+
             const newShape: AnyNodeConfig = {
                 ...action.payload,
                 type: action.payload.type,
                 id: action.payload.id,
                 parentId: action.payload.parentId,
-                name: `${action.payload.type} #${sameTypeCount + 1}`,
+                name: uniqueName,
                 listening: action.payload.listening ?? false,
                 x: action.payload.x ?? 0,
                 y: action.payload.y ?? 0,

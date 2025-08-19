@@ -63,6 +63,7 @@ export interface GcodeSettings {
     maskingClearance: number;    // 마스킹 여유 거리 (mm)
 
     workArea: { width: number; height: number };
+    travelAvoidanceStrategy: 'lift' | 'contour'; // 이동 회피 전략 추가
     unit?: 'mm';
 }
 

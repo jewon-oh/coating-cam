@@ -223,7 +223,7 @@ export const GCodeSettingsDialog: React.FC<GCodeSettingsDialogProps> = ({ isOpen
                                 <SelectContent>
                                     <SelectItem value="horizontal">수평</SelectItem>
                                     <SelectItem value="vertical">수직</SelectItem>
-                                    <SelectItem value="both">격자 (수평+수직)</SelectItem>
+                                    {/*<SelectItem value="both">격자 (수평+수직)</SelectItem>*/}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -316,6 +316,22 @@ export const GCodeSettingsDialog: React.FC<GCodeSettingsDialogProps> = ({ isOpen
                                         onChange={handleInputChange}
                                         className="col-span-3"
                                     />
+                                    <Label htmlFor="travelAvoidanceStrategy" className="text-right">
+                                        마스킹 우회 방식
+                                    </Label>
+                                    <Select
+                                        value={gcodeSettings.travelAvoidanceStrategy}
+                                        onValueChange={(value) => handleSelectChange('travelAvoidanceStrategy', value)}
+                                    >
+                                        <SelectTrigger className="col-span-3">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="contour">윤곽 우회</SelectItem>
+                                            <SelectItem value="lift">Z축 들어올리기</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+
                                 </div>
                             </>
                         )}

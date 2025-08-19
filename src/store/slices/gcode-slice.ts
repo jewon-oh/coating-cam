@@ -23,6 +23,7 @@ const initialState: GCodeState = {
         // 마스킹 기본 설정
         enableMasking: true,
         maskingClearance: 0.5,       // 0.5mm 여유 거리
+        travelAvoidanceStrategy: 'contour', // 마스킹 테두리 따라 우회
 
         workArea: { width: 1000, height: 1000 },
         unit: 'mm',

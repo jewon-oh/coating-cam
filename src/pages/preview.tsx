@@ -1,16 +1,19 @@
 "use client";
 
-import React, {useState, useEffect, useMemo, useRef} from 'react';
+import React, {useState, useEffect, useMemo, useRef, useCallback} from 'react';
 import {useAppSelector} from '@/hooks/redux';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable';
 import {Slider} from '@/components/ui/slider';
-import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause} from 'lucide-react';
+import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause, RefreshCw} from 'lucide-react';
 // import {generateCoatingGCode} from '@/lib/coating-gcode-generator';
 // import {setGCode, setGenerating} from '@/store/slices/gcode-slice';
 import Preview3D, {PathPoint} from '@/components/3d-preview';
+import {AnyNodeConfig} from "@/types/custom-konva-config";
+import {setGCode, setGenerating} from "@/store/slices/gcode-slice";
+import {generateCoatingGCode} from "@/lib/generate-coating-gcode-with-snippets";
 // import {useSettings} from '@/contexts/settings-context';
 
 /**
@@ -79,6 +82,13 @@ export default function PreviewPage() {
     // 3D 툴헤드 포즈
     const [toolheadPos, setToolheadPos] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0]);
 
+    // 이미지 shapes만 필터링
+    const imageShapes = useMemo(() =>
+            shapes.filter((shape): shape is Extract<AnyNodeConfig, { type: 'image' }> =>
+                shape.type === 'image'
+            ),
+        [shapes]
+    );
 
     // 슬라이더 변경 시 툴헤드 위치 반영
     useEffect(() => {
@@ -109,56 +119,6 @@ export default function PreviewPage() {
         };
     }, []);
 
-    // G-code 재생성 함수
-    // const handleRegenerateGCode = useCallback(async () => {
-    //     if (shapes.length === 0) {
-    //         alert('도형이 없습니다. 캔버스에서 도형을 생성하세요.');
-    //         return;
-    //     }
-    //
-    //     dispatch(setGenerating(true));
-    //     try {
-    //         const generatedGCode = await generateCoatingGCode(shapes, {
-    //             ...settings,
-    //             workArea: workArea
-    //         });
-    //
-    //         // G-code 생성 후 Redux에 저장
-    //         const pathForRedux = generatedGCode.split('\n').map(line => {
-    //             if (line.startsWith('G0') || line.startsWith('G1')) {
-    //                 const x = line.match(/X([+-]?\d*\.?\d+)/);
-    //                 const y = line.match(/Y([+-]?\d*\.?\d+)/);
-    //                 const z = line.match(/Z([+-]?\d*\.?\d+)/);
-    //                 return [
-    //                     x ? parseFloat(x[1]) : 0,
-    //                     y ? parseFloat(y[1]) : 0,
-    //                     z ? parseFloat(z[1]) : 0
-    //                 ];
-    //             }
-    //             return null;
-    //         }).filter(p => p !== null) as number[][];
-    //
-    //         dispatch(setGCode({gcode: generatedGCode, path: pathForRedux}));
-    //
-    //         // 첫 번째 위치로 툴헤드 설정
-    //         setStep(0);
-    //         if (localPathData.length > 0) {
-    //             const { pos: [x, y, z] } = localPathData[0];
-    //             setToolheadPos([x, y, z, 0, 0, 0, 0, 0]);
-    //         }
-    //     } catch (error) {
-    //         console.error('G-code 생성 실패:', error);
-    //         alert('G-code 재생성에 실패했습니다.');
-    //     } finally {
-    //         dispatch(setGenerating(false));
-    //     }
-    // });
-    // 컴포넌트 마운트 시 G-code가 없으면 자동 생성
-    // useEffect(() => {
-    //     if (!gcode && shapes.length > 0 && !isGenerating) {
-    //         handleRegenerateGCode();
-    //     }
-    // }, [shapes, gcode, isGenerating, handleRegenerateGCode]);
 
     // G-code 다운로드 함수
     const handleDownloadGCode = () => {
@@ -361,15 +321,6 @@ export default function PreviewPage() {
                                 <CardTitle className="text-base">제어</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
-                                {/*<Button*/}
-                                {/*    onClick={handleRegenerateGCode}*/}
-                                {/*    disabled={isGenerating}*/}
-                                {/*    className="w-full"*/}
-                                {/*    variant="outline"*/}
-                                {/*>*/}
-                                {/*    <RefreshCw className="w-4 h-4 mr-2"/>*/}
-                                {/*    {isGenerating ? '생성 중...' : 'G-code 재생성'}*/}
-                                {/*</Button>*/}
                                 <Button
                                     onClick={handlePlayAnimation}
                                     disabled={!gcode || localPathData.length === 0}
@@ -460,6 +411,7 @@ export default function PreviewPage() {
                                         toolheadPos={toolheadPos}
                                         pathData={localPathData}                 // 전체 경로 그대로 전달
                                         activeCount={Math.min(step + 1, localPathData.length)} // 진행 개수만 전달
+                                        imageShapes={imageShapes} // 여러 이미지 전달
                                     />
                                 ) : (
                                     <div className="h-full flex items-center justify-center text-muted-foreground">

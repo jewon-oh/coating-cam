@@ -1,6 +1,6 @@
 "use client";
 
-import React, {useRef, useCallback, useEffect, useState} from 'react';
+import React, {useRef, useCallback, useEffect, useState, useMemo} from 'react';
 import {Stage, Layer, Rect, Transformer, Circle, Image, Group} from 'react-konva';
 import type Konva from 'konva';
 
@@ -47,6 +47,9 @@ export default function CanvasStage() {
     // 캐시 관련 상태
     const [isCacheEnabled, setIsCacheEnabled] = useState(false);
 
+    const selectedShapes = shapes.filter(shape => selectedShapeIds.includes(shape.id));
+    const hasImages = selectedShapes.some(shape => shape.type === 'image');
+
     const transformerConfig: TransformerConfig = {
         anchorStyleFunc: (anchor) => {
             anchor.cornerRadius(10);
@@ -80,28 +83,37 @@ export default function CanvasStage() {
         stageRef,
         canvasContainerRef,
         stage: stageState,
+        canvasSize,
         setStage,
         setIsLoading,
         setLoadingMessage
     } = useCanvas();
 
     const stage = stageRef.current!;
-
     // Context menu target state
     const [isContextOnShape, setIsContextOnShape] = useState(false);
 
-    // Apply stage transform (scale and position) from CanvasContext state to Konva Stage
+    // ✅ X축 반전을 위한 Stage transform 적용
     useEffect(() => {
         const s = stageRef.current;
         if (!s) return;
         try {
-            s.scale({ x: stageState.scale, y: stageState.scale });
-            s.position({ x: stageState.x, y: stageState.y });
+            // 기존 스케일과 위치에 X축 반전 추가
+            s.scale({
+                x: -stageState.scale,  // ✅ X축 반전: 음수 스케일
+                y: stageState.scale
+            });
+            s.position({
+                x: stageState.x + canvasSize.width, // ✅ 반전된 원점을 오른쪽으로 이동
+                y: stageState.y
+            });
             s.batchDraw();
         } catch (err) {
             console.error('Failed to apply stage transform:', err);
         }
-    }, [stageRef, stageState.scale, stageState.x, stageState.y]);
+    }, [stageRef, stageState.scale, stageState.x, stageState.y, canvasSize.width]);
+
+
 
     const layerRef = useRef<Konva.Layer>(null);
     const transformerRef = useRef<Konva.Transformer>(null);
@@ -118,6 +130,21 @@ export default function CanvasStage() {
     // SettingsContext에서 그리드 및 작업 영역 설정 가져오기
     const {isGridVisible, gridSize, workArea,} = useSettings();
 
+    // 커서 스타일 결정 로직
+    const cursorStyle = useMemo(() => {
+        if (isPanning) return 'grabbing';
+        if (isTransforming) return 'move';
+
+        switch (tool) {
+            case 'select':
+                return isHoveringShape ? 'move' : 'default';
+            case 'rectangle':
+            case 'circle':
+                return 'crosshair';
+            default:
+                return 'default';
+        }
+    }, [tool, isPanning, isTransforming, isHoveringShape]);
 
     // 캐시 자동 활성화 로직 - 조건을 더 보수적으로 변경
     useEffect(() => {
@@ -433,7 +460,8 @@ export default function CanvasStage() {
                 // 포커스 상태에 따른 시각적 피드백 (선택사항)
                 border: isCanvasFocused ? '2px solid rgba(59, 130, 246, 0.3)' : '2px solid transparent',
                 borderRadius: '8px',
-                transition: 'border-color 0.2s ease'
+                transition: 'border-color 0.2s ease',
+                cursor: cursorStyle
             }}
         >
 
@@ -453,9 +481,7 @@ export default function CanvasStage() {
                 draggable={isPanning}
             >
                 {/* 배경 */}
-                <Layer
-                    listening={false}
-                >
+                <Layer ref={layerRef}>
                     {/* 캔버스 배경*/}
                     <Rect
                         x={- (stage?.x() ?? 0) / (stage?.scaleX() || 1)}
@@ -477,21 +503,24 @@ export default function CanvasStage() {
                         listening={false}
                     />
                     {/* 그리드 표시 */}
-                    <CanvasGrid
-                        stageRef={stageRef}
-                        gridSize={gridSize}
-                        workArea={workArea}
-                        visible={isGridVisible}
-                        isPanning={isPanning}
-                        stageScale={stageState.scale}
-                        stageX={stageState.x}
-                        stageY={stageState.y}
-                        viewportWidth={stage?.width()}
-                        viewportHeight={stage?.height()}
-                    />
-                </Layer>
+                    <Group
+                        scaleX={-1}
+                        x={canvasSize.width}
+                    >
+                        <CanvasGrid
+                            stageRef={stageRef}
+                            gridSize={gridSize}
+                            workArea={workArea}
+                            visible={isGridVisible}
+                            isPanning={isPanning}
+                            stageScale={stageState.scale}
+                            stageX={stageState.x}
+                            stageY={stageState.y}
+                            viewportWidth={stage?.width()}
+                            viewportHeight={stage?.height()}
+                        />
+                    </Group>
 
-                <Layer ref={layerRef}>
                     {/* 이미지 그룹 (캐시 가능) */}
                     <Group
                         ref={imageGroupRef}
@@ -604,6 +633,8 @@ export default function CanvasStage() {
 
                     <Transformer
                         ref={transformerRef}
+                        // 이미지의 경우 회전 스냅 각도 설정 (15도 단위)
+                        rotationSnaps={hasImages ? [0, 45, 90, 135, 180, 225, 270, 315] : []}
                         onTransformStart={handleTransformStart}
                         onTransform={handleTransform}
                         onTransformEnd={handleTransformEnd}
