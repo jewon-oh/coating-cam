@@ -1,13 +1,12 @@
 'use client';
 
-import  { useEffect, useMemo, useRef,useState } from 'react';
-import { useSettings } from "@/contexts/settings-context";
-import {Canvas, extend} from "@react-three/fiber";
-import { OrbitControls, Grid, Text, Line } from "@react-three/drei";
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {useSettings} from "@/contexts/settings-context";
+import {Canvas} from "@react-three/fiber";
+import {OrbitControls, Grid, Text} from "@react-three/drei";
 import * as THREE from 'three';
 import {AnyNodeConfig} from "@/types/custom-konva-config";
 import {useAppSelector} from "@/hooks/redux";
-
 
 
 // PathPoint 타입 정의 및 export
@@ -24,16 +23,52 @@ interface MotionBoard3DProps {
     imageShapes?: Extract<AnyNodeConfig, { type: 'image' }>[];
 }
 
+/**
+ * 이미지 데이터 URL과 crop 정보를 받아, 잘라낸 새 이미지 데이터 URL을 반환합니다.
+ * @param dataUrl 원본 이미지의 데이터 URL
+ * @param crop {x, y, width, height} 크롭 정보
+ * @returns Promise<string> - 잘라낸 이미지의 데이터 URL
+ */
+function cropImageData(dataUrl: string, crop: { x: number, y: number, width: number, height: number }): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const img = new window.Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => {
+            // crop 크기에 맞는 새 캔버스 생성
+            const canvas = document.createElement('canvas');
+            canvas.width = crop.width;
+            canvas.height = crop.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return reject(new Error('2D context를 얻을 수 없습니다.'));
+
+            // 원본 이미지(img)에서 crop 영역만큼을 잘라 새 캔버스에 그립니다.
+            ctx.drawImage(
+                img,
+                crop.x,      // 원본에서 복사할 영역의 시작 X
+                crop.y,      // 원본에서 복사할 영역의 시작 Y
+                crop.width,  // 복사할 영역의 너비
+                crop.height, // 복사할 영역의 높이
+                0,           // 새 캔버스에 그릴 위치 X
+                0,           // 새 캔버스에 그릴 위치 Y
+                crop.width,  // 그릴 이미지의 너비
+                crop.height  // 그릴 이미지의 높이
+            );
+            // 새 캔버스의 내용을 새로운 데이터 URL로 만들어 반환
+            resolve(canvas.toDataURL());
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
+}
+
 
 // 실제 imageShape 구조에 맞춰 다중 이미지를 렌더링하는 컴포넌트
 function MultipleCanvasImages({
                                   imageShapes = [],
                                   scaleFactor,
-                                  workArea
                               }: {
     imageShapes: Extract<AnyNodeConfig, { type: 'image' }>[];
     scaleFactor: number;
-    workArea: { width: number; height: number };
 }) {
     const [textures, setTextures] = useState<Map<string, THREE.Texture>>(new Map());
     const [loadingStates, setLoadingStates] = useState<Map<string, boolean>>(new Map());
@@ -46,30 +81,45 @@ function MultipleCanvasImages({
 
             // 로딩 상태 초기화
             imageShapes.forEach(shape => {
-                newLoadingStates.set(shape.id, true);
+                newLoadingStates.set(shape.id ?? "", true);
             });
             setLoadingStates(newLoadingStates);
 
             for (const imageShape of imageShapes) {
                 if (imageShape.imageDataUrl) {
                     try {
-                        console.log(`Loading texture for image: ${imageShape.name} (${imageShape.id})`);
+                        // --- ⬇️ 1. 이미지 URL 준비 ⬇️ ---
+                        let finalImageUrl = imageShape.imageDataUrl;
+                        // crop 정보가 있으면, 이미지를 미리 잘라냅니다.
+                        if (imageShape.crop) {
+                            finalImageUrl = await cropImageData(imageShape.imageDataUrl, imageShape.crop);
+                        }
+                        // --- ⬆️ 1. 이미지 URL 준비 ⬆️ ---
 
                         const texture = await new Promise<THREE.Texture>((resolve, reject) => {
+                            // 2. '잘라낸 이미지' 또는 '원본 이미지' URL로 텍스처를 로드합니다.
                             loader.load(
-                                imageShape.imageDataUrl!,
+                                finalImageUrl,
                                 (loadedTexture) => {
-                                    // 텍스처 설정 최적화
                                     loadedTexture.generateMipmaps = false;
                                     loadedTexture.minFilter = THREE.LinearFilter;
                                     loadedTexture.magFilter = THREE.LinearFilter;
-                                    loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-                                    loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
 
-                                    // ✅ 텍스처를 90도 회전시켜서 원래 이미지 방향 유지
+                                    // --- ⬇️ 3. 텍스처 처리 로직 단순화 ⬇️ ---
+                                    // 이미지가 미리 잘렸으므로 복잡한 crop 계산이 필요 없습니다.
+                                    // 기존의 반전/회전 로직만 적용합니다.
+
+                                    // 반전 처리
+                                    loadedTexture.wrapS = THREE.RepeatWrapping;
+                                    loadedTexture.repeat.x = -1;
+                                    loadedTexture.offset.x = 1;
+
+                                    // 회전
                                     loadedTexture.center.set(0.5, 0.5);
-                                    loadedTexture.rotation = Math.PI / 2; // 90도 회전
+                                    loadedTexture.rotation = Math.PI / 2;
+                                    // --- ⬆️ 3. 텍스처 처리 로직 단순화 ⬆️ ---
 
+                                    loadedTexture.needsUpdate = true;
                                     resolve(loadedTexture);
                                 },
                                 undefined,
@@ -77,16 +127,14 @@ function MultipleCanvasImages({
                             );
                         });
 
-                        newTextures.set(imageShape.id, texture);
-                        console.log(`Texture loaded successfully for: ${imageShape.name}`);
+                        newTextures.set(imageShape.id ?? "", texture);
                     } catch (error) {
                         console.warn(`이미지 텍스처 로드 실패: ${imageShape.name} (${imageShape.id})`, error);
                     } finally {
-                        newLoadingStates.set(imageShape.id, false);
+                        newLoadingStates.set(imageShape.id ?? "", false);
                     }
                 } else {
-                    console.warn(`imageDataUrl이 없음: ${imageShape.name} (${imageShape.id})`);
-                    newLoadingStates.set(imageShape.id, false);
+                    newLoadingStates.set(imageShape.id ?? "", false);
                 }
             }
 
@@ -97,11 +145,19 @@ function MultipleCanvasImages({
         if (imageShapes.length > 0) {
             loadTextures();
         } else {
-            // imageShapes가 없으면 초기화
+            // 이미지가 없을 때 상태 초기화
             setTextures(new Map());
             setLoadingStates(new Map());
         }
-    }, [imageShapes]);
+
+        // 의존성 변경/언마운트 시 기존 텍스처 자원 해제
+        return () => {
+            textures.forEach((tex) => {
+                try { tex.dispose(); } catch {}
+            });
+        };
+    }, [imageShapes, textures]);
+
 
     if (imageShapes.length === 0) {
         return null;
@@ -110,8 +166,8 @@ function MultipleCanvasImages({
     return (
         <group>
             {imageShapes.map((imageShape) => {
-                const texture = textures.get(imageShape.id);
-                const isLoading = loadingStates.get(imageShape.id) ?? false;
+                const texture = textures.get(imageShape.id ?? "");
+                const isLoading = loadingStates.get(imageShape.id ?? "") ?? false;
 
                 // ✅ crop된 영역의 실제 크기와 위치 계산
                 const baseX = imageShape.x ?? 0;
@@ -125,8 +181,8 @@ function MultipleCanvasImages({
 
                 if (imageShape.crop) {
                     // crop이 있으면 crop된 영역 사용
-                    effectiveX = baseX + (imageShape.crop.x * scaleX);
-                    effectiveY = baseY + (imageShape.crop.y * scaleY);
+                    effectiveX = baseX;//+ (imageShape.crop.x * scaleX);
+                    effectiveY = baseY;// + (imageShape.crop.y * scaleY);
                     effectiveWidth = imageShape.crop.width * scaleX;
                     effectiveHeight = imageShape.crop.height * scaleY;
                 } else {
@@ -157,11 +213,11 @@ function MultipleCanvasImages({
                             position={[posX, 0.005, posZ]}
                             rotation={[-Math.PI / 2, 0, (rotation * Math.PI) / 180]}
                         >
-                            <planeGeometry args={[actualWidth, actualHeight]} />
+                            <planeGeometry args={[actualWidth, actualHeight]}/>
                             <meshBasicMaterial
                                 color="#666666"
                                 transparent
-                                opacity={0.3}
+                                opacity={0.6}
                             />
                             {/* crop된 영역 표시를 위한 텍스트 */}
                             <Text
@@ -185,9 +241,17 @@ function MultipleCanvasImages({
                         key={imageShape.id}
                         position={[posX, 0.05, posZ]}
                         rotation={[-Math.PI / 2, 0, (rotation * Math.PI) / 180]}
-                        userData={{ imageShape, effectiveBounds: { x: effectiveX, y: effectiveY, width: effectiveWidth, height: effectiveHeight } }}
+                        userData={{
+                            imageShape,
+                            effectiveBounds: {
+                                x: effectiveX,
+                                y: effectiveY,
+                                width: effectiveWidth,
+                                height: effectiveHeight
+                            }
+                        }}
                     >
-                        <planeGeometry args={[actualWidth, actualHeight]} />
+                        <planeGeometry args={[actualWidth, actualHeight]}/>
                         <meshBasicMaterial
                             map={texture}
                             transparent
@@ -203,7 +267,7 @@ function MultipleCanvasImages({
 }
 
 // ToolHead 위치를 렌더링하는 컴포넌트 (프레임 루프 제거)
-function ToolHead({ position, scaleFactor }: { position: number[], scaleFactor: number }) {
+function ToolHead({position, scaleFactor}: { position: number[], scaleFactor: number }) {
     const cylinderHeight = 2;
 
     // 위치 계산 로직을 useMemo로 분리하여 불필요한 계산 방지
@@ -218,21 +282,25 @@ function ToolHead({ position, scaleFactor }: { position: number[], scaleFactor: 
 
     return (
         <mesh position={toolheadPosition}>
-            <cylinderGeometry args={[0.5, 0.5, cylinderHeight]} />
-            <meshStandardMaterial color="lime" />
+            <cylinderGeometry args={[0.5, 0.5, cylinderHeight]}/>
+            <meshStandardMaterial color="lime"/>
         </mesh>
     );
 }
 
 
-function GCodePath({ pathData = [], scaleFactor, activeCount = 0 }: { pathData?: PathPoint[]; scaleFactor: number; activeCount?: number }) {
+function GCodePath({pathData = [], scaleFactor, activeCount = 0}: {
+    pathData?: PathPoint[];
+    scaleFactor: number;
+    activeCount?: number
+}) {
     const g0Ref = useRef<THREE.LineSegments>(null!);
     const g1Ref = useRef<THREE.LineSegments>(null!);
 
     // 1. G0와 G1 지오메트리를 '한 번만' 미리 생성
-    const { g0Geometry, g1Geometry, segmentTypes } = useMemo(() => {
+    const {g0Geometry, g1Geometry, segmentTypes} = useMemo(() => {
         if (pathData.length === 0) {
-            return { g0Geometry: new THREE.BufferGeometry(), g1Geometry: new THREE.BufferGeometry(), segmentTypes: [] };
+            return {g0Geometry: new THREE.BufferGeometry(), g1Geometry: new THREE.BufferGeometry(), segmentTypes: []};
         }
 
         const base = [0, 2 / scaleFactor, 0];
@@ -267,7 +335,7 @@ function GCodePath({ pathData = [], scaleFactor, activeCount = 0 }: { pathData?:
         const g1Geo = new THREE.BufferGeometry();
         g1Geo.setAttribute('position', new THREE.Float32BufferAttribute(g1Positions, 3));
 
-        return { g0Geometry: g0Geo, g1Geometry: g1Geo, segmentTypes: types };
+        return {g0Geometry: g0Geo, g1Geometry: g1Geo, segmentTypes: types};
     }, [pathData, scaleFactor]);
 
     // 2. activeCount가 바뀔 때마다 'drawRange' 값만 업데이트
@@ -294,19 +362,21 @@ function GCodePath({ pathData = [], scaleFactor, activeCount = 0 }: { pathData?:
         <group>
             {/* G0 선분 그룹 */}
             <lineSegments ref={g0Ref} geometry={g0Geometry} frustumCulled={false}>
-                <lineBasicMaterial color="#ff6600" linewidth={12} />
+                <lineBasicMaterial color="#ff6600" linewidth={12}/>
             </lineSegments>
 
             {/* G1 선분 그룹 */}
             <lineSegments ref={g1Ref} geometry={g1Geometry} frustumCulled={false}>
-                <lineBasicMaterial color="#00ff88" linewidth={15} />
+                <lineBasicMaterial color="#00ff88" linewidth={15}/>
             </lineSegments>
         </group>
     );
 }
-const Preview3D = ({ toolheadPos, pathData = [], activeCount = 0,imageShapes
+
+const Preview3D = ({
+                       toolheadPos, pathData = [], activeCount = 0, imageShapes
                    }: MotionBoard3DProps) => {
-    const { workArea } = useSettings();
+    const {workArea} = useSettings();
     const SCALE_FACTOR = 10;
 
     // Redux에서 직접 이미지 shapes를 가져오는 대안
@@ -334,12 +404,16 @@ const Preview3D = ({ toolheadPos, pathData = [], activeCount = 0,imageShapes
         const textOffset = 2;
         for (let i = 0; i <= workArea.width; i += labelInterval) {
             labels.push(
-                <Text key={`x-label-${i}`} position={[-textOffset, 0, i / SCALE_FACTOR]} color="gray" fontSize={fontSize} rotation={[-Math.PI / 2, 0, Math.PI / 2]} anchorX="center" anchorY="middle">{`X${i}`}</Text>
+                <Text key={`x-label-${i}`} position={[-textOffset, 0, i / SCALE_FACTOR]} color="gray"
+                      fontSize={fontSize} rotation={[-Math.PI / 2, 0, Math.PI / 2]} anchorX="center"
+                      anchorY="middle">{`X${i}`}</Text>
             );
         }
         for (let i = 0; i <= workArea.height; i += labelInterval) {
             labels.push(
-                <Text key={`y-label-${i}`} position={[i / SCALE_FACTOR, 0, -textOffset]} color="gray" fontSize={fontSize} rotation={[-Math.PI / 2, 0, Math.PI / 2]} anchorX="center" anchorY="middle">{`Y${i}`}</Text>
+                <Text key={`y-label-${i}`} position={[i / SCALE_FACTOR, 0, -textOffset]} color="gray"
+                      fontSize={fontSize} rotation={[-Math.PI / 2, 0, Math.PI / 2]} anchorX="center"
+                      anchorY="middle">{`Y${i}`}</Text>
             );
         }
         return labels;
@@ -347,29 +421,34 @@ const Preview3D = ({ toolheadPos, pathData = [], activeCount = 0,imageShapes
 
     return (
         <Canvas
-            camera={{ position: [gridCenter, scaledWorkArea.height * 1.5, gridCenter], fov: 75 }}
-            style={{ background: '#111111' }}
-            gl={{ powerPreference: 'high-performance', antialias: true }}
+            camera={{position: [gridCenter, scaledWorkArea.height * 1.5, gridCenter], fov: 75}}
+            style={{background: '#111111'}}
+            gl={{powerPreference: 'high-performance', antialias: true}}
         >
-            <ambientLight intensity={1.2} />
-            <directionalLight position={[scaledWorkArea.width * 2, scaledWorkArea.height * 2, scaledWorkArea.height * 2]} intensity={1} />
-            <hemisphereLight groundColor={"#666"} intensity={0.8} />
+            <ambientLight intensity={1.2}/>
+            <directionalLight
+                position={[scaledWorkArea.width * 2, scaledWorkArea.height * 2, scaledWorkArea.height * 2]}
+                intensity={1}/>
+            <hemisphereLight groundColor={"#666"} intensity={0.8}/>
 
-            <Grid position={[scaledWorkArea.height / 2, 0, scaledWorkArea.width / 2]} args={[scaledWorkArea.height, scaledWorkArea.width]} infiniteGrid={false} sectionColor={'#555555'} cellColor={'#333333'} />
-            <axesHelper args={[10]} position-y={0.01} />
-            <Text position={[11, 0.01, 0]} color="red" fontSize={1.5} rotation={[-Math.PI / 2, 0, Math.PI / 2]} anchorX="center" anchorY="middle">Y</Text>
+            <Grid position={[scaledWorkArea.height / 2, 0, scaledWorkArea.width / 2]}
+                  args={[scaledWorkArea.height, scaledWorkArea.width]} infiniteGrid={false} sectionColor={'#555555'}
+                  cellColor={'#333333'}/>
+            <axesHelper args={[10]} position-y={0.01}/>
+            <Text position={[11, 0.01, 0]} color="red" fontSize={1.5} rotation={[-Math.PI / 2, 0, Math.PI / 2]}
+                  anchorX="center" anchorY="middle">Y</Text>
             <Text position={[0, 11, 0]} color="green" fontSize={1.5} anchorX="center" anchorY="middle">Z</Text>
-            <Text position={[0, 0.01, 11]} color="blue" fontSize={1.5} rotation={[-Math.PI / 2, 0, Math.PI / 2]} anchorX="center" anchorY="middle">X</Text>
+            <Text position={[0, 0.01, 11]} color="blue" fontSize={1.5} rotation={[-Math.PI / 2, 0, Math.PI / 2]}
+                  anchorX="center" anchorY="middle">X</Text>
 
             {gridLabels}
 
-            <GCodePath pathData={pathData} scaleFactor={SCALE_FACTOR} activeCount={activeCount} />
-            <ToolHead position={toolheadPos} scaleFactor={SCALE_FACTOR} />
+            <GCodePath pathData={pathData} scaleFactor={SCALE_FACTOR} activeCount={activeCount}/>
+            <ToolHead position={toolheadPos} scaleFactor={SCALE_FACTOR}/>
             {/* 여러 캔버스 이미지들 표시 */}
             <MultipleCanvasImages
                 imageShapes={finalImageShapes}
                 scaleFactor={SCALE_FACTOR}
-                workArea={workArea}
             />
 
             {/* 휠 클릭(중클릭)으로 패닝: OrbitControls의 mouseButtons 매핑 */}

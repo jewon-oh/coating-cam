@@ -122,14 +122,16 @@ export function useTransformerHandlers(
                         newCrop.x = Math.max(0, cache.crop.x - cropWidthChange);
                         newCrop.width = Math.max(1, cache.crop.width + cropWidthChange);
                         break;
-                    case 'bottom-center':
+                    case 'top-center' :
                         newCrop.height = Math.max(1, cache.crop.height + cropHeightChange);
+                        console.log('newCrop', newCrop);
                         break;
-                    case 'top-center':
+                    case 'bottom-center':
                         newCrop.y = Math.max(0, cache.crop.y - cropHeightChange);
                         newCrop.height = Math.max(1, cache.crop.height + cropHeightChange);
                         break;
                 }
+
 
                 // 이미지 영역 내로 제한
                 newCrop.x = Math.max(0, Math.min(newCrop.x, cache.originalImageWidth - 1));

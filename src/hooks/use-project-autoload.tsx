@@ -10,15 +10,14 @@ import { ProjectFileType } from "@/types/project";
 import { useRouter } from "next/router";
 
 export function useProjectAutoLoad() {
-    const { setIsLoading, setLoadingMessage } = useCanvas();
+    const { setLoading } = useCanvas();
     const dispatch = useAppDispatch();
     const router = useRouter();
 
     useEffect(() => {
         const loadProject = async () => {
             try {
-                setIsLoading(true);
-                setLoadingMessage("프로젝트 로딩 중...");
+                setLoading({isLoading:true,message:"프로젝트 로딩 중..."});
 
                 let jsonText: string | null = null;
 
@@ -28,8 +27,8 @@ export function useProjectAutoLoad() {
                         ? router.query.filePath
                         : undefined;
 
-                if (filePath && (window as any).projectApi) {
-                    jsonText = await (window as any).projectApi.readFile(filePath, "utf8");
+                if (filePath && window.projectApi) {
+                    jsonText = await window.projectApi.readFile(filePath, "utf8");
                 }
 
                 // 2) 웹 환경: sessionStorage
@@ -51,8 +50,7 @@ export function useProjectAutoLoad() {
                 }
 
                 if (!jsonText) {
-                    setLoadingMessage("로딩 중...");
-                    setIsLoading(false);
+                    setLoading({isLoading:false,message:" 로딩 중..."});
                     return;
                 }
 
@@ -70,17 +68,15 @@ export function useProjectAutoLoad() {
                 dispatch(updateGcodeSettings(parsedGcodeSettings));
                 dispatch(resetHistory(parsedShapes));
 
-                setLoadingMessage("완료!");
+                setLoading({ message:"완료!"});
                 setTimeout(() => {
-                    setIsLoading(false);
-                    setLoadingMessage("로딩 중...");
+                    setLoading({isLoading:false,message:" 로딩 중..."});
                 }, 500);
             } catch (e) {
                 console.error("Failed to load project:", e);
-                setLoadingMessage("로딩 실패");
+                setLoading({ message:"로딩 실패"});
                 setTimeout(() => {
-                    setIsLoading(false);
-                    setLoadingMessage("로딩 중...");
+                    setLoading({isLoading:false,message:" 로딩 중..."});
                 }, 800);
             }
         };
@@ -88,5 +84,5 @@ export function useProjectAutoLoad() {
         if (router.isReady) {
             void loadProject();
         }
-    }, [router.isReady, router.query, setIsLoading, setLoadingMessage, dispatch]);
+    }, [router.isReady, router.query, setLoading, dispatch]);
 }

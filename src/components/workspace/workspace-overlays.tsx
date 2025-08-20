@@ -20,7 +20,7 @@ export const WorkspaceOverlays = () => {
     const shapes = useAppSelector((state) => state.shapes.shapes);
     const selectedShapeIds = useAppSelector((state) => state.shapes.selectedShapeIds);
     const {workArea} = useSettings();
-    const {stage, isLoading} = useCanvas();
+    const {stage, loading} = useCanvas();
 
     const [showShortcuts, setShowShortcuts] = useState(false);
 
@@ -32,7 +32,7 @@ export const WorkspaceOverlays = () => {
                 shapes={shapes}
                 selectedCount={selectedShapeIds.length}
                 zoom={stage.scale}
-                isLoading={isLoading}
+                isLoading={loading.isLoading}
             />
             {/* 미니맵 */}
             <Minimap

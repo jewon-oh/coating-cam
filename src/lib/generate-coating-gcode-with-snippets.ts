@@ -105,6 +105,26 @@ class GCodeEmitter {
         this.moveTo(x, y, this.lastPosition.z, this.settings.coatingSpeed, false);
     }
 
+    // --- ⬇️ 새로운 메서드 추가 ⬇️ ---
+    /**
+     * [신규] 지정된 속도를 사용하여 코팅(G1) 이동을 합니다.
+     * @param x X좌표
+     * @param y Y좌표
+     * @param speed 이동 속도 (F값)
+     */
+    public coatToWithSpeed(x: number, y: number, speed: number) {
+        this.moveTo(x, y, this.lastPosition.z, speed, false);
+    }
+
+    /**
+     * 코팅 속도(G1)를 사용하여 현재 Z높이에서 지정된 위치로 이동합니다.
+     * @param x X좌표
+     * @param y Y좌표
+     */
+    public coatTo(x: number, y: number) {
+        this.moveTo(x, y, this.lastPosition.z, this.settings.coatingSpeed, false);
+    }
+
     /**
      * 코팅 높이(G1)에서 지정된 위치로 이동합니다.
      * @param x X좌표
@@ -180,10 +200,46 @@ class PathGenerator {
         this.settings = settings;
         // 도형들을 경계용과 마스킹용으로 나눕니다.
         this.boundaryShapes = shapes.filter((s): s is Extract<AnyNodeConfig, { type: 'image' }> => s.type === 'image');
-        this.maskShapes = settings.enableMasking ? shapes.filter((s): s is Exclude<AnyNodeConfig, {
-            type: 'image'
-        }> => s.type !== 'image') : [];
         this.maskClearance = settings.maskingClearance + settings.coatingWidth / 2;
+
+        // this.maskShapes = settings.enableMasking ? shapes.filter((s): s is Exclude<AnyNodeConfig, {
+        //     type: 'image'
+        // }> => s.type !== 'image') : [];
+
+        // --- ⬇️ 핵심 수정 부분: 마스킹 도형 처리 로직 변경 ⬇️ ---
+        if (!settings.enableMasking) {
+            this.maskShapes = [];
+        } else {
+            const originalMasks = shapes.filter((s) => s.type !== 'image');
+
+            // 1. 마스킹 도형들을 순회하며 윤곽선 코팅 옵션을 확인합니다.
+            this.maskShapes = originalMasks.map(shape => {
+                // 2. 윤곽선 코팅이 활성화된 경우
+                if (shape.enableOutlineCoating) {
+                    // 3. 최종 확장 오프셋을 계산합니다.
+                    const passes = shape.outlineCoatingPasses ?? 1;
+                    const baseOffset = shape.outlineCoatingOffset ?? 0;
+                    const totalOffset = passes * baseOffset;
+
+                    // 4. 원본 도형을 복사하여 '확장된 가상 마스크'를 생성합니다.
+                    const expandedMask = { ...shape };
+
+                    if (expandedMask.type === 'rectangle') {
+                        expandedMask.x = (expandedMask.x ?? 0) - totalOffset;
+                        expandedMask.y = (expandedMask.y ?? 0) - totalOffset;
+                        expandedMask.width = (expandedMask.width ?? 0) + totalOffset * 2;
+                        expandedMask.height = (expandedMask.height ?? 0) + totalOffset * 2;
+                    } else if (expandedMask.type === 'circle' && expandedMask.radius) {
+                        expandedMask.radius = expandedMask.radius + totalOffset;
+                    }
+                    return expandedMask;
+                }
+
+                // 5. 윤곽선 코팅이 비활성화된 경우, 원본 도형을 그대로 사용합니다.
+                return shape;
+            });
+        }
+        // --- ⬆️ 핵심 수정 부분 ⬆️ ---
     }
 
     /**
@@ -332,6 +388,30 @@ class PathGenerator {
                 emitter.setZ(this.settings.safeHeight);
                 emitter.addLine(`; ---- PCB Image ${boundary.name ?? 'unknown'} end ----`);
             }
+
+            // --- ⬇️ 새로운 로직 추가: 윤곽선 코팅 ⬇️ ---
+            // 1. 윤곽선 코팅이 활성화된 마스킹 도형들을 찾습니다.
+            const outlineShapes = this.maskShapes.filter(s =>
+                s.enableOutlineCoating && (s.type === 'rectangle' || s.type === 'circle')
+            );
+
+            if (outlineShapes.length > 0) {
+                emitter.addLine(`;`);
+                emitter.addLine(`; ---- Outline Coating Start ----`);
+                if (onProgress) onProgress(95, '윤곽선 코팅 경로 생성 중...');
+
+                // 2. 각 도형에 대해 윤곽선 생성 메서드를 호출합니다.
+                for (const shape of outlineShapes) {
+                    // 각 윤곽선 작업 전/후로 노즐을 안전 높이로 올립니다.
+                    emitter.setZ(this.settings.safeHeight);
+                    this.generateOutlinePath(shape, emitter);
+                }
+
+                emitter.setZ(this.settings.safeHeight);
+                emitter.addLine(`; ---- Outline Coating End ----`);
+                emitter.addLine(`;`);
+            }
+            // --- ⬆️ 새로운 로직 추가 ⬆️ ---
 
             if (onProgress) onProgress(100, 'G-code 생성 완료');
         } catch (error: any) {
@@ -593,8 +673,8 @@ class PathGenerator {
 
         // ✅ 2. 도형의 절대 위치(x, y)와 crop 영역의 상대 위치(crop.x, crop.y)를 합산하여
         //    실제 Crop된 영역의 시작점을 계산합니다.
-        const cropStartX = (boundary.x ?? 0) + (crop.x ?? 0);
-        const cropStartY = (boundary.y ?? 0) + (crop.y ?? 0);
+        const cropStartX = (boundary.x ?? 0);// + (crop.x ?? 0);
+        const cropStartY = (boundary.y ?? 0);// + (crop.y ?? 0);
         const cropWidth = crop.width ?? boundary.width ?? 0;
         const cropHeight = crop.height ?? boundary.height ?? 0;
 
@@ -602,7 +682,31 @@ class PathGenerator {
         const isHorizontal = direction === 'horizontal';
         const lineStart = Math.max(isHorizontal ? cropStartX : cropStartY, 0);
         const lineEnd = Math.min(isHorizontal ? cropStartX + cropWidth : cropStartY + cropHeight, isHorizontal ? workArea.width : workArea.height);
+
+        // ================= [새로 추가할 콘솔 로그] =================
+        // boundary.crop 데이터가 있을 때만 로그를 출력합니다.
+        if (boundary.crop) {
+            // 특정 라인에서만 확인하고 싶다면 아래와 같이 조건을 추가할 수 있습니다.
+            // 예: if (boundary.crop && mainAxis > 50 && mainAxis < 51) {
+            console.log(
+                `[Crop Check] Image: "${boundary.name}" | Dir: ${direction} | Scan @ ${mainAxis.toFixed(2)}`,
+                {
+                    "Image Pos": { x: boundary.x?.toFixed(2), y: boundary.y?.toFixed(2) },
+                    "Crop Data (Relative)": boundary.crop,
+                    "Calculated Area (Absolute)": {
+                        startX: cropStartX.toFixed(2),
+                        startY: cropStartY.toFixed(2),
+                        width: cropWidth.toFixed(2),
+                        height: cropHeight.toFixed(2)
+                    },
+                    "Final Scan Range": { start: lineStart.toFixed(2), end: lineEnd.toFixed(2) },
+                }
+            );
+        }
+        // ========================================================
+
         if (lineStart >= lineEnd) return [];
+
 
         // 마스킹 기능이 비활성화되어 있으면 전체 구간을 안전한 세그먼트로 반환
         if (!this.settings.enableMasking || this.maskShapes.length === 0) {
@@ -677,7 +781,89 @@ class PathGenerator {
             .filter((seg) => seg.end > seg.start);
     }
 
-    // PathGenerator 클래스 내부에 아래 함수들을 추가하세요.
+    /**
+     * 단일 도형의 윤곽선을 따라 코팅하는 G-code를 생성합니다.
+     * @param shape 윤곽선을 생성할 도형
+     * @param emitter G-code를 출력할 Emitter 인스턴스
+     */
+    private generateOutlinePath(shape: AnyNodeConfig, emitter: GCodeEmitter): void {
+        // 1. 윤곽선 코팅 관련 속성 가져오기 (없으면 기본값 사용)
+        const passes = shape.outlineCoatingPasses ?? 1;
+        const baseOffset = shape.outlineCoatingOffset ?? 0;
+        const speed = shape.outlineCoatingSpeed ?? this.settings.coatingSpeed;
+        const coatingZ = getCoatingHeight(shape, this.settings);
+
+        if (passes <= 0) return;
+
+        emitter.addLine(`; Outlining ${shape.name} for ${passes} passes with offset ${baseOffset} at speed F${speed}`);
+
+        // 2. 지정된 횟수(passes)만큼 반복
+        for (let i = 0; i < passes; i++) {
+            emitter.addLine(`; Pass ${i + 1}/${passes}`);
+
+            // --- ⬇️ 핵심 수정 부분 ⬇️ ---
+            // 1. 현재 패스의 오프셋을 동적으로 계산합니다. (1배, 2배, 3배...)
+            const currentOffset = baseOffset * (i + 1);
+            emitter.addLine(`; Pass ${i + 1}/${passes}, offset: ${currentOffset.toFixed(3)}`);
+            // --- ⬆️ 핵심 수정 부분 ⬆️ ---
+
+            if (shape.type === 'rectangle') {
+                // 3-1. 사각형 윤곽선 생성
+                const x = (shape.x ?? 0) - currentOffset;
+                const y = (shape.y ?? 0) - currentOffset;
+                const width = (shape.width ?? 0) + currentOffset * 2;
+                const height = (shape.height ?? 0) + currentOffset * 2;
+
+                const corners = [
+                    { x: x, y: y },
+                    { x: x + width, y: y },
+                    { x: x + width, y: y + height },
+                    { x: x, y: y + height },
+                ];
+
+                // 시작점으로 이동 후 코팅 시작
+                emitter.travelTo(corners[0].x, corners[0].y);
+                emitter.setCoatingZ(coatingZ);
+                emitter.nozzleOn();
+
+                // 각 꼭짓점을 순서대로 코팅
+                emitter.coatToWithSpeed(corners[1].x, corners[1].y, speed);
+                emitter.coatToWithSpeed(corners[2].x, corners[2].y, speed);
+                emitter.coatToWithSpeed(corners[3].x, corners[3].y, speed);
+                emitter.coatToWithSpeed(corners[0].x, corners[0].y, speed); // 루프 닫기
+
+                emitter.nozzleOff();
+
+            } else if (shape.type === 'circle' && shape.radius) {
+                // 3-2. 원 윤곽선 생성 (직선 세그먼트로 근사)
+                const centerX = shape.x ?? 0;
+                const centerY = shape.y ?? 0;
+                // 2. 'offset' 대신 'currentOffset'을 사용하여 반지름 계산
+                const radius = shape.radius + currentOffset;
+                const numSegments = 180;
+
+                const startPoint = {
+                    x: centerX + radius * Math.cos(0),
+                    y: centerY + radius * Math.sin(0),
+                };
+
+                // 시작점으로 이동 후 코팅 시작
+                emitter.travelTo(startPoint.x, startPoint.y);
+                emitter.setCoatingZ(coatingZ);
+                emitter.nozzleOn();
+
+                // 원주를 따라 작은 선분들로 코팅
+                for (let j = 1; j <= numSegments; j++) {
+                    const angle = (j / numSegments) * 2 * Math.PI;
+                    const nextX = centerX + radius * Math.cos(angle);
+                    const nextY = centerY + radius * Math.sin(angle);
+                    emitter.coatToWithSpeed(nextX, nextY, speed);
+                }
+
+                emitter.nozzleOff();
+            }
+        }
+    }
 
     /**
      * [신규] 두 점 사이의 선분이 원과 교차하는지 확인하는 함수

@@ -16,8 +16,9 @@ function MainHeader() {
     const [isSettingsOpen, setSettingsOpen] = useState(false);
 
     const navLinks = [
-        { href: '/workspace', label: 'Workspace' },
-        { href: '/preview', label: 'Preview' },
+        { href: '/workspace', label: '마스킹' },
+        { href: '/path-edit', label: '경로 확인' },
+        { href: '/preview', label: '3D 미리보기' },
     ];
 
     const appName = process.env.NEXT_PUBLIC_APP_NAME?.trim()?? "";

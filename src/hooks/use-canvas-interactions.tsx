@@ -14,13 +14,13 @@ import {setPresent} from '@/store/slices/history-slice';
 import {setTool} from '@/store/slices/tool-slice';
 import type {AnyNodeConfig} from '@/types/custom-konva-config';
 import {useSettings} from '@/contexts/settings-context';
+import {StageState} from "@/contexts/canvas-context";
 
-type StageState = { scale: number; x: number; y: number };
 type Tool = 'select' | 'circle' | 'rectangle';
 
 export function useCanvasInteractions(
-    stageRef: React.RefObject<Konva.Stage | null>,
-    setStage: React.Dispatch<React.SetStateAction<StageState>>,
+    // stageRef: React.RefObject<Konva.Stage | null>,
+    setStage: (updater: React.SetStateAction<StageState>)=>void,
     selectionRectRef: React.RefObject<Konva.Rect | null>,
     isPanning: boolean,
     setIsPanning: React.Dispatch<React.SetStateAction<boolean>>
@@ -40,13 +40,12 @@ export function useCanvasInteractions(
 
 
     // 패닝 종료: 마우스 업/리브 시 draggable 해제
-    const stopPan = useCallback(() => {
-        const s = stageRef.current;
+    const stopPan = useCallback((s: Konva.Stage) => {
         if (!s) return;
 
         setIsPanning(false);
         s.draggable(false);
-    }, [setIsPanning, stageRef]);
+    }, [setIsPanning]);
 
     // 드래그 선택
     const isDragSelectingRef = useRef(false);
@@ -159,8 +158,7 @@ export function useCanvasInteractions(
 
     // 박스 선택 실행
     const performDragSelection = useCallback(
-        (startClient: { x: number; y: number }, endClient: { x: number; y: number }) => {
-            const stage = stageRef.current;
+        (startClient: { x: number; y: number }, endClient: { x: number; y: number },stage: Konva.Stage) => {
             if (!stage) return;
 
             const s = toStagePoint(stage, startClient);
@@ -192,7 +190,7 @@ export function useCanvasInteractions(
             }
             if (ids.length) dispatch(selectGroup(ids));
         },
-        [dispatch, stageRef, toStagePoint]
+        [dispatch,  toStagePoint]
     );
 
     // 드래그 이동 중 스냅
@@ -395,7 +393,7 @@ export function useCanvasInteractions(
         // Prevent the browser default context menu and allow our UI ContextMenu to appear
         // e.evt.preventDefault();
 
-        const stage = stageRef.current;
+        const stage = e.target.getStage();
         if (!stage) return;
 
         // Only handle selection behaviors for the select tool
@@ -421,12 +419,12 @@ export function useCanvasInteractions(
         if (!alreadySelected) {
             dispatch(selectShape(id));
         }
-    }, [dispatch, selectedShapeIds, stageRef, tool]);
+    }, [dispatch, selectedShapeIds, tool]);
 
     // 핸들러: Mouse
     const handleMouseDown = useCallback(
         (e: KonvaEventObject<MouseEvent>, layerRef?: React.RefObject<Konva.Layer | null>) => {
-            const stage = stageRef.current;
+            const stage = e.target.getStage();
             if (!stage) return;
 
             const layer = layerRef?.current;
@@ -437,13 +435,12 @@ export function useCanvasInteractions(
 
             // Middle click만 패닝
             if (e.evt.buttons === 4) {
-                const s = stageRef.current;
-                if (!s) return;
+                if (!stage) return;
 
                 setIsPanning(true);
-                s.draggable(true);
+                stage.draggable(true);
                 // mousedown 시점에 draggable을 켰으므로 드래그를 강제로 시작해 자연스러운 패닝
-                s.startDrag();
+                stage.startDrag();
                 return;
             }
 
@@ -470,13 +467,12 @@ export function useCanvasInteractions(
                 return;
             }
         },
-        [stageRef, getPointerClient, setIsPanning, tool, toStagePoint, updateSelectionRect, dispatch, snapPoint, createTempShape]
+        [ getPointerClient, setIsPanning, tool, toStagePoint, updateSelectionRect, dispatch, snapPoint, createTempShape]
     );
 
     // 마우스 이동으로 선택/그리기 미리보기 업데이트
     const handleMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
-        void e;
-        const stage = stageRef.current;
+        const stage = e.target.getStage();
         if (!stage) return;
 
         // 패닝 중에는 무시 (드래그 이벤트에서 처리)
@@ -508,15 +504,15 @@ export function useCanvasInteractions(
             updateTempShape(s, c);
             return;
         }
-    }, [stageRef, isPanning, tool, toStagePoint, updateSelectionRect, getPointerClient, updateTempShape]);
+    }, [ isPanning, tool, toStagePoint, updateSelectionRect, getPointerClient, updateTempShape]);
 
     const handleMouseUp = useCallback((e: KonvaEventObject<MouseEvent>) => {
-        void e;
-        const stage = stageRef.current;
+        const stage = e.target.getStage();
         if (!stage) {
-            stopPan();
             return;
         }
+
+        stopPan(stage);
 
         // 박스 선택 종료
         if (isDragSelectingRef.current && dragSelectStartClientRef.current && tool === 'select') {
@@ -528,7 +524,7 @@ export function useCanvasInteractions(
 
             if (endClient) {
                 const dist = Math.hypot(endClient.x - startClient.x, endClient.y - startClient.y);
-                if (dist > 3) performDragSelection(startClient, endClient);
+                if (dist > 3) performDragSelection(startClient, endClient,stage);
             }
             updateSelectionRect(0, 0, 0, 0, false);
         }
@@ -603,12 +599,14 @@ export function useCanvasInteractions(
             }
         }
 
-        stopPan();
-    }, [stageRef, stopPan, tool, getPointerClient, performDragSelection, updateSelectionRect, destroyTempShape, dispatch, snapPoint, toStagePoint]);
+        stopPan(stage);
+    }, [ tool, stopPan, getPointerClient, updateSelectionRect, performDragSelection, destroyTempShape, dispatch, snapPoint, toStagePoint, gcodeSettings.coatingHeight]);
 
     const handleMouseLeave = useCallback((e: KonvaEventObject<MouseEvent>) => {
-        void e;
-        stopPan();
+        const stage = e.target.getStage();
+        if(!stage) return;
+
+        stopPan(stage);
         // 선택/그리기 상태 초기화
         isDragSelectingRef.current = false;
         dragSelectStartClientRef.current = null;
@@ -657,7 +655,8 @@ export function useCanvasInteractions(
             selectedShapeIds.forEach(shapeId => {
                 const targetShape = shapesRef.current.find(s => s.id === shapeId);
                 if (targetShape) {
-                    const stageNode = stageRef.current?.findOne(`#${shapeId}`);
+                    const stage = e.target.getStage();
+                    const stageNode = stage?.findOne(`#${shapeId}`);
                     if (stageNode) {
                         updates.push({
                             id: shapeId,
@@ -690,12 +689,12 @@ export function useCanvasInteractions(
         // 시작 위치 정리
         dragStartPositionsRef.current.delete(node.id());
 
-    }, [dispatch, selectedShapeIds, stageRef]);
+    }, [dispatch, selectedShapeIds]);
 
 
     // Stage 전용 드래그 시작 핸들러 (그리기 용)
     const handleStageDragStart = useCallback((e: KonvaEventObject<MouseEvent>, layerRef?: React.RefObject<Konva.Layer | null>) => {
-        const stage = stageRef.current;
+        const stage = e.target.getStage();
         if (!stage) return;
 
         const layer = layerRef?.current;
@@ -713,22 +712,21 @@ export function useCanvasInteractions(
             createTempShape(tool, layer, sp.x, sp.y);
             return;
         }
-    }, [createTempShape, getPointerClient, snapPoint, stageRef, toStagePoint, tool]);
+    }, [createTempShape, getPointerClient, snapPoint, toStagePoint, tool]);
 
     // Stage 전용 드래그 이동 핸들러
     const handleStageDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
-        const stage = stageRef.current;
+        const stage = e.target.getStage();
         if (!stage) return;
 
         if (e.target !== stage) return;
 
         // 드래그 이동 중 Stage 위치를 Context 상태에 동기화 (패닝)
         if (isPanning) {
-            const s = e.target as Konva.Stage;
             setStage(prev => ({
                 ...prev,
-                x: s.x(),
-                y: s.y(),
+                x: stage.x(),
+                y: stage.y(),
             }));
             return;
         }
@@ -759,21 +757,21 @@ export function useCanvasInteractions(
             updateTempShape(s, c);
             return;
         }
-    }, [stageRef, isPanning, setStage, tool, toStagePoint, updateSelectionRect, getPointerClient, updateTempShape]);
+    }, [ isPanning, setStage, tool, toStagePoint, updateSelectionRect, getPointerClient, updateTempShape]);
 
     const handleStageDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
-        const stage = stageRef.current;
+        const stage = e.target.getStage();
         if (!stage) return;
+
 
         // 드래그 종료 시 최종 위치 동기화 후 패닝 종료
         if (isPanning) {
-            const s = e.target as Konva.Stage;
             setStage(prev => ({
                 ...prev,
-                x: s.x(),
-                y: s.y(),
+                x: stage.x(),
+                y: stage.y(),
             }));
-            stopPan();
+            stopPan(stage);
         }
 
         // 박스 선택 종료
@@ -786,7 +784,7 @@ export function useCanvasInteractions(
 
             if (endClient) {
                 const dist = Math.hypot(endClient.x - startClient.x, endClient.y - startClient.y);
-                if (dist > 3) performDragSelection(startClient, endClient);
+                if (dist > 3) performDragSelection(startClient, endClient,stage);
             }
             updateSelectionRect(0, 0, 0, 0, false);
             return;
@@ -865,7 +863,7 @@ export function useCanvasInteractions(
 
             dispatch(setTool('select'));
         }
-    }, [destroyTempShape, dispatch, getPointerClient, isPanning, performDragSelection, setStage, snapPoint, stageRef, stopPan, toStagePoint, tool, updateSelectionRect])
+    }, [destroyTempShape, dispatch, gcodeSettings.coatingHeight, getPointerClient, isPanning, performDragSelection, setStage, snapPoint, stopPan, toStagePoint, tool, updateSelectionRect])
 
     // 휠 줌: rAF 스로틀 + 스케일 클램프 (Stage 중심이 아닌 포인터 중심 줌)
     const rafIdRef = useRef<number | null>(null);
@@ -873,41 +871,54 @@ export function useCanvasInteractions(
         if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     }, []);
 
+
     const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
         e.evt.preventDefault();
-        e.cancelBubble = true;
-        const s = e.target.getStage();
-        if (!s) return;
+        e.cancelBubble = true; // Konva의 버블링을 막아 상위 요소 스크롤 방지
 
-        const pointer = s.getPointerPosition();
+        const stage = e.target.getStage();
+        if (!stage) return;
+
+        const pointer = stage.getPointerPosition();
         if (!pointer) return;
 
+        // 1. 현재 스케일 값을 부호를 포함하여 가져옵니다. (Math.abs 제거)
+        const oldScaleX = stage.scaleX();
+        const oldScaleY = stage.scaleY();
+
+        // 확대/축소 비율 계산
         const scaleBy = 1.05;
-        const oldScale = s.scaleX();
-        const direction = e.evt.deltaY > 0 ? 1 : -1;
-        const unclamped = direction > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+        const direction = e.evt.deltaY > 0 ? -1 : 1;
 
-        const MIN_SCALE = 0.1;
-        const MAX_SCALE = 8;
-        const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, unclamped));
-        if (Math.abs(newScale - oldScale) < 1e-4) return;
+        // 새 스케일의 '크기'를 계산하고 범위를 제한합니다.
+        const newScale = direction > 0 ? Math.abs(oldScaleX) * scaleBy : Math.abs(oldScaleX) / scaleBy;
+        const clampedScale = Math.max(0.1, Math.min(10, newScale));
 
-        const mousePointTo = {
-            x: (pointer.x - s.x()) / oldScale,
-            y: (pointer.y - s.y()) / oldScale,
-        };
+        // 2. X축 반전 상태를 유지하면서 새 스케일 값을 결정합니다.
+        const isXInverted = oldScaleX < 0;
+        const newScaleX = isXInverted ? -clampedScale : clampedScale;
+        const newScaleY = clampedScale; // Y축은 항상 양수로 가정
 
-        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+        // 3. 안정적인 단일 공식을 사용하여 새 위치를 계산합니다.
+        // (pointer.x - stage.x()) / oldScaleX  => 마우스 포인터의 캔버스 내 상대 좌표
+        const newX = pointer.x - ((pointer.x - stage.x()) / oldScaleX) * newScaleX;
+        const newY = pointer.y - ((pointer.y - stage.y()) / oldScaleY) * newScaleY;
+
+        // rAF를 사용한 상태 업데이트 (기존 로직 유지)
+        if (rafIdRef.current) {
+            cancelAnimationFrame(rafIdRef.current);
+        }
         rafIdRef.current = requestAnimationFrame(() => {
-            setStage({
-                scale: newScale,
-                x: pointer.x - mousePointTo.x * newScale,
-                y: pointer.y - mousePointTo.y * newScale,
-            });
+            setStage(prev => ({
+                ...prev,
+                scaleX: newScaleX,
+                scaleY: newScaleY,
+                x: newX,
+                y: newY,
+            }));
             rafIdRef.current = null;
         });
     }, [setStage]);
-
     const handleGroup = useCallback(() => {
         // Need at least 2 selected to form a group
         if (selectedShapeIds.length < 2) return;

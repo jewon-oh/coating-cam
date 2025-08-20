@@ -1,244 +1,222 @@
-// src/components/canvas/grid-layer.tsx
-
-import React, {JSX, RefObject, useMemo} from 'react';
-import {  Line, Group, Text } from 'react-konva';
-import Konva from "konva";
+import React, {useMemo} from 'react';
+import {Line, Group, Text} from 'react-konva';
 
 interface CanvasGridProps {
-    stageRef: RefObject<Konva.Stage|null>
     gridSize: number;
     workArea: { width: number; height: number };
     visible?: boolean;
     isPanning?: boolean;
-    // 외부에서 Stage 변환 상태를 전달하면 React.memo가 변화를 감지해 재렌더합니다.
-    stageScale?: number;
-    stageX?: number;
-    stageY?: number;
-    // 성능을 위해 window 접근 대신, 캔버스 뷰포트 크기를 직접 전달받을 수 있게 옵션 제공
+    stageScaleX: number;
+    stageScaleY: number;
+    stageX: number;
+    stageY: number;
     viewportWidth?: number;
     viewportHeight?: number;
+
 }
 
-const CanvasGrid: React.FC<CanvasGridProps> = React.memo(
-    ({
-         stageRef,
-         gridSize,
-         workArea,
-         visible = true,
-         isPanning = false,
-         stageScale,
-         stageX: stageXProp,
-         stageY: stageYProp,
-         viewportWidth,
-         viewportHeight,
-     }) => {
-        const stage = stageRef.current;
-        const scale = typeof stageScale === 'number' ? stageScale : (stage?.scaleX() ?? 1);
-        const stageX = typeof stageXProp === 'number' ? stageXProp : (stage?.x() ?? 0);
-        const stageY = typeof stageYProp === 'number' ? stageYProp : (stage?.y() ?? 0);
+/**
+ * Canvas Grid 컴포넌트
+ * X축이 반전된 상황(-scaleX)에서도 올바르게 표시되는 그리드를 렌더링합니다.
+ */
+const CanvasGrid: React.FC<CanvasGridProps> = React.memo(({
+                                                              gridSize,
+                                                              workArea,
+                                                              visible = true,
+                                                              isPanning = false,
+                                                              stageScaleX,
+                                                              stageScaleY,
+                                                              stageX,
+                                                              stageY,
+                                                              viewportWidth = 800,
+                                                              viewportHeight = 600,
 
-        const { lines, axes } = useMemo(() => {
-            if (!visible || isPanning || gridSize <= 0 || scale <= 0) {
-                return { lines: [] as Array<JSX.Element>, labels: [] as Array<JSX.Element>, axes: [] as Array<JSX.Element> };
+                                                          }) => {
+    const gridElements = useMemo(() => {
+            // 조기 반환 조건
+            const absScaleX = Math.abs(stageScaleX);
+            const absScaleY = Math.abs(stageScaleY);
+            if (!visible || isPanning || gridSize <= 0 || absScaleX <= 0 || absScaleY <= 0) {
+                return null;
             }
 
-            const safeViewportW =
-                typeof viewportWidth === 'number' && viewportWidth > 0
-                    ? viewportWidth
-                    : typeof window !== 'undefined'
-                        ? window.innerWidth
-                        : workArea.width;
+            // 스케일/반전 정보
+            const invScaleX = 1 / absScaleX;
+            const invScaleY = 1 / absScaleY;
+            const invScale = 1 / Math.max(absScaleX, absScaleY); // 선/폰트 두께 기준
+            const flipX = stageScaleX < 0;
+            const flipY = stageScaleY < 0;
 
-            const safeViewportH =
-                typeof viewportHeight === 'number' && viewportHeight > 0
-                    ? viewportHeight
-                    : typeof window !== 'undefined'
-                        ? window.innerHeight
-                        : workArea.height;
+            // 줌 레벨에 따른 그리드 간격
+            const majorStep = gridSize * 5;
+            const labelStep = gridSize * 10;
 
-
-            const majorGridSize = gridSize * 5;
-            const labelGridSize = gridSize * 10; // 100mm
-            const axisColor = '#8B0000';
-            const majorLineColor = '#c0c0c0';
-            const minorLineColor = '#e0e0e0';
-            const labelColor = '#666';
-
-            const invScale = 1 / scale;
-            const lineStrokeWidth = 0.5 * invScale;
-            const majorLineStrokeWidth = invScale;
-            const axisWidth = 1.5 * invScale;
-            const fontSize = Math.max(8, 10 * invScale); // 최소 폰트 크기 보장
-
-            const workAreaRect = {
-                x: 0,
-                y: 0,
-                width: workArea.width,
-                height: workArea.height,
-            };
-
-            // 뷰포트 컬링
-            const viewportMargin = 100; // 여유 마진
-            const visibleLeft = Math.max(0, -stageX * invScale - viewportMargin);
-            const visibleRight = Math.min(
-                workArea.width,
-                (-stageX + safeViewportW) * invScale + viewportMargin
-            );
-            const visibleTop = Math.max(0, -stageY * invScale - viewportMargin);
-            const visibleBottom = Math.min(
-                workArea.height,
-                (-stageY + safeViewportH) * invScale + viewportMargin
-            );
-
-            // 줌 레벨 적응
-            let effectiveGridSize = gridSize;
-            let showMinorGrid = true;
+            let effectiveStep = gridSize;
+            let showMinor = true;
             let showLabels = true;
 
-            if (scale< 0.1) {
-                effectiveGridSize = labelGridSize;
-                showMinorGrid = false;
-            } else if (scale< 0.3) {
-                effectiveGridSize = majorGridSize;
-                showMinorGrid = false;
-            } else if (scale< 0.5) {
+            const zoom = Math.max(absScaleX, absScaleY);
+            if (zoom < 0.1) {
+                effectiveStep = labelStep;
+                showMinor = false;
+            } else if (zoom < 0.3) {
+                effectiveStep = majorStep;
+                showMinor = false;
+            } else if (zoom < 0.5) {
                 showLabels = false;
             }
 
-            // 컬링된 범위 내에서만 선 생성
-            const verticalLinesRaw: Array<{ x: number; isMajor: boolean }> = [];
-            const horizontalLinesRaw: Array<{ y: number; isMajor: boolean }> = [];
+            // 스타일
+            const styles = {
+                axis: { color: '#8B0000', width: 1.5 * invScale },
+                major: { color: '#c0c0c0', width: invScale },
+                minor: { color: '#e0e0e0', width: 0.5 * invScale },
+                label: { color: '#666', size: Math.max(8, 10 * invScale) },
+            };
 
-            const startX = Math.floor(visibleLeft / effectiveGridSize) * effectiveGridSize;
-            const endX = Math.ceil(visibleRight / effectiveGridSize) * effectiveGridSize;
-            for (let i = startX; i <= Math.min(endX, workAreaRect.width); i += effectiveGridSize) {
-                if (i === 0) continue;
-                const isMajor = i % majorGridSize === 0;
-                if (!showMinorGrid && !isMajor) continue;
-                verticalLinesRaw.push({ x: i, isMajor });
-            }
+            // 뷰포트 컬링: 스케일 부호를 고려해 범위 계산
+            const margin = 100;
+            const vx1 = (0 - stageX) / stageScaleX;
+            const vx2 = (viewportWidth - stageX) / stageScaleX;
+            const vy1 = (0 - stageY) / stageScaleY;
+            const vy2 = (viewportHeight - stageY) / stageScaleY;
 
-            const startY = Math.floor(visibleTop / effectiveGridSize) * effectiveGridSize;
-            const endY = Math.ceil(visibleBottom / effectiveGridSize) * effectiveGridSize;
-            for (let i = startY; i <= Math.min(endY, workAreaRect.height); i += effectiveGridSize) {
-                if (i === 0) continue;
-                const isMajor = i % majorGridSize === 0;
-                if (!showMinorGrid && !isMajor) continue;
-                horizontalLinesRaw.push({ y: i, isMajor });
-            }
+            const bounds = {
+                left: Math.max(0, Math.min(vx1, vx2) - margin),
+                right: Math.min(workArea.width, Math.max(vx1, vx2) + margin),
+                top: Math.max(0, Math.min(vy1, vy2) - margin),
+                bottom: Math.min(workArea.height, Math.max(vy1, vy2) + margin),
+            };
 
-            // 라벨 제한 (오버헤드 방지)
-            const MAX_LABELS = 200;
-            let labelCount = 0;
+            const lineElements: React.ReactElement[] = [];
+            const labelElements: React.ReactElement[] = [];
 
-            // 라인 생성 (key 포함)
-            const linesElements: Array<JSX.Element> = [];
-            for (const { x, isMajor } of verticalLinesRaw) {
-                linesElements.push(
+            // 좌표축 (라인)
+            lineElements.push(
+                <Line
+                    key="axis-x"
+                    points={[0, 0, workArea.width, 0]}
+                    stroke={styles.axis.color}
+                    strokeWidth={styles.axis.width}
+                    listening={false}
+                    perfectDrawEnabled={false}
+                />,
+                <Line
+                    key="axis-y"
+                    points={[0, 0, 0, workArea.height]}
+                    stroke={styles.axis.color}
+                    strokeWidth={styles.axis.width}
+                    listening={false}
+                    perfectDrawEnabled={false}
+                />
+            );
+
+            // 세로선 + X 라벨
+            const startX = Math.floor(bounds.left / effectiveStep) * effectiveStep;
+            const endX = Math.ceil(bounds.right / effectiveStep) * effectiveStep;
+
+            for (let x = startX; x <= Math.min(endX, workArea.width); x += effectiveStep) {
+                if (x === 0) continue;
+                const isMajor = x % majorStep === 0;
+                if (!showMinor && !isMajor) continue;
+
+                const style = isMajor ? styles.major : styles.minor;
+                lineElements.push(
                     <Line
-                        key={`grid-v-${x}-${isMajor ? 'M' : 'm'}`}
-                        points={[x, workAreaRect.y, x, workAreaRect.height]}
-                        stroke={isMajor ? majorLineColor : minorLineColor}
-                        strokeWidth={isMajor ? majorLineStrokeWidth : lineStrokeWidth}
+                        key={`vertical-${x}`}
+                        points={[x, 0, x, workArea.height]}
+                        stroke={style.color}
+                        strokeWidth={style.width}
                         listening={false}
                         perfectDrawEnabled={false}
-                        shadowForStrokeEnabled={false}
-                        hitStrokeWidth={0}
                     />
                 );
-                // 라벨
-                if (showLabels && x % labelGridSize === 0 && labelCount < MAX_LABELS && x % (effectiveGridSize * 2) === 0) {
-                    linesElements.push(
+
+                if (showLabels && x % labelStep === 0) {
+                    labelElements.push(
                         <Text
-                            key={`grid-lbl-v-${x}`}
-                            x={x + 4 * invScale}
-                            y={-12 * invScale}
-                            text={String(x)}
-                            fontSize={fontSize}
-                            fill={labelColor}
+                            key={`xlabel-${x}`}
+                            // x 좌표와 정렬을 flipX 값에 따라 동적으로 변경
+                            x={flipX ? x + styles.label.size * invScaleX : x - styles.label.size * invScaleX}
+                            y={-12 * invScaleY}
+                            text={x.toString()}
+                            fontSize={styles.label.size}
+                            fill={styles.label.color}
+                            align={flipX ? 'right' : 'left'} // 정렬 기준 변경
                             listening={false}
                             perfectDrawEnabled={false}
+                            scaleX={flipX ? -1 : 1}
+                            scaleY={flipY ? -1 : 1}
                         />
                     );
-                    labelCount++;
                 }
             }
 
-            for (const { y, isMajor } of horizontalLinesRaw) {
-                linesElements.push(
+            // 가로선 + Y 라벨
+            const startY = Math.floor(bounds.top / effectiveStep) * effectiveStep;
+            const endY = Math.ceil(bounds.bottom / effectiveStep) * effectiveStep;
+
+            for (let y = startY; y <= Math.min(endY, workArea.height); y += effectiveStep) {
+                if (y === 0) continue;
+                const isMajor = y % majorStep === 0;
+                if (!showMinor && !isMajor) continue;
+
+                const style = isMajor ? styles.major : styles.minor;
+                lineElements.push(
                     <Line
-                        key={`grid-h-${y}-${isMajor ? 'M' : 'm'}`}
-                        points={[workAreaRect.x, y, workAreaRect.width, y]}
-                        stroke={isMajor ? majorLineColor : minorLineColor}
-                        strokeWidth={isMajor ? majorLineStrokeWidth : lineStrokeWidth}
+                        key={`horizontal-${y}`}
+                        points={[0, y, workArea.width, y]}
+                        stroke={style.color}
+                        strokeWidth={style.width}
                         listening={false}
                         perfectDrawEnabled={false}
-                        shadowForStrokeEnabled={false}
-                        hitStrokeWidth={0}
                     />
                 );
-                // 라벨
-                if (showLabels && y % labelGridSize === 0 && labelCount < MAX_LABELS && y % (effectiveGridSize * 2) === 0) {
-                    linesElements.push(
+
+                if (showLabels && y % labelStep === 0) {
+                    labelElements.push(
                         <Text
-                            key={`grid-lbl-h-${y}`}
-                            x={-24 * invScale}
-                            y={y - fontSize / 2}
-                            text={String(y)}
-                            fontSize={fontSize}
-                            fill={labelColor}
+                            key={`ylabel-${y}`}
+                            x={flipX ? -12 * invScaleX : 12 * invScaleX}
+                            y={y - styles.label.size / 2}
+                            text={y.toString()}
+                            fontSize={styles.label.size}
+                            fill={styles.label.color}
+                            align={flipX ? 'left' : 'right'}
                             listening={false}
                             perfectDrawEnabled={false}
+                            // ✅ 추가: 텍스트의 뒤집힘을 상쇄합니다.
+                            scaleX={flipX ? -1 : 1}
+                            scaleY={flipY ? -1 : 1}
                         />
                     );
-                    labelCount++;
                 }
             }
 
-            // 축선 + 축 라벨
-            const axesElements: Array<JSX.Element> = [
-                <Line
-                    key="grid-axis-y"
-                    points={[workAreaRect.x, 0, 0, workAreaRect.height]}
-                    stroke={axisColor}
-                    strokeWidth={axisWidth}
-                    listening={false}
-                    perfectDrawEnabled={false}
-                    shadowForStrokeEnabled={false}
-                    hitStrokeWidth={0}
-                />,
-                <Line
-                    key="grid-axis-x"
-                    points={[workAreaRect.x, 0, workAreaRect.width, 0]}
-                    stroke={axisColor}
-                    strokeWidth={axisWidth}
-                    listening={false}
-                    perfectDrawEnabled={false}
-                    shadowForStrokeEnabled={false}
-                    hitStrokeWidth={0}
-                />,
-            ];
-
+            // 축 라벨
             if (showLabels) {
-                axesElements.push(
+                labelElements.push(
                     <Text
-                        key="grid-axis-label-x"
-                        x={workAreaRect.width + 24 * invScale}
-                        y={-20 * invScale}
+                        key="axis-label-x"
+                        // x 좌표와 정렬을 flipX 값에 따라 동적으로 변경
+                        x={flipX ? -24 * invScaleX : workArea.width + 24 * invScaleX}
+                        y={-20 * invScaleY}
                         text="X"
-                        fontSize={fontSize}
-                        fill={axisColor}
+                        fontSize={styles.label.size}
+                        fill={styles.axis.color}
                         fontStyle="bold"
+                        align={flipX ? 'left' : 'right'} // 정렬 기준 변경
                         listening={false}
                         perfectDrawEnabled={false}
+
                     />,
                     <Text
-                        key="grid-axis-label-y"
-                        x={-20 * invScale}
-                        y={workAreaRect.height + 20 * invScale}
+                        key="axis-label-y"
+                        x={-20 * invScaleX}
+                        y={flipY ? -24 * invScaleY : workArea.height + 20 * invScaleY}
                         text="Y"
-                        fontSize={fontSize}
-                        fill={axisColor}
+                        fontSize={styles.label.size}
+                        fill={styles.axis.color}
                         fontStyle="bold"
                         listening={false}
                         perfectDrawEnabled={false}
@@ -246,21 +224,42 @@ const CanvasGrid: React.FC<CanvasGridProps> = React.memo(
                 );
             }
 
-            return { lines: linesElements, labels: [], axes: axesElements };
-            // 스냅된 스테이지 그리드 좌표(gx, gy)와 scale에만 의존 → 미세 이동시 재계산 회피
-        }, [visible, isPanning, gridSize, scale, stageX, stageY, viewportWidth, workArea.width, workArea.height, viewportHeight]);
+            // 라벨만 반전 상쇄
+            return (
+                <>
+                    <Group listening={false}>
+                        {lineElements}
+                        {labelElements}
+                    </Group>
+                </>
+            );
+        }
+        , [
+            visible,
+            isPanning,
+            gridSize,
+            stageScaleX,
+            stageScaleY,
+            stageX,
+            stageY,
+            viewportWidth,
+            viewportHeight,
+            workArea.width,
+            workArea.height
+    ]);
 
-        if (!visible || isPanning) return null;
+    // 그리드가 비활성화되거나 패닝 중인 경우 렌더링하지 않음
+    if (!gridElements) return null;
 
-        return (
-            <Group listening={false}>
-                {lines}
-                {axes}
-            </Group>
-        );
-    }
-);
+    return (
+        <Group
+            listening={false}
+        >
+            {gridElements}
+        </Group>
+    );
+});
 
-CanvasGrid.displayName = 'GridLayer';
+CanvasGrid.displayName = 'CanvasGrid';
 
 export default CanvasGrid;
