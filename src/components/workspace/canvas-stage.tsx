@@ -1,23 +1,23 @@
 "use client";
 
-import React, { useRef, useCallback, useEffect, useState, useMemo } from 'react';
-import { Stage, Layer, Rect, Transformer, Circle, Image, Group } from 'react-konva';
+import React, {useRef, useCallback, useEffect, useState, useMemo} from 'react';
+import {Stage, Layer, Rect, Transformer, Circle, Image, Group, Text} from 'react-konva';
 import type Konva from 'konva';
 
 // Redux 상태 관리
-import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { unselectAllShapes, updateShape } from '@/store/slices/shapes-slice';
-import { redoWithSync, undoWithSync } from '@/store/thunks/history-thunk';
+import {useAppDispatch, useAppSelector} from '@/hooks/redux';
+import {unselectAllShapes, updateShape} from '@/store/slices/shapes-slice';
+import {redoWithSync, undoWithSync} from '@/store/thunks/history-thunk';
 
 // 커스텀 훅들
-import { useCanvasInteractions } from '@/hooks/use-canvas-interactions';
-import { useTransformerHandlers } from '@/hooks/use-transformer-handlers';
-import { useSettings } from '@/contexts/settings-context';
-import { useCanvas } from '@/contexts/canvas-context';
+import {useCanvasInteractions} from '@/hooks/use-canvas-interactions';
+import {useTransformerHandlers} from '@/hooks/use-transformer-handlers';
+import {useSettings} from '@/contexts/settings-context';
+import {useCanvas} from '@/contexts/canvas-context';
 
 // 컴포넌트 및 타입
-import { TransformerConfig } from "konva/lib/shapes/Transformer";
-import { AnyNodeConfig } from '@/types/custom-konva-config';
+import {TransformerConfig} from "konva/lib/shapes/Transformer";
+import {AnyNodeConfig} from '@/types/custom-konva-config';
 import CanvasGrid from "@/components/workspace/canvas-grid";
 import {
     ContextMenu,
@@ -46,10 +46,10 @@ export default function CanvasStage() {
     const [isContextOnShape, setIsContextOnShape] = useState(false);
 
     // Context에서 캔버스 상태 가져오기
-    const { stageRef, canvasContainerRef, stage, setStage, setLoading } = useCanvas();
+    const {stageRef, canvasContainerRef, stage, setStage, setLoading} = useCanvas();
 
     // 설정 가져오기
-    const { isGridVisible, gridSize, workArea } = useSettings();
+    const {isGridVisible, gridSize, workArea} = useSettings();
 
     // 참조들
     const layerRef = useRef<Konva.Layer>(null);
@@ -107,15 +107,18 @@ export default function CanvasStage() {
         if (isTransforming) return 'move';
 
         switch (tool) {
-            case 'select': return isHoveringShape ? 'move' : 'default';
+            case 'select':
+                return isHoveringShape ? 'move' : 'default';
             case 'rectangle':
-            case 'circle': return 'crosshair';
-            default: return 'default';
+            case 'circle':
+                return 'crosshair';
+            default:
+                return 'default';
         }
     }, [tool, isPanning, isTransforming, isHoveringShape]);
 
     // 도형 분류
-    const { imageShapes, otherShapes } = useMemo(() => {
+    const {imageShapes, otherShapes} = useMemo(() => {
         const visibleShapes = shapes.filter(s => s.visible !== false);
         return {
             imageShapes: visibleShapes.filter(s => s.type === 'image'),
@@ -158,12 +161,12 @@ export default function CanvasStage() {
             setTimeout(() => {
                 const shape = shapes.find(s => s.id === shapeId);
                 if (shape && !shape.crop) {
-                    const defaultCrop = { x: 0, y: 0, width: img.width, height: img.height };
+                    const defaultCrop = {x: 0, y: 0, width: img.width, height: img.height};
                     if (shapeId) {
-                        dispatch(updateShape({ id: shapeId, updatedProps: { crop: defaultCrop } }));
+                        dispatch(updateShape({id: shapeId, updatedProps: {crop: defaultCrop}}));
                     }
                 }
-                setLoading({ isLoading: false });
+                setLoading({isLoading: false});
                 layerRef.current?.batchDraw();
             }, 0);
         };
@@ -172,13 +175,13 @@ export default function CanvasStage() {
             console.error(`❌ 이미지 로드 실패 (${shapeId}):`, error);
             imageCache.current.delete(imageDataUrl);
             setTimeout(() => {
-                setLoading({ isLoading: false });
+                setLoading({isLoading: false});
             }, 0);
         };
 
         // 로딩 시작은 동기적으로 실행 (렌더링 전)
         if (shapeId) {
-            setLoading({ isLoading: true, message: `이미지 로딩 중... (${shapeId})` });
+            setLoading({isLoading: true, message: `이미지 로딩 중... (${shapeId})`});
         }
 
         img.src = imageDataUrl;
@@ -198,7 +201,7 @@ export default function CanvasStage() {
 
         // 비동기 함수로 이미지들을 하나씩 처리합니다.
         const processImages = async () => {
-            setLoading({ isLoading: true, message: '이미지 최적화 중...' });
+            setLoading({isLoading: true, message: '이미지 최적화 중...'});
 
             for (const shape of imagesToFlip) {
                 try {
@@ -219,11 +222,11 @@ export default function CanvasStage() {
                 } catch (error) {
                     console.error(`${shape.id} 이미지 뒤집기 실패:`, error);
                     // 실패 시에도 플래그를 업데이트하여 무한 재시도를 방지
-                    dispatch(updateShape({ id: shape.id!, updatedProps: { isFlipped: true } }));
+                    dispatch(updateShape({id: shape.id!, updatedProps: {isFlipped: true}}));
                 }
             }
 
-            setLoading({ isLoading: false });
+            setLoading({isLoading: false});
         };
 
         processImages();
@@ -231,32 +234,234 @@ export default function CanvasStage() {
     }, [shapes, dispatch, setLoading, imageCache]); // shapes 배열이 변경될 때마다 실행
 
 
-    // ===== 도형 공통 속성 생성기 =====
-    const makeCommonProps = useCallback((shape: Partial<AnyNodeConfig>) => ({
-        draggable: tool === 'select' && !shape.listening,
-        onClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
-            e.evt.preventDefault();
-            handleSelect(e);
-        },
-        onMouseEnter: () => setIsHoveringShape(shape.id!),
-        onMouseLeave: () => setIsHoveringShape(null),
-        onDragStart: handleDragStart,
-        onDragMove: handleDragMove,
-        onDragEnd: handleDragEnd,
-        shadowColor: isHoveringShape === shape.id ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
-        shadowBlur: isHoveringShape === shape.id ? 10 : 0,
-        perfectDrawEnabled: false,
-        listening: tool === 'select'
-    }), [tool, isHoveringShape, handleSelect, handleDragStart, handleDragMove, handleDragEnd]);
+    // ===== 도형 공통 속성 생성기 (isLocked 속성 사용) =====
+    const makeCommonProps = useCallback((shape: Partial<AnyNodeConfig>) => {
+        // 새로운 isLocked 속성 사용 (기본값은 false)
+        const isLocked = shape.isLocked;
+        const isInteractionBlocked = isPanning || isLocked;
 
+        const baseProps = {
+            // 패닝 중이거나 잠긴 상태가 아닐 때만 드래그 가능
+            draggable: tool === 'select' && !isPanning && !isLocked,
+
+            // 클릭 이벤트는 항상 정의하되, 내부에서 조건 체크
+            onClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
+                e.evt.preventDefault();
+                // 패닝 중이거나 잠긴 상태가 아닐 때만 선택 처리
+                if (!isPanning && !isLocked) {
+                    handleSelect(e);
+                }
+            },
+
+            // 호버 이벤트도 항상 정의하되, 내부에서 조건 체크
+            onMouseEnter: () => {
+                // 패닝 중이거나 잠긴 상태가 아닐 때만 호버 효과 적용
+                if (!isInteractionBlocked) {
+                    setIsHoveringShape(shape.id!);
+                }
+            },
+
+            onMouseLeave: () => {
+                // 패닝 중이거나 잠긴 상태가 아닐 때만 호버 효과 제거
+                if (!isInteractionBlocked) {
+                    setIsHoveringShape(null);
+                }
+            },
+
+            // 드래그 이벤트는 조건부로 정의
+            ...((!isPanning && !isLocked) && {
+                onDragStart: handleDragStart,
+                onDragMove: handleDragMove,
+                onDragEnd: handleDragEnd,
+            }),
+
+            perfectDrawEnabled: false,
+            // Konva의 listening은 isLocked와 반대로 설정
+            listening: tool === 'select' && !isPanning && !isLocked
+        };
+
+        // 패닝 중이거나 잠긴 상태가 아닐 때만 호버 효과 적용
+        const hoverEffect = (isHoveringShape === shape.id && !isInteractionBlocked) ? {
+            shadowColor: 'rgba(59, 130, 246, 0.6)',
+            shadowBlur: 12,
+            shadowOpacity: 1
+        } : {};
+
+        // 잠긴 객체 시각적 표시 (isLocked === true일 때)
+        const lockEffect = isLocked ? {
+            opacity: 0.6,
+            dashEnabled: true,
+            dash: [4, 4],
+            strokeWidth: 1 / Math.abs(stage.scaleX),
+            stroke: '#6c757d'
+        } : {};
+
+        // 코팅 타입별 스타일 적용
+        const coatingStyle = getCoatingVisualStyle(shape as AnyNodeConfig);
+
+        return {
+            ...baseProps,
+            ...coatingStyle,
+            ...lockEffect,
+            ...hoverEffect
+        };
+    }, [tool, isHoveringShape, handleSelect, handleDragStart, handleDragMove, handleDragEnd, isPanning, stage.scaleX]);
+
+    // ===== 이미지 스타일 적용 (isLocked 속성 사용) =====
+    const makeImageProps = useCallback((shape: AnyNodeConfig) => {
+        const isLocked = shape.isLocked;
+        const baseProps = makeCommonProps(shape);
+        const coatingStyle = getCoatingVisualStyle(shape);
+
+        // 이미지는 fill 대신 opacity와 필터 효과 사용
+        const imageSpecificStyle = {
+            opacity: isLocked ? 0.4 : (coatingStyle.opacity || 1),
+            // 잠긴 이미지 또는 코팅 제외된 이미지는 그레이스케일 효과
+            filters: (isLocked || shape.skipCoating) ? ['Grayscale'] : undefined,
+            // 잠긴 이미지에는 점선 테두리 효과
+            ...(isLocked && {
+                shadowColor: '#6c757d',
+                shadowBlur: 2,
+                shadowOpacity: 0.3
+            })
+        };
+
+        // fill, stroke 등 이미지에 적용되지 않는 속성 제거
+        const { fill, stroke, strokeWidth, dash, shadowColor, shadowBlur, shadowOpacity, dashEnabled, ...validImageProps } = baseProps;
+
+        return {
+            ...validImageProps,
+            ...imageSpecificStyle,
+            // 잠기지 않고 패닝 중이 아닌 이미지만 그림자 효과
+            ...(!isLocked && !isPanning && shadowColor && {
+                shadowColor,
+                shadowBlur,
+                shadowOpacity
+            })
+        };
+    }, [makeCommonProps, isPanning]);
+
+    // ===== 코팅 타입별 스타일 유틸리티 (isLocked 고려) =====
+    const getCoatingVisualStyle = (shape: AnyNodeConfig) => {
+        const isLocked = shape.isLocked;
+        // 잠긴 객체는 항상 회색 계열로 표시
+        if (isLocked) {
+            return {
+                fill: shape.fill ? `${shape.fill}40` : '#f8f9fa', // 원래 색상에 투명도 적용
+                stroke: '#6c757d',
+                strokeWidth: 1,
+                dash: [4, 4],
+                opacity: 0.6
+            };
+        }
+
+        // ... 나머지 코팅 타입별 스타일 코드는 동일 ...
+
+        // 코팅이 제외된 경우
+        if (shape.skipCoating) {
+            return {
+                fill: shape.fill || '#f8f9fa',
+                stroke: '#6c757d',
+                strokeWidth: 1,
+                dash: [8, 4],
+                opacity: 0.5
+            };
+        }
+
+        // 개별 코팅 설정이 없는 경우 기본 스타일
+        if (shape.type === 'image') return { opacity: 1 }
+
+        // 코팅 타입별 스타일
+        switch (shape.coatingType) {
+            case 'fill':
+                return {
+                    fill: '#2196f3',
+                    stroke: '#2196f3',
+                    strokeWidth: 2,
+                    opacity: 0.5,
+                    shadowColor: '#2196f3',
+                    shadowBlur: 5,
+                    shadowOpacity: 0.3
+                };
+
+            case 'outline':
+                return {
+                    fill: 'transparent',
+                    stroke: '#ff9800',
+                    strokeWidth: 3,
+                    opacity: 1,
+                    shadowColor: '#ff9800',
+                    shadowBlur: 8,
+                    shadowOpacity: 0.4
+                };
+
+            case 'masking':
+                return {
+                    fill: '#f44336',
+                    stroke: '#f44336',
+                    strokeWidth: 2,
+                    dash: [6, 3],
+                    opacity: 0.6,
+                    shadowColor: '#f44336',
+                    shadowBlur: 4,
+                    shadowOpacity: 0.2
+                };
+
+            default:
+                return {
+                    fill: shape.fill || '#e9ecef',
+                    stroke: '#6c757d',
+                    strokeWidth: 1,
+                    opacity: 1
+                };
+        }
+    };
+
+    // ===== 코팅 순서 표시 유틸리티 (isLocked 고려) =====
+    const renderCoatingOrderBadge = (shape: AnyNodeConfig, stageScale: number) => {
+        // 잠긴 객체이거나 코팅 설정이 없으면 배지 표시 안 함
+        if (shape.isLocked || !shape.useCustomCoating || shape.skipCoating || !shape.coatingOrder) {
+            return null;
+        }
+
+        const badgeSize = 20 / Math.abs(stageScale);
+        const fontSize = 12 / Math.abs(stageScale);
+
+        return (
+            <Group key={`${shape.id}-badge`}>
+                <Circle
+                    x={(shape.x || 0) - badgeSize/2}
+                    y={(shape.y || 0) - badgeSize/2}
+                    radius={badgeSize/2}
+                    fill="#4caf50"
+                    stroke="#2e7d32"
+                    strokeWidth={1 / Math.abs(stageScale)}
+                    listening={false}
+                />
+                <Text
+                    x={(shape.x || 0) - badgeSize/2}
+                    y={(shape.y || 0) - badgeSize/2}
+                    width={badgeSize}
+                    height={badgeSize}
+                    text={shape.coatingOrder.toString()}
+                    fontSize={fontSize}
+                    fontFamily="Arial, sans-serif"
+                    fill="white"
+                    align="center"
+                    verticalAlign="middle"
+                    listening={false}
+                />
+            </Group>
+        );
+    };
     // ===== 이펙트들 =====
 
     // 캐시 자동 활성화 (도형 수 기반)
     useEffect(() => {
         const shapeCount = shapes.length;
-        if (shapeCount >= 50 && !isCacheEnabled && !isTransforming) {
+        if (shapeCount >= 250 && !isCacheEnabled && !isTransforming) {
             setIsCacheEnabled(true);
-        } else if (shapeCount < 50 && isCacheEnabled) {
+        } else if (shapeCount < 250 && isCacheEnabled) {
             setIsCacheEnabled(false);
         }
     }, [shapes.length, isCacheEnabled, isTransforming]);
@@ -332,11 +537,11 @@ export default function CanvasStage() {
             }
             // 도구 단축키
             else if (e.key.toLowerCase() === 'v') {
-                dispatch({ type: 'tool/setTool', payload: 'select' });
+                dispatch({type: 'tool/setTool', payload: 'select'});
             } else if (e.key.toLowerCase() === 'c') {
-                dispatch({ type: 'tool/setTool', payload: 'circle' });
+                dispatch({type: 'tool/setTool', payload: 'circle'});
             } else if (e.key.toLowerCase() === 'r') {
-                dispatch({ type: 'tool/setTool', payload: 'rectangle' });
+                dispatch({type: 'tool/setTool', payload: 'rectangle'});
             } else if (e.key === 'Escape') {
                 dispatch(unselectAllShapes());
             }
@@ -412,6 +617,7 @@ export default function CanvasStage() {
                         listening={!isTransforming}
                         draggable={isPanning}
                     >
+
                         <Layer ref={layerRef}>
                             {/* 캔버스 배경: 뷰포트 크기에 맞춰 월드 좌표로 채우기 */}
                             {(() => {
@@ -472,12 +678,13 @@ export default function CanvasStage() {
                                 viewportHeight={stage.height}
                             />
 
-                            {/* 이미지 그룹 */}
+                            {/* 이미지 그룹 (스타일 적용) */}
                             <Group ref={imageGroupRef} listening={tool === 'select'}>
                                 {imageShapes.map((shape) => {
                                     const imageElement = shape.imageDataUrl ? loadImage(shape.imageDataUrl, shape.id) : null;
 
                                     if (!imageElement) {
+                                        const style = getCoatingVisualStyle(shape);
                                         return (
                                             <Rect
                                                 key={`${shape.id}-loading`}
@@ -487,10 +694,11 @@ export default function CanvasStage() {
                                                 y={shape.y}
                                                 width={shape.width}
                                                 height={shape.height}
-                                                fill="#f8f9fa"
-                                                stroke="#dee2e6"
-                                                strokeWidth={1}
-                                                dash={[4, 4]}
+                                                fill={style.fill || "#f8f9fa"}
+                                                stroke={style.stroke || "#dee2e6"}
+                                                strokeWidth={style.strokeWidth || 1}
+                                                dash={style.dash || [4, 4]}
+                                                opacity={style.opacity || 0.5}
                                                 draggable={false}
                                                 listening={false}
                                             />
@@ -525,13 +733,13 @@ export default function CanvasStage() {
                                             scaleY={shape.scaleY || 1}
                                             crop={safeCrop}
                                             onTransformStart={handleTransformStart}
-                                            {...makeCommonProps(shape)}
+                                            {...makeImageProps(shape)}
                                         />
                                     );
                                 })}
                             </Group>
 
-                            {/* 도형 그룹 */}
+                            {/* 도형 그룹 (스타일 적용) */}
                             <Group ref={shapeGroupRef} listening={true}>
                                 {otherShapes.map((shape) => {
                                     const commonProps = makeCommonProps(shape);
@@ -547,7 +755,6 @@ export default function CanvasStage() {
                                                     y={shape.y}
                                                     width={shape.width}
                                                     height={shape.height}
-                                                    fill={shape.fill}
                                                     rotation={shape.rotation}
                                                     scaleX={shape.scaleX}
                                                     scaleY={shape.scaleY}
@@ -563,7 +770,6 @@ export default function CanvasStage() {
                                                     x={shape.x}
                                                     y={shape.y}
                                                     radius={shape.radius}
-                                                    fill={shape.fill}
                                                     rotation={shape.rotation}
                                                     scaleX={shape.scaleX}
                                                     scaleY={shape.scaleY}
@@ -575,6 +781,15 @@ export default function CanvasStage() {
                                     }
                                 })}
                             </Group>
+
+                            {/* 코팅 순서 배지 */}
+                            <Group listening={false}>
+                                {shapes
+                                    .filter(shape => shape.visible !== false)
+                                    .map(shape => renderCoatingOrderBadge(shape, stage.scaleX))
+                                }
+                            </Group>
+
 
                             {/* Transformer */}
                             <Transformer
@@ -618,11 +833,11 @@ export default function CanvasStage() {
                     Select All
                     <ContextMenuShortcut>Ctrl+A</ContextMenuShortcut>
                 </ContextMenuItem>
-                <ContextMenuSeparator />
+                <ContextMenuSeparator/>
                 <ContextMenuItem disabled={selectedShapeIds.length < 2} onSelect={handleGroup}>
                     Group
                 </ContextMenuItem>
-                <ContextMenuSeparator />
+                <ContextMenuSeparator/>
                 <ContextMenuItem disabled={!isContextOnShape} onSelect={handleCopy}>
                     Copy
                     <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>

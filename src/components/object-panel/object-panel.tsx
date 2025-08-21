@@ -24,19 +24,15 @@ import {setPresent} from "@/store/slices/history-slice";
 import type {AnyNodeConfig} from "@/types/custom-konva-config";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {ScrollArea} from "@/components/ui/scroll-area";
-import {Button} from "@/components/ui/button";
 import {Badge} from "@/components/ui/badge";
 import {
     Layers,
-    PanelLeftClose,
-    PanelLeftOpen,
 } from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useVirtualTree} from "@/hooks/use-virtual-tree";
 import {GroupItem} from "@/components/object-panel/group-item";
 import {ObjectItem} from "@/components/object-panel/object-item";
 import debounce from "lodash/debounce";
-import {Separator} from "@radix-ui/react-menu";
 
 export const ObjectPanel = memo(() => {
     const dispatch = useAppDispatch();
@@ -49,12 +45,12 @@ export const ObjectPanel = memo(() => {
     const [openItemId, setOpenItemId] = useState<string | null>(null);
 
     // useVirtualTree를 사용한 트리 구조 생성
-    const {tree, flattenedTree, totalCount} = useVirtualTree(
+    const { flattenedTree } = useVirtualTree(
         shapes,
         expandedIds
     );
 
-    // 새로 생성된 그룹 자동 확장
+    // 새로 생성된 그룹 자동 확장 (수정된 부분)
     useEffect(() => {
         const currentGroupIds = new Set(shapes.filter(s => s.type === 'group').map(s => s.id!));
         const newGroupIds = [...currentGroupIds].filter(id => !expandedIds.has(id));
@@ -62,7 +58,7 @@ export const ObjectPanel = memo(() => {
         if (newGroupIds.length > 0) {
             setExpandedIds(prev => new Set([...prev, ...newGroupIds]));
         }
-    }, [shapes, expandedIds]);
+    }, [ shapes]); // 의존성 배열에서 expandedIds 제거
 
     // 통계 텍스트
     const statsText = useMemo(() => {
@@ -198,7 +194,7 @@ export const ObjectPanel = memo(() => {
 
     // 트리 노드 렌더링
     const renderTreeNode = useCallback((node: ReturnType<typeof useVirtualTree>['flattenedTree'][0]) => {
-        const {shape, depth, isExpanded, hasChildren} = node;
+        const {shape, depth, isExpanded} = node;
         const isSelected = selectedShapeIds.includes(shape.id!);
 
         if (shape.type === 'group') {
@@ -213,8 +209,7 @@ export const ObjectPanel = memo(() => {
                         onSelect={handleSelect}
                         onPatch={handlePatch}
                         onUngroup={handleUngroup}
-                        onDuplicate={() => {/* 복제 로직 */
-                        }}
+                        onDuplicate={() => {}}
                         onDelete={handleDeleteGroup}
                         onToggleVisibility={handleToggleGroupVisibility}
                         onToggleLock={handleToggleGroupLock}
@@ -229,26 +224,12 @@ export const ObjectPanel = memo(() => {
                 <ObjectItem
                     shape={shape}
                     isSelected={isSelected}
-                    isOpen={openItemId === shape.id}
                     onSelect={handleSelect}
-                    onOpen={() => setOpenItemId(openItemId === shape.id ? null : shape.id!)}
                     onPatch={handlePatch}
-                    isDragging={false}
                 />
             </div>
         );
-    }, [
-        selectedShapeIds,
-        shapes,
-        openItemId,
-        handleSelect,
-        handlePatch,
-        handleToggleGroup,
-        handleUngroup,
-        handleDeleteGroup,
-        handleToggleGroupVisibility,
-        handleToggleGroupLock
-    ]);
+    }, [selectedShapeIds, shapes, handleSelect, handlePatch, handleToggleGroup, handleUngroup, handleDeleteGroup, handleToggleGroupVisibility, handleToggleGroupLock]);
 
     return (
         <Card className="h-full w-full rounded-none flex flex-col transition-all duration-200 border-0">

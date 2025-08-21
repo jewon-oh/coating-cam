@@ -621,6 +621,7 @@ export function useCanvasInteractions(
 
     // 드래그 시작 핸들러
     const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
+
         const node = e.target;
         dragStartPositionsRef.current.set(node.id(), {
             x: node.x(),
@@ -824,12 +825,13 @@ export function useCanvasInteractions(
                     type: 'rectangle',
                     name: 'Rectangle',
                     x, y, width, height,
-                    fill: 'rgba(59,130,246,0.5)',
+                    // fill: 'rgba(59,130,246,0.5)',
                     rotation: 0,
                     scaleX: 1,
                     scaleY: 1,
-                    listening: false,
+                    isLocked: false,
                     visible: true,
+                    coatingType: 'masking', // 기본은 마스킹
                     coatingHeight: gcodeSettings.coatingHeight
                 };
                 const next = [...shapesRef.current, rect] as AnyNodeConfig[];
@@ -848,12 +850,13 @@ export function useCanvasInteractions(
                     x: cx,
                     y: cy,
                     radius: r,
-                    fill: 'rgba(59,130,246,0.5)',
+                    // fill: 'rgba(59,130,246,0.5)',
                     rotation: 0,
                     scaleX: 1,
                     scaleY: 1,
-                    listening: false,
+                    isLocked: false,
                     visible: true,
+                    coatingType: 'masking', // 기본은 마스킹
                     coatingHeight: gcodeSettings.coatingHeight
                 };
                 const next = [...shapesRef.current, circle] as AnyNodeConfig[];

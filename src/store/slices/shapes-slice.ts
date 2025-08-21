@@ -88,8 +88,10 @@ const shapesSlice = createSlice({
                 parentId: action.payload.parentId,
                 name: uniqueName,
                 listening: action.payload.listening ?? false,
+                isLocked: action.payload.isLocked ?? false,
                 x: action.payload.x ?? 0,
                 y: action.payload.y ?? 0,
+                coatingType: action.payload.coatingType ?? 'masking'
             };
             Object.assign(state, {
                 shapes: [...state.shapes, newShape]
@@ -110,6 +112,7 @@ const shapesSlice = createSlice({
                 parentId: action.payload.parentId,
                 name: uniqueName,
                 listening: action.payload.listening ?? false,
+                isLocked: action.payload.isLocked ?? false,
                 x: action.payload.x ?? 0,
                 y: action.payload.y ?? 0,
             };
@@ -120,6 +123,7 @@ const shapesSlice = createSlice({
             // state.shapes.unshift(newShape);
         },
 
+
         // updateShape는 Immer가 있으니 현재 형태 유지 가능
         updateShape: (state, action: PayloadAction<{ id: string; updatedProps: Partial<AnyNodeConfig> }>) => {
             const index = state.shapes.findIndex(s => s.id === action.payload.id);
@@ -128,6 +132,8 @@ const shapesSlice = createSlice({
                 // state.shapes[index] = { ...state.shapes[index], ...action.payload.updatedProps };
             }
         },
+
+
         // 배치 작업을 위한 새 리듀서
         batchUpdateShapes: (state, action: PayloadAction<Array<{ id: string; props: Partial<AnyNodeConfig> }>>) => {
             const updateMap = new Map(action.payload.map(update => [update.id, update.props]));
@@ -175,6 +181,7 @@ const shapesSlice = createSlice({
                     name: s.name || `${s.type || 'Shape'} #${i + 1}`,
                     visible: s.visible ?? true,
                     listening: s.listening ?? false,
+                    isLocked: s.isLocked ?? false,
                 })),
                 selectedShapeIds: [],
                 isGroupSelected: false
@@ -213,7 +220,7 @@ const shapesSlice = createSlice({
         toggleShapeLock: (state, action: PayloadAction<string>) => {
             const shape = state.shapes.find(s => s.id === action.payload);
             if (shape) {
-                shape.listening = !(shape.listening ?? false);
+                shape.isLocked = !(shape.isLocked ?? false);
             }
         },
         // 그룹 관련 최적화된 액션들
@@ -239,6 +246,7 @@ const shapesSlice = createSlice({
                 y: 0,
                 listening: false,
                 visible: true,
+                isLocked: false,
             } as AnyNodeConfig;
 
             Object.assign(state, {
@@ -307,7 +315,7 @@ const shapesSlice = createSlice({
             const group = state.shapes.find(s => s.id === groupId && s.type === 'group');
             if (!group) return;
 
-            const newLockState = !(group.listening ?? false);
+            const newLockState = !(group.isLocked ?? false);
             const memberIds = state.shapes
                 .filter(s => s.parentId === groupId)
                 .map(s => s.id!)
@@ -317,7 +325,7 @@ const shapesSlice = createSlice({
             Object.assign(state, {
                 shapes: state.shapes.map(shape => {
                     if (shape.id === groupId || memberIds.includes(shape.id!)) {
-                        return { ...shape, listening: newLockState };
+                        return { ...shape, isLocked: newLockState };
                     }
                     return shape;
                 }),

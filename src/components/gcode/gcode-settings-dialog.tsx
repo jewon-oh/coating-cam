@@ -221,9 +221,9 @@ export const GCodeSettingsDialog: React.FC<GCodeSettingsDialogProps> = ({ isOpen
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="auto">자동</SelectItem>
                                     <SelectItem value="horizontal">수평</SelectItem>
                                     <SelectItem value="vertical">수직</SelectItem>
-                                    {/*<SelectItem value="both">격자 (수평+수직)</SelectItem>*/}
                                 </SelectContent>
                             </Select>
                         </div>

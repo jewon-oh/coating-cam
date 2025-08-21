@@ -1,16 +1,17 @@
-
 "use client";
 
-import React, {  useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAppSelector, useAppDispatch } from '@/hooks/redux';
 import { updateShape, batchUpdateShapes } from '@/store/slices/shapes-slice';
 import { AnyNodeConfig } from '@/types/custom-konva-config';
+import { SmallNumberField } from '@/components/small-number-field';
 import {
     Settings,
     Eye,
@@ -21,10 +22,16 @@ import {
     Circle as CircleIcon,
     Image as ImageIcon,
     Layers,
-    RotateCcw
+    RotateCcw,
+    ChevronDown,
+    ChevronRight,
+    Palette,
+    Move,
+    Zap,
+    Target,
+    SkipForward
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {Separator} from "@radix-ui/react-menu";
 
 interface PropertyPanelProps {
     className?: string;
@@ -54,7 +61,9 @@ export function PropertyPanel({ className }: PropertyPanelProps) {
         const common: Partial<AnyNodeConfig> = {
             type: selectedShapes.every(s => s.type === first.type) ? first.type : undefined,
             visible: selectedShapes.every(s => s.visible === first.visible) ? first.visible : undefined,
-            listening: selectedShapes.every(s => s.listening === first.listening) ? first.listening : undefined,
+            isLocked: selectedShapes.every(s => s.isLocked === first.isLocked) ? first.isLocked : undefined,
+            skipCoating: selectedShapes.every(s => s.skipCoating === first.skipCoating) ? first.skipCoating : undefined,
+            useCustomCoating: selectedShapes.every(s => s.useCustomCoating === first.useCustomCoating) ? first.useCustomCoating : undefined,
         };
 
         return common;
@@ -79,305 +88,202 @@ export function PropertyPanel({ className }: PropertyPanelProps) {
         }
     };
 
-    // 객체 속성 렌더링
-    const renderObjectProperties = () => {
+    // 섹션 상태 관리
+    const [expandedSections, setExpandedSections] = React.useState({
+        transform: true,
+        appearance: true,
+        coating: true,
+    });
+
+    const toggleSection = (section: keyof typeof expandedSections) => {
+        setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
+    // 도형 아이콘 가져오기
+    const getShapeIcon = (type: string) => {
+        switch (type) {
+            case 'rectangle': return <Square className="w-3 h-3" />;
+            case 'circle': return <CircleIcon className="w-3 h-3" />;
+            case 'image': return <ImageIcon className="w-3 h-3" />;
+            case 'group': return <Layers className="w-3 h-3" />;
+            case 'polygon': return <Target className="w-3 h-3" />;
+            default: return <Square className="w-3 h-3" />;
+        }
+    };
+
+    // 선택 상태에 따른 헤더 렌더링
+    const renderHeader = () => {
         if (selectedShapes.length === 0) {
             return (
-                <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">
-                        객체를 선택하여 속성을 편집하세요.
-                    </p>
-                </div>
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                        <Settings className="w-4 h-4" />
+                        속성 패널
+                    </CardTitle>
+                </CardHeader>
             );
         }
 
         if (selectedShapes.length === 1) {
-            // 단일 객체 속성
             const shape = singleSelectedShape!;
-            const shapeIcon = {
-                rectangle: <Square className="w-3 h-3" />,
-                circle: <CircleIcon className="w-3 h-3" />,
-                image: <ImageIcon className="w-3 h-3" />,
-                group: <Layers className="w-3 h-3" />
-            }[shape.type] || <Square className="w-3 h-3" />;
-
             return (
-                <div className="space-y-2.5">
-                    <div className="flex items-center space-x-2">
-                        {shapeIcon}
-                        <h4 className="text-xs font-medium">{shape.name || shape.type}</h4>
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 h-auto">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                        {getShapeIcon(shape.type)}
+                        <span>{shape.name || shape.type}</span>
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 h-auto ml-auto">
                             {shape.type}
                         </Badge>
+                    </CardTitle>
+                </CardHeader>
+            );
+        }
+
+        return (
+            <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                    <Layers className="w-4 h-4" />
+                    <span>{selectedShapes.length}개 선택됨</span>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 h-auto ml-auto">
+                        다중선택
+                    </Badge>
+                </CardTitle>
+            </CardHeader>
+        );
+    };
+
+    if (selectedShapes.length === 0) {
+        return (
+            <Card className={cn("h-full", className)}>
+                {renderHeader()}
+                <CardContent className="pt-0">
+                    <div className="text-xs text-muted-foreground text-center py-8">
+                        객체를 선택하여 속성을 편집하세요.
                     </div>
+                </CardContent>
+            </Card>
+        );
+    }
 
-                    {/* 기본 속성 */}
-                    <div className="grid grid-cols-2 gap-1.5">
-                        <div>
-                            <Label htmlFor="obj-x" className="text-xs">X</Label>
-                            <Input
-                                id="obj-x"
-                                type="number"
-                                value={Math.round(shape.x || 0)}
-                                onChange={(e) => handlePropertyUpdate('x', parseFloat(e.target.value) || 0)}
-                                className="h-6 text-xs px-2"
-                            />
+    return (
+        <Card className={cn("h-full", className)}>
+            {renderHeader()}
+            <CardContent className="pt-0 space-y-4">
+                {/* 변형 속성 섹션 */}
+                <Collapsible open={expandedSections.transform} onOpenChange={() => toggleSection('transform')}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full py-2 px-1 hover:bg-accent rounded-sm">
+                        <div className="flex items-center gap-2">
+                            <Move className="w-3 h-3" />
+                            <span className="text-xs font-medium">변형</span>
                         </div>
-                        <div>
-                            <Label htmlFor="obj-y" className="text-xs">Y</Label>
-                            <Input
-                                id="obj-y"
-                                type="number"
-                                value={Math.round(shape.y || 0)}
-                                onChange={(e) => handlePropertyUpdate('y', parseFloat(e.target.value) || 0)}
-                                className="h-6 text-xs px-2"
-                            />
-                        </div>
-                    </div>
-
-                    {/* 크기 속성 - 사각형, 이미지 공통 */}
-                    {(shape.type === 'rectangle' || shape.type === 'image') && (
-                        <div className="grid grid-cols-2 gap-1.5">
-                            <div>
-                                <Label htmlFor="obj-width" className="text-xs">너비</Label>
-                                <Input
-                                    id="obj-width"
-                                    type="number"
-                                    value={Math.round(shape.width || 0)}
-                                    onChange={(e) => handlePropertyUpdate('width', parseFloat(e.target.value) || 0)}
-                                    className="h-6 text-xs px-2"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="obj-height" className="text-xs">높이</Label>
-                                <Input
-                                    id="obj-height"
-                                    type="number"
-                                    value={Math.round(shape.height || 0)}
-                                    onChange={(e) => handlePropertyUpdate('height', parseFloat(e.target.value) || 0)}
-                                    className="h-6 text-xs px-2"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 원 반지름 */}
-                    {shape.type === 'circle' && (
-                        <div>
-                            <Label htmlFor="obj-radius" className="text-xs">반지름</Label>
-                            <Input
-                                id="obj-radius"
-                                type="number"
-                                value={Math.round(shape.radius || 0)}
-                                onChange={(e) => handlePropertyUpdate('radius', parseFloat(e.target.value) || 0)}
-                                className="h-6 text-xs px-2"
-                            />
-                        </div>
-                    )}
-                    {/* 회전 - 모든 도형 타입 */}
-                    {shape.rotation !== undefined && (
-                        <div>
-                            <div className="flex items-center space-x-2 mb-1">
-                                <RotateCcw className="w-3 h-3" />
-                                <Label className="text-xs">회전: {Math.round(shape.rotation || 0)}°</Label>
-                            </div>
-                            <Slider
-                                value={[shape.rotation || 0]}
-                                onValueChange={([value]) => handlePropertyUpdate('rotation', value)}
-                                min={-180}
-                                max={180}
-                                step={1}
-                                className="w-full"
-                            />
-                        </div>
-                    )}
-
-                    {/* 가시성 및 잠금 - 모든 도형 타입 */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-1.5">
-                                {shape.visible !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                <Label className="text-xs">표시</Label>
-                            </div>
-                            <Switch
-                                checked={shape.visible !== false}
-                                onCheckedChange={(checked) => handlePropertyUpdate('visible', checked)}
-                            />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-1.5">
-                                {shape.listening ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                                <Label className="text-xs">잠금</Label>
-                            </div>
-                            <Switch
-                                checked={shape.listening || false}
-                                onCheckedChange={(checked) => handlePropertyUpdate('listening', checked)}
-                            />
-                        </div>
-                    </div>
-
-                    {/* 코팅 설정 - 모든 도형 타입 */}
-                    {(shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'image') && (
-                        <div className="space-y-2">
-                            <div className="flex items-center space-x-1.5 mb-1">
-                                <Settings className="w-3 h-3" />
-                                <Label className="text-xs font-medium">코팅 설정</Label>
-                            </div>
-
-                            <div className="flex items-center justify-between mb-1.5">
-                                <div className="flex items-center space-x-1.5">
-                                    <Switch
-                                        checked={shape.useCustomCoating || false}
-                                        onCheckedChange={(checked) => handlePropertyUpdate('useCustomCoating', checked)}
+                        {expandedSections.transform ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-2">
+                        {singleSelectedShape && (
+                            <>
+                                {/* 위치 */}
+                                <div className="grid grid-cols-2 gap-2">
+                                    <SmallNumberField
+                                        id="obj-x"
+                                        label="X"
+                                        value={Math.round(singleSelectedShape.x || 0)}
+                                        onChange={(value) => handlePropertyUpdate('x', value)}
                                     />
-                                    <Label className="text-xs">개별 설정</Label>
+                                    <SmallNumberField
+                                        id="obj-y"
+                                        label="Y"
+                                        value={Math.round(singleSelectedShape.y || 0)}
+                                        onChange={(value) => handlePropertyUpdate('y', value)}
+                                    />
                                 </div>
-                            </div>
 
-                            <Separator  />
-                            <div>
-                                <Label htmlFor="coating-height" className="text-xs">
-                                    코팅 높이 (mm)
-                                    {!shape.useCustomCoating && (
-                                        <span className="text-muted-foreground ml-1">
-                                            (기본값: {gcodeSettings.coatingHeight})
-                                        </span>
-                                    )}
-                                </Label>
-                                <Input
-                                    id="coating-height"
-                                    type="number"
-                                    step="0.01"
-                                    value={shape.useCustomCoating ? (shape.coatingHeight || '') : ''}
-                                    onChange={(e) => handlePropertyUpdate('coatingHeight', parseFloat(e.target.value) || gcodeSettings.coatingHeight)}
-                                    className="h-6 text-xs px-2"
-                                    placeholder={`기본값: ${gcodeSettings.coatingHeight}`}
-                                    disabled={!shape.useCustomCoating}
-                                />
-                            </div>
-                            {/* 테두리 코팅 설정 - 사각형과 원만 */}
-                            {(shape.type === 'rectangle' || shape.type === 'circle') && (
-                                <div className="space-y-2 pt-2 border-t border-muted">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <div className="flex items-center space-x-1.5">
-                                            <Switch
-                                                checked={shape.enableOutlineCoating || false}
-                                                onCheckedChange={(checked) => handlePropertyUpdate('enableOutlineCoating', checked)}
+                                {/* 크기 - 사각형, 이미지, 폴리곤 */}
+                                {(singleSelectedShape.type === 'rectangle' ||
+                                    singleSelectedShape.type === 'image' ||
+                                    singleSelectedShape.type === 'polygon') && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <SmallNumberField
+                                            id="obj-width"
+                                            label="너비"
+                                            value={Math.round(singleSelectedShape.width || 0)}
+                                            onChange={(value) => handlePropertyUpdate('width', value)}
+                                        />
+                                        <SmallNumberField
+                                            id="obj-height"
+                                            label="높이"
+                                            value={Math.round(singleSelectedShape.height || 0)}
+                                            onChange={(value) => handlePropertyUpdate('height', value)}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* 원 반지름 */}
+                                {singleSelectedShape.type === 'circle' && (
+                                    <SmallNumberField
+                                        id="obj-radius"
+                                        label="반지름"
+                                        value={Math.round(singleSelectedShape.radius || 0)}
+                                        onChange={(value) => handlePropertyUpdate('radius', value)}
+                                    />
+                                )}
+
+                                {/* 회전 */}
+                                {singleSelectedShape.rotation !== undefined && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <RotateCcw className="w-3 h-3" />
+                                                <span className="text-xs">회전</span>
+                                            </div>
+                                            <div className="w-20">
+                                                <SmallNumberField
+                                                    id="obj-rotation"
+                                                    label=""
+                                                    value={Math.round(singleSelectedShape.rotation || 0)}
+                                                    step={1}
+                                                    onChange={(value) => handlePropertyUpdate('rotation', Math.max(-180, Math.min(180, value)))}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="px-1">
+                                            <Slider
+                                                value={[singleSelectedShape.rotation || 0]}
+                                                onValueChange={([value]) => handlePropertyUpdate('rotation', value)}
+                                                min={-180}
+                                                max={180}
+                                                step={1}
+                                                className="w-full"
                                             />
-                                            <Label className="text-xs">테두리 코팅</Label>
+                                            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                                                <span>-180°</span>
+                                                <span>0°</span>
+                                                <span>180°</span>
+                                            </div>
                                         </div>
                                     </div>
+                                )}
 
-                                    {shape.enableOutlineCoating && (
-                                        <div className="space-y-2 pl-4 border-l border-muted">
-                                            <div>
-                                                <Label htmlFor="outline-passes" className="text-xs">코팅 회수</Label>
-                                                <Input
-                                                    id="outline-passes"
-                                                    type="number"
-                                                    min="1"
-                                                    max="10"
-                                                    value={shape.outlineCoatingPasses || 1}
-                                                    onChange={(e) => handlePropertyUpdate('outlineCoatingPasses', parseInt(e.target.value) || 1)}
-                                                    className="h-6 text-xs px-2"
-                                                />
-                                            </div>
+                            </>
+                        )}
+                    </CollapsibleContent>
+                </Collapsible>
 
-                                            <div>
-                                                <Label htmlFor="outline-offset" className="text-xs">오프셋 (mm)</Label>
-                                                <Input
-                                                    id="outline-offset"
-                                                    type="number"
-                                                    step="0.1"
-                                                    value={shape.outlineCoatingOffset || 0}
-                                                    onChange={(e) => handlePropertyUpdate('outlineCoatingOffset', parseFloat(e.target.value) || 0)}
-                                                    className="h-6 text-xs px-2"
-                                                    placeholder="0"
-                                                />
-                                            </div>
+                <Separator />
 
-                                            <div>
-                                                <Label htmlFor="outline-speed" className="text-xs">
-                                                    속도 (mm/min)
-                                                    <span className="text-muted-foreground ml-1">
-                                                        (기본값: {gcodeSettings.coatingSpeed})
-                                                    </span>
-                                                </Label>
-                                                <Input
-                                                    id="outline-speed"
-                                                    type="number"
-                                                    value={shape.outlineCoatingSpeed || ''}
-                                                    onChange={(e) => handlePropertyUpdate('outlineCoatingSpeed', parseFloat(e.target.value) || gcodeSettings.coatingSpeed)}
-                                                    className="h-6 text-xs px-2"
-                                                    placeholder={`기본값: ${gcodeSettings.coatingSpeed}`}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                {/* 외관 속성 섹션 */}
+                <Collapsible open={expandedSections.appearance} onOpenChange={() => toggleSection('appearance')}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full py-2 px-1 hover:bg-accent rounded-sm">
+                        <div className="flex items-center gap-2">
+                            <Palette className="w-3 h-3" />
+                            <span className="text-xs font-medium">외관</span>
                         </div>
-                    )}
-
-
-                </div>
-            );
-        } else {
-            // 다중 선택 속성 - 기존 코드 유지
-            return (
-                <div className="space-y-2.5">
-                    <div className="flex items-center space-x-2">
-                        <Layers className="w-3 h-3" />
-                        <h4 className="text-xs font-medium">다중 선택</h4>
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 h-auto">
-                            {selectedShapes.length}개 객체
-                        </Badge>
-                    </div>
-
-                    {/* 코팅 가능한 도형들만 필터링 */}
-                    {selectedShapes.some(s => s.type === 'rectangle' || s.type === 'circle' || s.type === 'image') && (
-                        <div className="space-y-2">
-                            <div className="flex items-center space-x-1.5 mb-1">
-                                <Settings className="w-3 h-3" />
-                                <Label className="text-xs font-medium">코팅 설정</Label>
-                            </div>
-
-                            <div className="flex items-center justify-between mb-1.5">
-                                <div className="flex items-center space-x-1.5">
-                                    <Switch
-                                        checked={selectedShapes.some(s => s.useCustomCoating)}
-                                        onCheckedChange={(checked) => handlePropertyUpdate('useCustomCoating', checked)}
-                                    />
-                                    <Label className="text-xs">개별 설정</Label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label className="text-xs">
-                                    코팅 높이 (mm)
-                                    <span className="text-muted-foreground ml-1">
-                                        (프로젝트 기본값: {gcodeSettings.coatingHeight})
-                                    </span>
-                                </Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    onChange={(e) => handlePropertyUpdate('coatingHeight', parseFloat(e.target.value) || gcodeSettings.coatingHeight)}
-                                    className="h-6 text-xs px-2"
-                                    placeholder={`기본값: ${gcodeSettings.coatingHeight}`}
-                                />
-                            </div>
-
-                        </div>
-                    )}
-
-
-                    {/* 공통 속성만 표시 */}
-                    <div className="space-y-2">
+                        {expandedSections.appearance ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-2">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-1.5">
-                                <Eye className="w-3 h-3" />
-                                <Label className="text-xs">표시</Label>
+                            <div className="flex items-center gap-2">
+                                {commonProperties?.visible !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                <span className="text-xs">표시</span>
                             </div>
                             <Switch
                                 checked={commonProperties?.visible !== false}
@@ -385,37 +291,141 @@ export function PropertyPanel({ className }: PropertyPanelProps) {
                             />
                         </div>
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-1.5">
-                                <Lock className="w-3 h-3" />
-                                <Label className="text-xs">잠금</Label>
+                            <div className="flex items-center gap-2">
+                                {/* 아이콘 로직 수정: isLocked가 true면 Lock 아이콘 */}
+                                {commonProperties?.isLocked
+                                    ? <Lock className="w-3 h-3" />
+                                    : <Unlock className="w-3 h-3" />
+                                }
+                                <span className="text-xs">잠금</span> {/* 레이블도 변경 */}
                             </div>
                             <Switch
-                                checked={commonProperties?.listening || false}
-                                onCheckedChange={(checked) => handlePropertyUpdate('listening', checked)}
+                                checked={commonProperties?.isLocked || false}
+                                onCheckedChange={(checked) => handlePropertyUpdate('isLocked', checked)}
                             />
                         </div>
-                    </div>
-                </div>
-            );
-        }
-    };
-    return (
-        <Card className={cn("h-full rounded-none border-0 flex flex-col ", className)}>
-            <CardHeader className="px-3 py-0.5">
-                <CardTitle className="text-lg flex items-center space-x-2">
-                    <Settings className="w-3 h-3" />
-                    <span>속성</span>
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 px-3 py-2 space-y-3">
-                {/* 객체 속성 섹션 */}
-                <div>
-                    <h3 className="text-xs font-medium text-muted-foreground mb-1.5">객체 속성</h3>
-                    {renderObjectProperties()}
-                </div>
+
+                    </CollapsibleContent>
+                </Collapsible>
+
+                <Separator />
+
+                {/* 코팅 설정 섹션 */}
+                <Collapsible open={expandedSections.coating} onOpenChange={() => toggleSection('coating')}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full py-2 px-1 hover:bg-accent rounded-sm">
+                        <div className="flex items-center gap-2">
+                            <Zap className="w-3 h-3" />
+                            <span className="text-xs font-medium">코팅 설정</span>
+                        </div>
+                        {expandedSections.coating ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-2">
+                        {/* 코팅 제외 */}
+                        <div className="flex items-center justify-between p-2 bg-muted/30 rounded-md">
+                            <div className="flex items-center gap-2">
+                                <SkipForward className="w-3 h-3" />
+                                <span className="text-xs">코팅 제외</span>
+                            </div>
+                            <Switch
+                                checked={commonProperties?.skipCoating || false}
+                                onCheckedChange={(checked) => handlePropertyUpdate('skipCoating', checked)}
+                            />
+                        </div>
+
+                        {/* 개별 코팅 설정 (코팅이 활성화된 경우에만) */}
+                        {!commonProperties?.skipCoating && (
+                            <>
+                                {/* 코팅 타입 */}
+                                {singleSelectedShape&& (
+                                    <>
+                                        <div>
+                                            <span className="text-xs block mb-1">코팅 타입</span>
+                                            <Select
+                                                value={singleSelectedShape.coatingType || 'fill'}
+                                                onValueChange={(value) => handlePropertyUpdate('coatingType', value)}
+                                            >
+                                                <SelectTrigger className="h-7 text-xs">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="fill">🔄 채우기</SelectItem>
+                                                    <SelectItem value="outline">📐 윤곽선</SelectItem>
+                                                    <SelectItem value="masking">🚫 마스킹</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        {/* 윤곽선 관련 설정 (outline 타입일 때만) */}
+                                        {singleSelectedShape.coatingType === 'outline' && (
+                                            <div className="space-y-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded border">
+                                                <div className="text-xs font-medium text-blue-700 dark:text-blue-300">윤곽선 설정</div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <SmallNumberField
+                                                        id="outline-passes"
+                                                        label="패스 수"
+                                                        value={singleSelectedShape.outlinePasses || 1}
+                                                        onChange={(value) => handlePropertyUpdate('outlinePasses', Math.max(1, value))}
+                                                    />
+                                                    <SmallNumberField
+                                                        id="outline-interval"
+                                                        label="간격 (mm)"
+                                                        value={singleSelectedShape.outlineInterval || 1}
+                                                        step={0.1}
+                                                        onChange={(value) => handlePropertyUpdate('outlineInterval', value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Settings className="w-3 h-3" />
+                                        <span className="text-xs">개별 설정 사용</span>
+                                    </div>
+                                    <Switch
+                                        checked={commonProperties?.useCustomCoating || false}
+                                        onCheckedChange={(checked) => handlePropertyUpdate('useCustomCoating', checked)}
+                                    />
+                                </div>
+
+
+                                {/* 개별 설정이 활성화된 경우 */}
+                                {commonProperties?.useCustomCoating && singleSelectedShape && (
+                                    <div className="space-y-3 p-3 bg-accent/20 rounded-md border-l-2 border-primary/30">
+                                        <div className="text-xs font-medium text-muted-foreground mb-2">개별 코팅 설정</div>
+
+                                        {/* 코팅 순서 */}
+                                        <SmallNumberField
+                                            id="coating-order"
+                                            label="코팅 순서"
+                                            value={singleSelectedShape.coatingOrder || 0}
+                                            onChange={(value) => handlePropertyUpdate('coatingOrder', value)}
+                                        />
+
+                                        {/* 코팅 높이와 속도 */}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <SmallNumberField
+                                                id="coating-height"
+                                                label="높이 (mm)"
+                                                value={singleSelectedShape.coatingHeight || gcodeSettings.coatingHeight}
+                                                step={0.01}
+                                                onChange={(value) => handlePropertyUpdate('coatingHeight', value)}
+                                            />
+                                            <SmallNumberField
+                                                id="coating-speed"
+                                                label="속도 (mm/min)"
+                                                value={singleSelectedShape.coatingSpeed || gcodeSettings.coatingSpeed}
+                                                onChange={(value) => handlePropertyUpdate('coatingSpeed', value)}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </CollapsibleContent>
+                </Collapsible>
             </CardContent>
         </Card>
     );
-
-
 }

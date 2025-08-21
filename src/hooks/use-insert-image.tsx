@@ -218,6 +218,9 @@ export const useInsertImage = () => {
                     scaleY: 1,
                     imageDataUrl: dataUrl,
                     isFlipped: false, // 👈 "아직 뒤집히지 않음" 플래그 추가
+                    visible: true,
+                    isLocked: false,
+                    coatingType: 'fill',
                 };
 
                 // 도형 추가

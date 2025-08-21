@@ -145,9 +145,9 @@ function MultipleCanvasImages({
         if (imageShapes.length > 0) {
             loadTextures();
         } else {
-            // 이미지가 없을 때 상태 초기화
-            setTextures(new Map());
-            setLoadingStates(new Map());
+            // // 이미지가 없을 때 상태 초기화
+            // setTextures(new Map());
+            // setLoadingStates(new Map());
         }
 
         // 의존성 변경/언마운트 시 기존 텍스처 자원 해제
@@ -179,19 +179,10 @@ function MultipleCanvasImages({
 
                 let effectiveX, effectiveY, effectiveWidth, effectiveHeight;
 
-                if (imageShape.crop) {
-                    // crop이 있으면 crop된 영역 사용
-                    effectiveX = baseX;//+ (imageShape.crop.x * scaleX);
-                    effectiveY = baseY;// + (imageShape.crop.y * scaleY);
-                    effectiveWidth = imageShape.crop.width * scaleX;
-                    effectiveHeight = imageShape.crop.height * scaleY;
-                } else {
-                    // crop이 없으면 전체 이미지 사용
-                    effectiveX = baseX;
-                    effectiveY = baseY;
-                    effectiveWidth = (imageShape.width ?? 0) * scaleX;
-                    effectiveHeight = (imageShape.height ?? 0) * scaleY;
-                }
+                effectiveX = baseX;
+                effectiveY = baseY;
+                effectiveWidth = (imageShape.width ?? 0) * scaleX;
+                effectiveHeight = (imageShape.height ?? 0) * scaleY;
 
                 // 3D 공간에서의 실제 크기 (X,Y 바뀐 상태)
                 const actualWidth = effectiveHeight / scaleFactor;

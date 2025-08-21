@@ -18,11 +18,11 @@ const initialState: GCodeState = {
         coatingHeight: 20,          // 20mm 코팅 높이
 
         // 패턴 기본 설정
-        fillPattern: 'horizontal',
+        fillPattern: 'auto',
 
         // 마스킹 기본 설정
         enableMasking: true,
-        maskingClearance: 0.5,       // 0.5mm 여유 거리
+        maskingClearance: 0,       // 기본 0mm 여유 거리
         travelAvoidanceStrategy: 'contour', // 마스킹 테두리 따라 우회
 
         workArea: { width: 1000, height: 1000 },

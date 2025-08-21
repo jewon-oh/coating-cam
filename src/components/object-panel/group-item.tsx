@@ -1,7 +1,7 @@
-import React, { memo, useCallback, useState, useRef, useEffect } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import React, {memo, useCallback, useState, useRef, useEffect} from 'react';
+import {Badge} from '@/components/ui/badge';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
 import {
     ChevronRight,
     ChevronDown,
@@ -16,8 +16,8 @@ import {
     Copy,
     Move
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { AnyNodeConfig } from '@/types/custom-konva-config';
+import {cn} from '@/lib/utils';
+import {AnyNodeConfig} from '@/types/custom-konva-config';
 import {
     ContextMenu,
     ContextMenuContent,
@@ -25,13 +25,8 @@ import {
     ContextMenuSeparator,
     ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import {useItemActions} from '@/hooks/use-item-actions'; // 커스텀 훅 임포트
+
 
 interface GroupItemProps {
     shape: AnyNodeConfig;
@@ -51,81 +46,44 @@ interface GroupItemProps {
 }
 
 export const GroupItem = memo<GroupItemProps>(({
-                                                            shape,
-                                                            isSelected,
-                                                            isOpen,
-                                                            memberCount = 0,
-                                                            onToggleOpen,
-                                                            onSelect,
-                                                            onPatch,
-                                                            onUngroup,
-                                                            onDuplicate,
-                                                            onDelete,
-                                                            onToggleVisibility,
-                                                            onToggleLock,
-                                                            depth = 0,
-                                                        }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(shape.name || '');
+                                                   shape,
+                                                   isSelected,
+                                                   isOpen,
+                                                   memberCount = 0,
+                                                   onToggleOpen,
+                                                   onSelect,
+                                                   onPatch,
+                                                   onUngroup,
+                                                   onDuplicate,
+                                                   onDelete,
+                                                   onToggleVisibility,
+                                                   onToggleLock,
+                                                   depth = 0,
+                                               }) => {
+    // 공통 로직을 커스텀 훅으로 대체
+    const {
+        isEditing,
+        editValue,
+        inputRef,
+        setEditValue,
+        handleNameSubmit,
+        handleKeyDown,
+        toggleVisibility,
+        toggleLock,
+        startEditing,
+    } = useItemActions({shape, onPatch, onToggleVisibility, onToggleLock});
+
     const [isHovered, setIsHovered] = useState(false);
-    const inputRef = useRef<HTMLInputElement>(null);
 
-    // 이름 편집 처리
-    useEffect(() => {
-        if (isEditing && inputRef.current) {
-            inputRef.current.focus();
-            inputRef.current.select();
-        }
-    }, [isEditing]);
-
-    const handleNameSubmit = useCallback(() => {
-        if (editValue.trim() && editValue !== shape.name) {
-            onPatch(shape.id!, { name: editValue.trim() });
-        }
-        setIsEditing(false);
-    }, [editValue, shape.name, shape.id, onPatch]);
-
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleNameSubmit();
-        } else if (e.key === 'Escape') {
-            setEditValue(shape.name || '');
-            setIsEditing(false);
-        }
-    }, [handleNameSubmit, shape.name]);
-
-    // 가시성 토글
-    const toggleVisibility = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (onToggleVisibility) {
-            onToggleVisibility(shape.id!);
-        } else {
-            onPatch(shape.id!, { visible: !(shape.visible ?? true) });
-        }
-    }, [shape.id, shape.visible, onPatch, onToggleVisibility]);
-
-    // 잠금 토글
-    const toggleLock = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (onToggleLock) {
-            onToggleLock(shape.id!);
-        } else {
-            onPatch(shape.id!, { listening: !(shape.listening ?? false) });
-        }
-    }, [shape.id, shape.listening, onPatch, onToggleLock]);
-
-    // 선택 처리
     const handleSelect = useCallback((e: React.MouseEvent) => {
         if (isEditing) return;
         onSelect(shape.id!, e);
     }, [isEditing, onSelect, shape.id]);
 
-    // 더블클릭으로 이름 편집
-    const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        setIsEditing(true);
-    }, []);
+    const handleDuplicate = () => onDuplicate?.(shape.id!);
+    const handleUngroup = () => onUngroup?.(shape.id!);
+    const handleDelete = () => onDelete?.(shape.id!);
+
 
     const isVisible = shape.visible ?? true;
     const isLocked = shape.listening ?? false;
@@ -141,9 +99,9 @@ export const GroupItem = memo<GroupItemProps>(({
                         !isVisible && "opacity-50",
                         isLocked && "bg-muted/30"
                     )}
-                    style={{ marginLeft: depth * 12 }}
+                    style={{marginLeft: depth * 12}}
                     onClick={handleSelect}
-                    onDoubleClick={handleDoubleClick}
+                    onDoubleClick={startEditing}
                     onMouseEnter={() => setIsHovered(true)}
                     onMouseLeave={() => setIsHovered(false)}
                 >
@@ -158,15 +116,15 @@ export const GroupItem = memo<GroupItemProps>(({
                         }}
                     >
                         {isOpen ? (
-                            <ChevronDown className="w-4 h-4" />
+                            <ChevronDown className="w-4 h-4"/>
                         ) : (
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight className="w-4 h-4"/>
                         )}
                     </Button>
 
                     {/* 그룹 아이콘 */}
                     <div className="flex items-center mr-2">
-                        <Users className="w-4 h-4 text-blue-500" />
+                        <Users className="w-4 h-4 text-blue-500"/>
                     </div>
 
                     {/* 이름 표시/편집 */}
@@ -206,9 +164,9 @@ export const GroupItem = memo<GroupItemProps>(({
                             onClick={toggleVisibility}
                         >
                             {isVisible ? (
-                                <Eye className="w-3 h-3" />
+                                <Eye className="w-3 h-3"/>
                             ) : (
-                                <EyeOff className="w-3 h-3 text-muted-foreground" />
+                                <EyeOff className="w-3 h-3 text-muted-foreground"/>
                             )}
                         </Button>
 
@@ -220,65 +178,32 @@ export const GroupItem = memo<GroupItemProps>(({
                             onClick={toggleLock}
                         >
                             {isLocked ? (
-                                <Lock className="w-3 h-3 text-orange-500" />
+                                <Lock className="w-3 h-3 text-orange-500"/>
                             ) : (
-                                <Unlock className="w-3 h-3" />
+                                <Unlock className="w-3 h-3"/>
                             )}
                         </Button>
-
-                        {/* 더보기 메뉴 */}
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-6 h-6 p-0"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <MoreHorizontal className="w-3 h-3" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                                    <Edit2 className="w-4 h-4 mr-2" />
-                                    이름 변경
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onDuplicate?.(shape.id!)}>
-                                    <Copy className="w-4 h-4 mr-2" />
-                                    복제
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => onUngroup?.(shape.id!)}>
-                                    <Move className="w-4 h-4 mr-2" />
-                                    그룹 해제
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    onClick={() => onDelete?.(shape.id!)}
-                                    className="text-red-600"
-                                >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    삭제
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
                     </div>
                 </div>
             </ContextMenuTrigger>
 
             <ContextMenuContent>
-                <ContextMenuItem onClick={() => setIsEditing(true)}>
-                    <Edit2 className="w-4 h-4 mr-2" />
+                <ContextMenuItem onClick={startEditing}>
+                    <Edit2 className="w-4 h-4 mr-2"/>
                     이름 변경
                 </ContextMenuItem>
-                <ContextMenuItem onClick={() => onDuplicate?.(shape.id!)}>
-                    <Copy className="w-4 h-4 mr-2" />
+                <ContextMenuItem onClick={handleDuplicate}>
+                    <Copy className="w-4 h-4 mr-2"/>
                     그룹 복제
                 </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem onClick={() => onUngroup?.(shape.id!)}>
-                    <Move className="w-4 h-4 mr-2" />
+                <ContextMenuSeparator/>
+                <ContextMenuItem onClick={handleUngroup}>
+                    <Move className="w-4 h-4 mr-2"/>
                     그룹 해제
+                </ContextMenuItem>
+                <ContextMenuItem onClick={handleDelete} className="text-red-600">
+                    <Trash2 className="w-4 h-4 mr-2"/>
+                    삭제
                 </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>
