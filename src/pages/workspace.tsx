@@ -27,6 +27,7 @@ const DynamicCanvasStage = dynamic(() => import('@/components/workspace/canvas-s
     ssr: false,
 });
 
+
 /**
  * 프로젝트 로드 로직을 포함하는 내부 컴포넌트
  * 이 컴포넌트는 CanvasProvider의 컨텍스트에 접근해야 하므로,

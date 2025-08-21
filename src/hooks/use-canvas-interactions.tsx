@@ -556,7 +556,7 @@ export function useCanvasInteractions(
                             id: crypto.randomUUID(),
                             parentId: null,
                             type: 'rectangle',
-                            name: '사각형 마스킹',
+                            name: '사각형',
                             x, y, width, height,
                             fill: 'rgba(59,130,246,0.5)',
                             rotation: 0,
@@ -564,6 +564,7 @@ export function useCanvasInteractions(
                             scaleY: 1,
                             listening: false,
                             visible: true,
+                            isLocked: false,
                             coatingHeight: gcodeSettings.coatingHeight
                         };
                         const next = [...shapesRef.current, rect] as AnyNodeConfig[];
@@ -578,7 +579,7 @@ export function useCanvasInteractions(
                             id: crypto.randomUUID(),
                             parentId: null,
                             type: 'circle',
-                            name: '원 마스킹',
+                            name: '원형',
                             x: cx,
                             y: cy,
                             radius: r,
@@ -588,6 +589,7 @@ export function useCanvasInteractions(
                             scaleY: 1,
                             listening: false,
                             visible: true,
+                            isLocked: false,
                             coatingHeight: gcodeSettings.coatingHeight
                         };
                         const next = [...shapesRef.current, circle] as AnyNodeConfig[];

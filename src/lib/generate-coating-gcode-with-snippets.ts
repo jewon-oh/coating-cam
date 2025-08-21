@@ -265,12 +265,12 @@ class PathGenerator {
                 const allSegments: { start: Point; end: Point }[] = [];
 
                 // 1-1. 현재 boundary 도형의 코팅 타입에 따른 처리
-                if (boundary.useCustomCoating && boundary.coatingType === 'outline') {
+                if (boundary.coatingType === 'outline') {
                     // 윤곽선 코팅인 경우
                     emitter.addLine(`; Generating outline segments for ${boundary.name || boundary.type} shape...`);
                     const outlineSegments = this.generateOutlineSegments(boundary);
                     allSegments.push(...outlineSegments);
-                } else if (!boundary.useCustomCoating || boundary.coatingType === 'fill' || boundary.type === 'image') {
+                } else if ( boundary.coatingType === 'fill' || boundary.type === 'image') {
                     // 채우기 코팅인 경우 (기본값 포함)
                     emitter.addLine(`; Pre-calculating fill segments for ${boundary.name || boundary.type}...`);
 
@@ -407,36 +407,6 @@ class PathGenerator {
             throw error;
         }
     }
-
-
-    /**
-     * [새로 추가] 이미지가 아닌 도형의 채우기 세그먼트를 생성합니다.
-     */
-    private async generateShapeFillSegments(
-        shape: AnyNodeConfig,
-        onProgress?: ProgressCallback
-    ): Promise<{ start: Point; end: Point }[]> {
-        const segments: { start: Point; end: Point }[] = [];
-
-        // TODO: 사각형, 원, 폴리곤 등 각 도형 타입별 채우기 로직 구현
-        // 현재는 기본적으로 빈 배열 반환 (추후 구현 필요)
-
-        if (onProgress) {
-            onProgress(0, `${shape.type} 채우기 세그먼트 생성 중...`);
-        }
-
-        // 임시 구현: 도형 중심점을 기준으로 한 단순 세그먼트
-        const centerX = (shape.x ?? 0) + ((shape.width ?? shape.radius ?? 0) / 2);
-        const centerY = (shape.y ?? 0) + ((shape.height ?? shape.radius ?? 0) / 2);
-
-        segments.push({
-            start: { x: centerX - 5, y: centerY },
-            end: { x: centerX + 5, y: centerY }
-        });
-
-        return segments;
-    }
-
 
     /**
      * 비동기 안전 세그먼트 계산
@@ -768,6 +738,7 @@ class PathGenerator {
             }))
             .filter((seg) => seg.end > seg.start);
     }
+
     /**
      * 단일 도형의 윤곽선 경로를 기하학적 세그먼트 배열로 생성합니다.
      * @param shape 윤곽선을 생성할 도형

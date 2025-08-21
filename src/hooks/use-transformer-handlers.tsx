@@ -80,7 +80,7 @@ export function useTransformerHandlers(
         }
     }, [shapes, transformerRef]);
 
-    const handleTransform = useCallback(() => {
+    const handleTransform = useCallback((e: Konva.KonvaEventObject<Event>) => {
         const nodes = transformerRef.current?.nodes() || [];
         if (nodes.length === 0 || !transformStartCache.current) return;
 

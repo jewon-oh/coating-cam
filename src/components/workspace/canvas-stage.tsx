@@ -758,6 +758,7 @@ export default function CanvasStage() {
                                                     rotation={shape.rotation}
                                                     scaleX={shape.scaleX}
                                                     scaleY={shape.scaleY}
+                                                    strokeScaleEnabled={false}
                                                     {...commonProps}
                                                 />
                                             );
@@ -773,6 +774,7 @@ export default function CanvasStage() {
                                                     rotation={shape.rotation}
                                                     scaleX={shape.scaleX}
                                                     scaleY={shape.scaleY}
+                                                    strokeScaleEnabled={false}
                                                     {...commonProps}
                                                 />
                                             );

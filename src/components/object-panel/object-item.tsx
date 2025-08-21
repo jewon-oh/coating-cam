@@ -157,7 +157,7 @@ export const ObjectItem = memo<ObjectItemProps>(({
                                     />
                                 ) : (
                                     <span>
-                                {shape.name ? ellipsizeEnd(shape.name, 12) : `${shape.type} #${shape.id?.slice(0, 6)}`}
+                                {shape.name ? ellipsizeEnd(shape.name, 20) : `${shape.type} #${shape.id?.slice(0, 6)}`}
                             </span>
                                 )}
                             </div>

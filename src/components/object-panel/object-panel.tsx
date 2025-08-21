@@ -254,7 +254,7 @@ export const ObjectPanel = memo(() => {
                     {statsText}
                 </Badge>
                 <ScrollArea className="h-full">
-                    <div className="p-1.5 space-y-0.5">
+                    <div className="px-2 pt-1 pb-12 space-y-0.5">
                         {flattenedTree.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
                                 <Layers className="w-8 h-8 mx-auto mb-2 opacity-30"/>
