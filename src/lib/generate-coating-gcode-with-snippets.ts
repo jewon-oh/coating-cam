@@ -226,9 +226,10 @@ class PathGenerator {
         }
     }
 
+
     /**
      * G-code 경로를 생성하고 GCodeEmitter에 추가합니다.(비동기 처리)
-     * 이미지1의 모든 경로 → 이미지2의 모든 경로 → ... 각 이미지 내에서는 개별/기본 코팅 높이를 적용합니다.
+     * 각 도형의 타입(outline, fill)에 따라 적절한 경로 생성 로직을 호출합니다.
      * @param emitter G-code를 생성할 Emitter 인스턴스
      * @param onProgress 진행 상황을 알리는 콜백 함수 (선택 사항)
      */
@@ -261,23 +262,28 @@ class PathGenerator {
                 const shapeTypeLabel = boundary.type === 'image' ? 'PCB' : boundary.type.toUpperCase();
                 if (onProgress) onProgress(boundaryProgressBase, `${shapeTypeLabel} ${bi + 1}/${orderedBoundaries.length} 경로 계산 중...`);
 
-                // --- ⬇️ 1. 모든 경로 세그먼트를 미리 생성하여 통합 ⬇️ ---
                 const allSegments: { start: Point; end: Point }[] = [];
 
-                // 1-1. 현재 boundary 도형의 코팅 타입에 따른 처리
+                // 이제 coatingType만으로 윤곽선과 채우기를 명확히 구분합니다.
+                // 도형의 실제 타입(image, rectangle, circle)에 의존하지 않습니다.
                 if (boundary.coatingType === 'outline') {
-                    // 윤곽선 코팅인 경우
+                    // 윤곽선 코팅
                     emitter.addLine(`; Generating outline segments for ${boundary.name || boundary.type} shape...`);
-                    const outlineSegments = this.generateOutlineSegments(boundary);
-                    allSegments.push(...outlineSegments);
-                } else if ( boundary.coatingType === 'fill' || boundary.type === 'image') {
-                    // 채우기 코팅인 경우 (기본값 포함)
-                    emitter.addLine(`; Pre-calculating fill segments for ${boundary.name || boundary.type}...`);
+                    // 1. 마스킹이 적용되지 않은 원본 윤곽선 세그먼트를 생성합니다.
+                    const rawOutlineSegments = this.generateOutlineSegments(boundary);
 
+                    // 2. 각 세그먼트를 순회하며 마스킹을 적용하고 안전한 부분만 allSegments에 추가합니다.
+                    for (const rawSegment of rawOutlineSegments) {
+                        const safeSegments = this.splitSegmentByMasks(rawSegment);
+                        allSegments.push(...safeSegments);
+                    }
+                }
+                else if (boundary.coatingType === 'fill') {
+                    // 채우기 코팅 (이전 수정으로 이제 모든 도형 유형을 지원)
+                    emitter.addLine(`; Pre-calculating fill segments for ${boundary.name || boundary.type}...`);
                     const fillSegments = await this.precalculateAllSafeSegmentsAsync(boundary, onProgress);
                     allSegments.push(...fillSegments);
                 }
-                // --- ⬆️ 1. 통합 완료 ⬆️ ---
 
                 if (allSegments.length === 0) {
                     emitter.addLine(`; ${boundary.name || boundary.type} - 생성할 경로 없음`);
@@ -319,17 +325,6 @@ class PathGenerator {
                                 closestEntryPoint = segment.end; // 끝점이 더 가까우면 끝점에서 시작하도록 설정
                             }
                         }
-                    }
-
-                    // [DEBUG] Zone 선택 G-code 주석
-                    if (bestNextZone && closestEntryPoint) {
-                        const zoneIdx = zones.indexOf(bestNextZone);
-                        const segCount = bestNextZone.length;
-                        emitter.addLine(
-                            `; [DEBUG] zone-select ${shapeTypeLabel.toLowerCase()}=${bi + 1} zone=${zoneIdx + 1}/${zones.length} ` +
-                            `segs=${segCount} entry=(${closestEntryPoint.x.toFixed(3)},${closestEntryPoint.y.toFixed(3)}) ` +
-                            `from=(${currentLocation.x.toFixed(3)},${currentLocation.y.toFixed(3)}) dist=${closestDistance.toFixed(3)}`
-                        );
                     }
 
                     if (bestNextZone && closestEntryPoint) {
@@ -410,8 +405,8 @@ class PathGenerator {
 
     /**
      * 비동기 안전 세그먼트 계산
-     * - boundary가 주어지면 해당 이미지 내부만 계산
-     * - 주어지지 않으면 기존처럼 모든 이미지를 대상으로 계산
+     * - boundary가 주어지면 해당 도형 내부만 계산
+     * - 주어지지 않으면 기존처럼 모든 코팅 도형을 대상으로 계산
      */
     private async precalculateAllSafeSegmentsAsync(
         boundary?: AnyNodeConfig,
@@ -422,7 +417,7 @@ class PathGenerator {
         try {
             const boundaries = boundary ? [boundary] : this.coatingShapes;
             if (boundaries.length === 0) {
-                console.warn('경계 도형이 없습니다. 이미지 타입 도형을 추가해주세요.');
+                console.warn('경계 도형이 없습니다. 코팅할 도형을 추가해주세요.');
                 return segments;
             }
 
@@ -439,16 +434,27 @@ class PathGenerator {
             let processedBoundaries = 0;
 
             for (const b of boundaries) {
-                const by = b.y ?? 0;
-                const bx = b.x ?? 0;
-                const bw = b.width ?? 0;
-                const bh = b.height ?? 0;
+                // --- ⬇️ 수정된 부분: 도형 타입에 따른 경계 계산 ⬇️ ---
+                let bx: number, by: number, bw: number, bh: number;
 
-                // 이미지 내부 마스크만 고려하고 싶다면, 여기서 this.maskShapes를 b 경계로 필터링하는 로직을 추가할 수 있습니다.
-                // 현재는 기존 getLineSegments 내부에서 boundary를 기준으로 절단/마스킹을 처리한다고 가정합니다.
+                if (b.type === 'circle' && typeof b.radius === 'number') {
+                    // 원의 경우, 반지름을 이용해 바운딩 박스를 계산합니다.
+                    bx = (b.x ?? 0) - b.radius;
+                    by = (b.y ?? 0) - b.radius;
+                    bw = b.radius * 2;
+                    bh = b.radius * 2;
+                } else {
+                    // 사각형, 이미지 등 기존 로직을 유지합니다.
+                    bx = b.x ?? 0;
+                    by = b.y ?? 0;
+                    bw = b.width ?? 0;
+                    bh = b.height ?? 0;
+                }
+                // --- ⬆️ 수정 완료 ⬆️ ---
 
                 for (const direction of directions) {
                     const isHorizontal = direction === 'horizontal';
+                    // 여기서 계산된 bx, by, bw, bh를 사용합니다.
                     const mainAxisStart = isHorizontal ? by : bx;
                     const mainAxisEnd = isHorizontal ? by + bh : bx + bw;
 
@@ -458,6 +464,7 @@ class PathGenerator {
                     let processedLines = 0;
 
                     for (let mainAxis = mainAxisStart; mainAxis <= mainAxisEnd; mainAxis += this.settings.lineSpacing) {
+                        // getLineSegments는 이제 원과 같은 도형도 처리할 수 있습니다.
                         const lineSegments = this.getLineSegments(mainAxis, direction, b);
 
                         for (const seg of lineSegments) {
@@ -564,12 +571,13 @@ class PathGenerator {
      * K-Means 알고리즘을 사용하여 세그먼트를 클러스터링합니다.
      * @param segments 전체 세그먼트 배열
      * @param k 생성할 클러스터(zone)의 개수
+     * @param maxIterations 최대 반복 횟수
      * @returns { start: Point; end: Point }[][] - 클러스터링된 세그먼트 배열
      */
     private clusterSegmentsWithKMeans(
         segments: { start: Point; end: Point }[],
         k: number,
-        maxIterations = 50 // 최대 반복 횟수
+        maxIterations = 50
     ): { start: Point; end: Point }[][] {
         if (segments.length === 0 || k === 0) return [];
 
@@ -654,15 +662,43 @@ class PathGenerator {
         direction: 'horizontal' | 'vertical' | 'auto',
         boundary: AnyNodeConfig,
     ): PathSegment[] {
-        const startX = (boundary.x ?? 0);
-        const startY = (boundary.y ?? 0);
-        const width =  boundary.width ?? 0;
-        const height = boundary.height ?? 0;
-
         const {workArea} = this.settings;
         const isHorizontal = direction === 'horizontal';
-        const lineStart = Math.max(isHorizontal ? startX : startY, 0);
-        const lineEnd = Math.min(isHorizontal ? startX + width : startY + height, isHorizontal ? workArea.width : workArea.height);
+
+        let lineStart: number;
+        let lineEnd: number;
+
+        // --- ⬇️ 수정된 부분: 도형 타입에 따른 라인 시작/끝 계산 ⬇️ ---
+        if (boundary.type === 'circle' && typeof boundary.radius === 'number') {
+            const centerCross = isHorizontal ? (boundary.x ?? 0) : (boundary.y ?? 0);
+            const centerMain = isHorizontal ? (boundary.y ?? 0) : (boundary.x ?? 0);
+            const radius = boundary.radius;
+
+            const deltaMain = Math.abs(mainAxis - centerMain);
+            if (deltaMain > radius) {
+                return []; // 스캔라인이 원을 지나지 않음
+            }
+
+            // 원과 직선의 교점을 찾아 라인의 시작과 끝을 계산
+            const deltaCross = Math.sqrt(radius * radius - deltaMain * deltaMain);
+            lineStart = centerCross - deltaCross;
+            lineEnd = centerCross + deltaCross;
+
+        } else {
+            // 사각형 및 기타 도형에 대한 기존 로직
+            const startX = boundary.x ?? 0;
+            const startY = boundary.y ?? 0;
+            const width = boundary.width ?? 0;
+            const height = boundary.height ?? 0;
+
+            lineStart = isHorizontal ? startX : startY;
+            lineEnd = isHorizontal ? startX + width : startY + height;
+        }
+
+        // 작업 영역 경계에 맞게 조정
+        lineStart = Math.max(lineStart, 0);
+        lineEnd = Math.min(lineEnd, isHorizontal ? workArea.width : workArea.height);
+        // --- ⬆️ 수정 완료 ⬆️ ---
 
         if (lineStart >= lineEnd) return [];
 
@@ -671,7 +707,7 @@ class PathGenerator {
             return [{type: 'safe', start: lineStart, end: lineEnd}];
         }
 
-        // 마스킹 영역이 있는 경우, 안전한/위험한 구간을 계산
+        // (이하 마스킹 로직은 기존과 동일)
         const unsafeIntervals: { start: number; end: number; cause: AnyNodeConfig }[] = [];
         for (const mask of this.maskShapes) {
             const mx = mask.x ?? 0;
@@ -758,7 +794,7 @@ class PathGenerator {
             //  maskClearance를 기본 오프셋으로 추가
             const totalOffset = this.maskClearance + currentInterval;
 
-            if (shape.type === 'rectangle') {
+            if (shape.type === 'rectangle' || shape.type === 'image') {
                 //  currentInterval 대신 totalOffset 사용
                 const x = (shape.x ?? 0) - totalOffset;
                 const y = (shape.y ?? 0) - totalOffset;
@@ -1005,7 +1041,152 @@ class PathGenerator {
 
         return [end]; // 사각형이 아닌 경우, 일단은 직접 이동
     }
+    /**
+     * [신규] 선분과 사각형 마스크의 교차 구간을 파라미터(t) 값으로 반환합니다. (0 <= t <= 1)
+     * @returns [t_start, t_end] | null - 교차 구간 또는 null
+     */
+    private getLineRectIntersectionParams(
+        p1: Point, p2: Point,
+        mask: AnyNodeConfig
+    ): [number, number] | null {
+        const rect = {
+            x: (mask.x ?? 0) - this.maskClearance,
+            y: (mask.y ?? 0) - this.maskClearance,
+            width: (mask.width ?? 0) + this.maskClearance * 2,
+            height: (mask.height ?? 0) + this.maskClearance * 2,
+        };
 
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        let t0 = 0.0;
+        let t1 = 1.0;
+
+        const check = (p: number, q: number): boolean => {
+            if (p === 0) {
+                if (q < 0) return false; // 선이 경계 바깥에 평행
+                return true;
+            }
+            const r = q / p;
+            if (p < 0) {
+                if (r > t1) return false;
+                if (r > t0) t0 = r;
+            } else { // p > 0
+                if (r < t0) return false;
+                if (r < t1) t1 = r;
+            }
+            return true;
+        };
+
+        if (!check(-dx, p1.x - rect.x)) return null; // Left
+        if (!check(dx, rect.x + rect.width - p1.x)) return null; // Right
+        if (!check(-dy, p1.y - rect.y)) return null; // Bottom
+        if (!check(dy, rect.y + rect.height - p1.y)) return null; // Top
+
+        return (t0 > 0 || t1 < 1) ? [t0, t1] : null;
+    }
+
+    /**
+     * [신규] 선분과 원 마스크의 교차 구간을 파라미터(t) 값으로 반환합니다.
+     * @returns [t_start, t_end] | null - 교차 구간 또는 null
+     */
+    private getLineCircleIntersectionParams(
+        p1: Point, p2: Point,
+        mask: AnyNodeConfig
+    ): [number, number] | null {
+        if (typeof mask.x !== 'number' || typeof mask.y !== 'number' || typeof mask.radius !== 'number') return null;
+
+        const center = { x: mask.x, y: mask.y };
+        const radius = mask.radius + this.maskClearance;
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const fx = p1.x - center.x;
+        const fy = p1.y - center.y;
+
+        const a = dx * dx + dy * dy;
+        const b = 2 * (fx * dx + fy * dy);
+        const c = (fx * fx + fy * fy) - radius * radius;
+
+        let discriminant = b * b - 4 * a * c;
+        if (discriminant < 0) return null;
+
+        discriminant = Math.sqrt(discriminant);
+        const t1 = (-b - discriminant) / (2 * a);
+        const t2 = (-b + discriminant) / (2 * a);
+
+        const startT = Math.max(0, Math.min(t1, t2));
+        const endT = Math.min(1, Math.max(t1, t2));
+
+        return startT < endT ? [startT, endT] : null;
+    }
+
+    /**
+     * [신규] 단일 경로 세그먼트를 마스크와 교차하는 부분을 기준으로 잘라냅니다.
+     * @param segment 마스킹을 적용할 원본 경로 세그먼트
+     * @returns 마스킹이 적용되어 잘라진 안전한 경로 세그먼트들의 배열
+     */
+    private splitSegmentByMasks(segment: { start: Point; end: Point }): { start: Point; end: Point }[] {
+        if (!this.settings.enableMasking || this.maskShapes.length === 0) {
+            return [segment]; // 마스킹 비활성화 시 원본 반환
+        }
+
+        const unsafeIntervals: { start: number; end: number }[] = [];
+
+        // 1. 모든 마스크와의 교차 구간(t값 기준)을 찾습니다.
+        for (const mask of this.maskShapes) {
+            let tValues: [number, number] | null = null;
+            if (mask.type === 'rectangle') {
+                tValues = this.getLineRectIntersectionParams(segment.start, segment.end, mask);
+            } else if (mask.type === 'circle') {
+                tValues = this.getLineCircleIntersectionParams(segment.start, segment.end, mask);
+            }
+            if (tValues) {
+                unsafeIntervals.push({ start: tValues[0], end: tValues[1] });
+            }
+        }
+
+        if (unsafeIntervals.length === 0) {
+            return [segment]; // 교차하는 마스크가 없음
+        }
+
+        // 2. 겹치는 위험 구간들을 하나로 합칩니다.
+        unsafeIntervals.sort((a, b) => a.start - b.start);
+        const mergedUnsafe: { start: number; end: number }[] = [];
+        if (unsafeIntervals.length > 0) {
+            let current = { ...unsafeIntervals[0] };
+            for (let i = 1; i < unsafeIntervals.length; i++) {
+                const next = unsafeIntervals[i];
+                if (next.start < current.end) {
+                    current.end = Math.max(current.end, next.end);
+                } else {
+                    mergedUnsafe.push(current);
+                    current = { ...next };
+                }
+            }
+            mergedUnsafe.push(current);
+        }
+
+        // 3. 위험 구간을 제외한 나머지 안전한 구간들로 새로운 세그먼트를 만듭니다.
+        const safeSegments: { start: Point; end: Point }[] = [];
+        let lastT = 0.0;
+        const dir = { x: segment.end.x - segment.start.x, y: segment.end.y - segment.start.y };
+
+        for (const unsafe of mergedUnsafe) {
+            if (unsafe.start > lastT) {
+                const p1 = { x: segment.start.x + dir.x * lastT, y: segment.start.y + dir.y * lastT };
+                const p2 = { x: segment.start.x + dir.x * unsafe.start, y: segment.start.y + dir.y * unsafe.start };
+                if (Math.hypot(p2.x - p1.x, p2.y - p1.y) > 0.01) safeSegments.push({ start: p1, end: p2 });
+            }
+            lastT = unsafe.end;
+        }
+
+        if (lastT < 1.0) {
+            const p1 = { x: segment.start.x + dir.x * lastT, y: segment.start.y + dir.y * lastT };
+            const p2 = segment.end; // t = 1.0
+            if (Math.hypot(p2.x - p1.x, p2.y - p1.y) > 0.01) safeSegments.push({ start: p1, end: p2 });
+        }
+
+        return safeSegments;
+    }
 }
 
 /**
