@@ -27,12 +27,12 @@ import {
     ChevronRight,
     Palette,
     Move,
-    Zap,
     Target,
-    SkipForward
+    SkipForward, Columns4, SquaresUnite, SquareX, Syringe
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {ScrollArea} from "@/components/ui/scroll-area";
+import {useSettings} from "@/contexts/settings-context";
 
 interface PropertyPanelProps {
     className?: string;
@@ -42,7 +42,8 @@ export function PropertyPanel({className}: PropertyPanelProps) {
     const dispatch = useAppDispatch();
     const shapes = useAppSelector((state) => state.shapes.shapes);
     const selectedShapeIds = useAppSelector((state) => state.shapes.selectedShapeIds);
-    const gcodeSettings = useAppSelector((state) => state.gcode.gcodeSettings);
+    const {gcodeSettings} = useSettings();
+
 
     // 선택된 도형들 가져오기
     const selectedShapes = useMemo(() => {
@@ -64,13 +65,16 @@ export function PropertyPanel({className}: PropertyPanelProps) {
             visible: selectedShapes.every(s => s.visible === first.visible) ? first.visible : undefined,
             isLocked: selectedShapes.every(s => s.isLocked === first.isLocked) ? first.isLocked : undefined,
             skipCoating: selectedShapes.every(s => s.skipCoating === first.skipCoating) ? first.skipCoating : undefined,
-            useCustomCoating: selectedShapes.every(s => s.useCustomCoating === first.useCustomCoating) ? first.useCustomCoating : undefined,
             coatingType: selectedShapes.every(s => s.coatingType === first.coatingType) ? first.coatingType : undefined,
             coatingSpeed: selectedShapes.every(s => s.coatingSpeed === first.coatingSpeed) ? first.coatingSpeed : undefined,
             coatingHeight: selectedShapes.every(s => s.coatingHeight === first.coatingHeight) ? first.coatingHeight : undefined,
             coatingOrder: selectedShapes.every(s => s.coatingOrder === first.coatingOrder) ? first.coatingOrder : undefined,
             outlinePasses: selectedShapes.every(s => s.outlinePasses === first.outlinePasses) ? first.outlinePasses : undefined,
             outlineInterval: selectedShapes.every(s => s.outlineInterval === first.outlineInterval) ? first.outlineInterval : undefined,
+            outlineStartPoint: selectedShapes.every(s => s.outlineStartPoint === first.outlineStartPoint) ? first.outlineStartPoint : undefined,
+            lineSpacing: selectedShapes.every(s => s.lineSpacing === first.lineSpacing) ? first.lineSpacing : undefined,
+            travelAvoidanceStrategy: selectedShapes.every(s => s.travelAvoidanceStrategy === first.travelAvoidanceStrategy) ? first.travelAvoidanceStrategy : undefined,
+            coatingWidth: selectedShapes.every(s => s.coatingWidth === first.coatingWidth) ? first.coatingWidth : undefined,
         };
 
 
@@ -78,7 +82,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
     }, [selectedShapes]);
 
     // 속성 업데이트 핸들러
-    const handlePropertyUpdate = (property: string, value: any) => {
+    const handlePropertyUpdate = (property: string, value: string | number | boolean | undefined) => {
         if (selectedShapeIds.length === 0) return;
 
         if (selectedShapeIds.length === 1) {
@@ -197,20 +201,24 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-3 pt-2">
                             {singleSelectedShape && (
-                                <>
+                                <div className="space-y-3 p-3 bg-accent/10 rounded-md border">
+                                    <div className="text-xs font-medium text-muted-foreground mb-2">
+                                        📐 기본 변형 설정
+                                    </div>
+
                                     {/* 위치 */}
                                     <div className="grid grid-cols-2 gap-2">
                                         <SmallNumberField
                                             id="obj-x"
                                             label="X"
                                             value={Math.round(singleSelectedShape.x || 0)}
-                                            onChange={(value) => handlePropertyUpdate('x', value)}
+                                            onChange={(value) => handlePropertyUpdate('x', value || 0)}
                                         />
                                         <SmallNumberField
                                             id="obj-y"
                                             label="Y"
                                             value={Math.round(singleSelectedShape.y || 0)}
-                                            onChange={(value) => handlePropertyUpdate('y', value)}
+                                            onChange={(value) => handlePropertyUpdate('y', value || 0)}
                                         />
                                     </div>
 
@@ -223,13 +231,13 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                                 id="obj-width"
                                                 label="너비"
                                                 value={Math.round(singleSelectedShape.width || 0)}
-                                                onChange={(value) => handlePropertyUpdate('width', value)}
+                                                onChange={(value) => handlePropertyUpdate('width', value || 0)}
                                             />
                                             <SmallNumberField
                                                 id="obj-height"
                                                 label="높이"
                                                 value={Math.round(singleSelectedShape.height || 0)}
-                                                onChange={(value) => handlePropertyUpdate('height', value)}
+                                                onChange={(value) => handlePropertyUpdate('height', value || 0)}
                                             />
                                         </div>
                                     )}
@@ -240,7 +248,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                             id="obj-radius"
                                             label="반지름"
                                             value={Math.round(singleSelectedShape.radius || 0)}
-                                            onChange={(value) => handlePropertyUpdate('radius', value)}
+                                            onChange={(value) => handlePropertyUpdate('radius', value || 0)}
                                         />
                                     )}
 
@@ -258,7 +266,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                                         label=""
                                                         value={Math.round(singleSelectedShape.rotation || 0)}
                                                         step={1}
-                                                        onChange={(value) => handlePropertyUpdate('rotation', Math.max(-180, Math.min(180, value)))}
+                                                        onChange={(value) => handlePropertyUpdate('rotation', Math.max(-180, Math.min(180, value || 0)))}
                                                     />
                                                 </div>
                                             </div>
@@ -280,8 +288,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                             </div>
                                         </div>
                                     )}
-
-                                </>
+                                </div>
                             )}
                         </CollapsibleContent>
                     </Collapsible>
@@ -300,32 +307,36 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 <ChevronRight className="w-3 h-3"/>}
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-3 pt-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    {commonProperties?.visible !== false ? <Eye className="w-3 h-3"/> :
-                                        <EyeOff className="w-3 h-3"/>}
-                                    <span className="text-xs">표시</span>
+                            <div className="space-y-3 p-3 bg-accent/10 rounded-md border">
+                                <div className="text-xs font-medium text-muted-foreground mb-2">
+                                    🎨 표시 및 잠금 설정
                                 </div>
-                                <Switch
-                                    checked={commonProperties?.visible !== false}
-                                    onCheckedChange={(checked) => handlePropertyUpdate('visible', checked)}
-                                />
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    {/* 아이콘 로직 수정: isLocked가 true면 Lock 아이콘 */}
-                                    {commonProperties?.isLocked
-                                        ? <Lock className="w-3 h-3"/>
-                                        : <Unlock className="w-3 h-3"/>
-                                    }
-                                    <span className="text-xs">잠금</span> {/* 레이블도 변경 */}
-                                </div>
-                                <Switch
-                                    checked={commonProperties?.isLocked || false}
-                                    onCheckedChange={(checked) => handlePropertyUpdate('isLocked', checked)}
-                                />
-                            </div>
 
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        {commonProperties?.visible !== false ? <Eye className="w-3 h-3"/> :
+                                            <EyeOff className="w-3 h-3"/>}
+                                        <span className="text-xs">표시</span>
+                                    </div>
+                                    <Switch
+                                        checked={commonProperties?.visible !== false}
+                                        onCheckedChange={(checked) => handlePropertyUpdate('visible', checked)}
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        {commonProperties?.isLocked
+                                            ? <Lock className="w-3 h-3"/>
+                                            : <Unlock className="w-3 h-3"/>
+                                        }
+                                        <span className="text-xs">잠금</span>
+                                    </div>
+                                    <Switch
+                                        checked={commonProperties?.isLocked || false}
+                                        onCheckedChange={(checked) => handlePropertyUpdate('isLocked', checked)}
+                                    />
+                                </div>
+                            </div>
                         </CollapsibleContent>
                     </Collapsible>
 
@@ -336,7 +347,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                         <CollapsibleTrigger
                             className="flex items-center justify-between w-full py-2 px-1 hover:bg-accent rounded-sm">
                             <div className="flex items-center gap-2">
-                                <Zap className="w-3 h-3"/>
+                                <Syringe className="w-3 h-3"/>
                                 <span className="text-xs font-medium">코팅 설정</span>
                             </div>
                             {expandedSections.coating ? <ChevronDown className="w-3 h-3"/> :
@@ -356,79 +367,64 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                             </div>
 
                             {/* 개별 코팅 설정 (코팅이 활성화된 경우에만) */}
-                            {!commonProperties?.skipCoating && (
+                            {!commonProperties?.skipCoating && singleSelectedShape && (
                                 <>
                                     {/* 코팅 타입 */}
-                                    {singleSelectedShape && (
-                                        <>
-                                            <div>
-                                                <span className="text-xs block mb-1">코팅 타입</span>
-                                                <Select
-                                                    value={singleSelectedShape.coatingType || 'fill'}
-                                                    onValueChange={(value) => handlePropertyUpdate('coatingType', value)}
-                                                >
-                                                    <SelectTrigger className="h-7 text-xs">
-                                                        <SelectValue/>
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="fill">🔄 채우기</SelectItem>
-                                                        <SelectItem value="outline">📐 윤곽선</SelectItem>
-                                                        <SelectItem value="masking">🚫 마스킹</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            {/* 윤곽선 관련 설정 (outline 타입일 때만) */}
-                                            {singleSelectedShape.coatingType === 'outline' && (
-                                                <div
-                                                    className="space-y-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded border">
-                                                    <div
-                                                        className="text-xs font-medium text-blue-700 dark:text-blue-300">윤곽선
-                                                        설정
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <SmallNumberField
-                                                            id="outline-passes"
-                                                            label="패스 수"
-                                                            value={singleSelectedShape.outlinePasses || 1}
-                                                            onChange={(value) => handlePropertyUpdate('outlinePasses', Math.max(1, value))}
-                                                        />
-                                                        <SmallNumberField
-                                                            id="outline-interval"
-                                                            label="간격 (mm)"
-                                                            value={singleSelectedShape.outlineInterval || 1}
-                                                            step={0.1}
-                                                            onChange={(value) => handlePropertyUpdate('outlineInterval', value)}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Settings className="w-3 h-3"/>
-                                            <span className="text-xs">개별 설정 사용</span>
-                                        </div>
-                                        <Switch
-                                            checked={commonProperties?.useCustomCoating || false}
-                                            onCheckedChange={(checked) => handlePropertyUpdate('useCustomCoating', checked)}
-                                        />
+                                    <div>
+                                        <span className="text-xs block mb-1">코팅 타입</span>
+                                        <Select
+                                            value={singleSelectedShape.coatingType || 'fill'}
+                                            onValueChange={(value) => handlePropertyUpdate('coatingType', value)}
+                                        >
+                                            <SelectTrigger className="h-7 text-xs">
+                                                <SelectValue/>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="fill"><Columns4/> 채우기</SelectItem>
+                                                <SelectItem value="outline"><SquaresUnite/> 윤곽선</SelectItem>
+                                                <SelectItem value="masking"><SquareX/> 마스킹</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
 
-
-                                    {/* 개별 설정이 활성화된 경우 */}
-                                    {commonProperties?.useCustomCoating && singleSelectedShape && (
+                                    {/* 코팅 타입별 설정 - 배경색 적용 */}
+                                    {singleSelectedShape.coatingType === 'fill' && (
                                         <div
-                                            className="space-y-3 p-3 bg-accent/20 rounded-md border-l-2 border-primary/30">
-                                            <div className="text-xs font-medium text-muted-foreground mb-2">개별 코팅 설정
+                                            className="space-y-3 p-3 bg-sky-50 dark:bg-sky-950/20 rounded-md border border-sky-200 dark:border-sky-800">
+                                            <div className="text-xs font-medium text-sky-700 dark:text-sky-300 mb-2">
+                                                <Columns4/> 채우기 설정
                                             </div>
+                                            <div className="text-[10px] text-sky-600 dark:text-sky-400 mb-3">
+                                                도형 내부를 설정된 패턴으로 채웁니다.
+                                            </div>
+
+                                            {/* 코팅 패턴*/}
+                                            <label className="text-xs font-medium">
+                                                패턴
+                                                <span className="text-[10px] opacity-70 ml-1">
+                                                        (기본: {gcodeSettings.fillPattern})
+                                                    </span>
+                                            </label>
+                                            <Select
+                                                value={singleSelectedShape.fillPattern || 'global'}
+                                                onValueChange={(value) => handlePropertyUpdate('fillPattern', value === 'global' ? undefined : value)}
+                                            >
+                                                <SelectTrigger className="h-8">
+                                                    <SelectValue/>
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="global">전역 설정 사용</SelectItem>
+                                                    <SelectItem value="auto">자동</SelectItem>
+                                                    <SelectItem value="horizontal">수평</SelectItem>
+                                                    <SelectItem value="vertical">수직</SelectItem>
+                                                </SelectContent>
+                                            </Select>
 
                                             {/* 코팅 순서 */}
                                             <SmallNumberField
                                                 id="coating-order"
                                                 label="코팅 순서"
-                                                value={singleSelectedShape.coatingOrder || 0}
+                                                value={singleSelectedShape.coatingOrder}
                                                 onChange={(value) => handlePropertyUpdate('coatingOrder', value)}
                                             />
 
@@ -436,17 +432,199 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                             <div className="grid grid-cols-2 gap-2">
                                                 <SmallNumberField
                                                     id="coating-height"
-                                                    label="높이 (mm)"
-                                                    value={singleSelectedShape.coatingHeight || gcodeSettings.coatingHeight}
+                                                    label={`높이 (기본: ${gcodeSettings.coatingHeight}mm)`}
+                                                    value={singleSelectedShape.coatingHeight}
                                                     step={0.01}
                                                     onChange={(value) => handlePropertyUpdate('coatingHeight', value)}
                                                 />
                                                 <SmallNumberField
                                                     id="coating-speed"
-                                                    label="속도 (mm/min)"
-                                                    value={singleSelectedShape.coatingSpeed || gcodeSettings.coatingSpeed}
+                                                    label={`속도 (기본: ${gcodeSettings.coatingSpeed}mm/min)`}
+                                                    value={singleSelectedShape.coatingSpeed}
                                                     onChange={(value) => handlePropertyUpdate('coatingSpeed', value)}
                                                 />
+                                            </div>
+
+                                            {/* 라인 간격과 코팅 폭 */}
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <SmallNumberField
+                                                    id="line-spacing"
+                                                    label={`라인 간격 (기본: ${gcodeSettings.lineSpacing}mm)`}
+                                                    value={singleSelectedShape.lineSpacing}
+                                                    step={0.1}
+                                                    onChange={(value) => handlePropertyUpdate('lineSpacing', value)}
+                                                />
+                                                <SmallNumberField
+                                                    id="coating-width"
+                                                    label={`코팅 폭 (기본: ${gcodeSettings.coatingWidth}mm)`}
+                                                    value={singleSelectedShape.coatingWidth}
+                                                    step={0.1}
+                                                    onChange={(value) => handlePropertyUpdate('coatingWidth', value)}
+                                                />
+                                            </div>
+
+                                        </div>
+                                    )}
+
+                                    {singleSelectedShape.coatingType === 'outline' && (
+                                        <div
+                                            className="space-y-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-md border border-yellow-200 dark:border-yellow-800">
+                                            <div
+                                                className="text-xs font-medium text-yellow-700 dark:text-yellow-300 mb-2">
+                                                <SquaresUnite/> 윤곽선 설정
+                                            </div>
+                                            <div className="text-[10px] text-yellow-600 dark:text-yellow-400 mb-3">
+                                                도형의 가장자리를 따라 코팅합니다.
+                                            </div>
+                                            {/* 시작점 선택 */}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <label className="text-[10px] text-muted-foreground">시작점</label>
+                                                </div>
+                                                <Select
+                                                    value={singleSelectedShape.outlineStartPoint || 'center'}
+                                                    onValueChange={(value) => handlePropertyUpdate('outlineStartPoint', value)}
+                                                >
+                                                    <SelectTrigger className="h-6 text-xs">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="outside" className="text-xs">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-2 h-2 border border-current rounded-sm"/>
+                                                                윤곽선 바깥
+                                                            </div>
+                                                        </SelectItem>
+                                                        <SelectItem value="center" className="text-xs">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-2 h-2 border-2 border-current rounded-sm"/>
+                                                                윤곽선 중심
+                                                            </div>
+                                                        </SelectItem>
+                                                        <SelectItem value="inside" className="text-xs">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-2 h-2 bg-current rounded-sm"/>
+                                                                윤곽선 안
+                                                            </div>
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            {/*  패스 수 설정 */}
+                                            <div className="grid grid-cols-2 gap-2 mb-3">
+                                                <SmallNumberField
+                                                    id="outline-passes"
+                                                    label="패스 수"
+                                                    value={singleSelectedShape.outlinePasses}
+                                                    onChange={(value) => handlePropertyUpdate('outlinePasses', Math.max(1, value || 1))}
+                                                />
+                                                <SmallNumberField
+                                                    id="outline-interval"
+                                                    label="간격 (mm)"
+                                                    value={singleSelectedShape.outlineInterval}
+                                                    step={0.1}
+                                                    onChange={(value) => handlePropertyUpdate('outlineInterval', value)}
+                                                />
+                                            </div>
+
+                                            {/* 코팅 순서 */}
+                                            <SmallNumberField
+                                                id="coating-order"
+                                                label="코팅 순서"
+                                                value={singleSelectedShape.coatingOrder}
+                                                onChange={(value) => handlePropertyUpdate('coatingOrder', value)}
+                                            />
+
+                                            {/* 코팅 높이와 속도 */}
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <SmallNumberField
+                                                    id="coating-height"
+                                                    label={`높이 (기본: ${gcodeSettings.coatingHeight}mm)`}
+                                                    value={singleSelectedShape.coatingHeight}
+                                                    step={0.01}
+                                                    onChange={(value) => handlePropertyUpdate('coatingHeight', value)}
+                                                />
+                                                <SmallNumberField
+                                                    id="coating-speed"
+                                                    label={`속도 (기본: ${gcodeSettings.coatingSpeed}mm/min)`}
+                                                    value={singleSelectedShape.coatingSpeed}
+                                                    onChange={(value) => handlePropertyUpdate('coatingSpeed', value)}
+                                                />
+                                            </div>
+
+                                            {/* 코팅 폭 */}
+                                            <SmallNumberField
+                                                id="coating-width-outline"
+                                                label={`코팅 폭 (기본: ${gcodeSettings.coatingWidth}mm)`}
+                                                value={singleSelectedShape.coatingWidth}
+                                                step={0.1}
+                                                onChange={(value) => handlePropertyUpdate('coatingWidth', value)}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {singleSelectedShape.coatingType === 'masking' && (
+                                        <div
+                                            className="space-y-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-md border border-red-200 dark:border-red-800">
+                                            <div className="text-xs font-medium text-red-700 dark:text-red-300 mb-2">
+                                                <SquareX/> 마스킹 설정
+                                            </div>
+                                            <div className="text-[10px] text-red-600 dark:text-red-400 mb-3">
+                                                다른 도형의 코팅 경로를 차단하는 장애물 역할을 합니다.
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {/* 마스킹 높이 설정 */}
+                                                <SmallNumberField
+                                                    id="masking-height"
+                                                    label={`마스킹 높이 (기본: ${gcodeSettings.coatingHeight}mm)`}
+                                                    value={singleSelectedShape.coatingHeight}
+                                                    step={0.01}
+                                                    onChange={(value) => handlePropertyUpdate('coatingHeight', value)}
+                                                />
+                                                {/* 마스킹 여유 거리 */}
+                                                <SmallNumberField
+                                                    id="masking-clearance"
+                                                    label={`마스킹 여유 거리 (기본: ${gcodeSettings.maskingClearance}mm)`}
+                                                    value={singleSelectedShape.maskingClearance}
+                                                    step={0.01}
+                                                    onChange={(value) => handlePropertyUpdate('maskingClearance', value)}
+                                                />
+                                            </div>
+                                            {/* 마스킹 우회 전략 */}
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium text-red-700 dark:text-red-300">
+                                                    우회 방식
+                                                    <span className="text-[10px] opacity-70 ml-1">
+                                                        (기본: {gcodeSettings.travelAvoidanceStrategy === 'lift' ? 'Z-Lift' : '윤곽 우회'})
+                                                    </span>
+                                                </label>
+                                                <Select
+                                                    value={singleSelectedShape.travelAvoidanceStrategy || 'global'}
+                                                    onValueChange={(value) => handlePropertyUpdate('travelAvoidanceStrategy', value === 'global' ? undefined : value)}
+                                                >
+                                                    <SelectTrigger className="h-8">
+                                                        <SelectValue/>
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="global">전역 설정 사용</SelectItem>
+                                                        <SelectItem value="lift">🔺 Z-Lift (들어올리기)</SelectItem>
+                                                        <SelectItem value="contour">🔄 윤곽 따라 우회</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+
+                                            {/* 마스킹 설명 추가 */}
+                                            <div
+                                                className="text-[10px] text-red-600/80 dark:text-red-400/80 bg-red-100/50 dark:bg-red-900/20 p-2 rounded border-l-2 border-red-400">
+                                                <div className="font-medium mb-1">💡 마스킹 동작:</div>
+                                                <ul className="space-y-1 list-disc list-inside ml-2">
+                                                    <li><strong>높이</strong>: 이 높이보다 낮은 코팅 경로가 차단됩니다</li>
+                                                    <li><strong>Z-Lift</strong>: 장애물을 만나면 안전 높이로 들어올립니다</li>
+                                                    <li><strong>윤곽 우회</strong>: 장애물 가장자리를 따라 우회합니다</li>
+                                                </ul>
                                             </div>
                                         </div>
                                     )}
@@ -456,7 +634,6 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                     </Collapsible>
                 </CardContent>
             </ScrollArea>
-
         </Card>
     );
 }

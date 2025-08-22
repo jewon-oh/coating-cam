@@ -16,7 +16,7 @@ interface CanvasGridProps {
 }
 
 /**
- * Canvas Grid 컴포넌트
+ * WorkspaceCanvas Grid 컴포넌트
  * X축이 반전된 상황(-scaleX)에서도 올바르게 표시되는 그리드를 렌더링합니다.
  */
 const CanvasGrid: React.FC<CanvasGridProps> = React.memo(({

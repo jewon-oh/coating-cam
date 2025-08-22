@@ -18,7 +18,7 @@ import {StageState} from "@/contexts/canvas-context";
 
 type Tool = 'select' | 'circle' | 'rectangle';
 
-export function useCanvasInteractions(
+export function useShapeLayerInteractions(
     // stageRef: React.RefObject<Konva.Stage | null>,
     setStage: (updater: React.SetStateAction<StageState>)=>void,
     selectionRectRef: React.RefObject<Konva.Rect | null>,
@@ -28,9 +28,7 @@ export function useCanvasInteractions(
     const dispatch = useAppDispatch();
     const {shapes, selectedShapeIds} = useAppSelector((state) => state.shapes);
     const tool = useAppSelector((state) => state.tool.tool) as Tool;
-    // gcode 설정
-    const gcodeSettings = useAppSelector((state) => state.gcode.gcodeSettings);
-    const {isSnappingEnabled, gridSize} = useSettings();
+    const {isSnappingEnabled, gridSize,gcodeSettings} = useSettings();
 
     // 최신 스냅샷 저장용
     const shapesRef = useRef(shapes);
@@ -565,7 +563,6 @@ export function useCanvasInteractions(
                             listening: false,
                             visible: true,
                             isLocked: false,
-                            coatingHeight: gcodeSettings.coatingHeight
                         };
                         const next = [...shapesRef.current, rect] as AnyNodeConfig[];
                         dispatch(addShape(rect));
@@ -590,7 +587,6 @@ export function useCanvasInteractions(
                             listening: false,
                             visible: true,
                             isLocked: false,
-                            coatingHeight: gcodeSettings.coatingHeight
                         };
                         const next = [...shapesRef.current, circle] as AnyNodeConfig[];
                         dispatch(addShape(circle));
@@ -602,7 +598,7 @@ export function useCanvasInteractions(
         }
 
         stopPan(stage);
-    }, [ tool, stopPan, getPointerClient, updateSelectionRect, performDragSelection, destroyTempShape, dispatch, snapPoint, toStagePoint, gcodeSettings.coatingHeight]);
+    }, [tool, stopPan, getPointerClient, updateSelectionRect, performDragSelection, destroyTempShape, dispatch, snapPoint, toStagePoint]);
 
     const handleMouseLeave = useCallback((e: KonvaEventObject<MouseEvent>) => {
         const stage = e.target.getStage();
@@ -960,7 +956,7 @@ export function useCanvasInteractions(
             id: groupId,
             parentId: null,
             type: 'group' as const,
-            name: 'Group',
+            name: '그룹',
             listening: false,
             visible: true,
             x: 0,

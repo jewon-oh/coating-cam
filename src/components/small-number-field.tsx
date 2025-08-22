@@ -3,20 +3,23 @@ import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 
 export const SmallNumberField = memo(function SmallNumberField({
-                                                            id,
-                                                            label,
-                                                            value,
-                                                            step = 1,
-                                                            onChange,
-                                                        }: {
+                                                                   id,
+                                                                   label,
+                                                                   value,
+                                                                   step = 1,
+                                                                   onChange,
+                                                               }: {
     id: string;
     label: string;
-    value: number;
+    value: number | string | undefined;
     step?: number;
-    onChange: (v: number) => void;
+    onChange: (v: number | undefined) => void;
 }) {
-    const [local, setLocal] = useState<number>(value);
-    useEffect(() => setLocal(value), [value]);
+    const [local, setLocal] = useState<string>(value?.toString() || '');
+
+    useEffect(() => {
+        setLocal(value?.toString() || '');
+    }, [value]);
 
     return (
         <div>
@@ -24,11 +27,20 @@ export const SmallNumberField = memo(function SmallNumberField({
             <Input
                 id={id}
                 type="number"
-                value={Number.isFinite(local) ? local : 0}
+                value={local}
+                placeholder="전역 설정"
                 onChange={(e) => {
-                    const n = Number(e.target.value);
-                    setLocal(n);
-                    if (!Number.isNaN(n) && Number.isFinite(n)) onChange(n);
+                    const inputValue = e.target.value;
+                    setLocal(inputValue);
+
+                    if (inputValue === '') {
+                        onChange(undefined); // 빈 값은 undefined로 처리
+                    } else {
+                        const n = Number(inputValue);
+                        if (!Number.isNaN(n) && Number.isFinite(n)) {
+                            onChange(n);
+                        }
+                    }
                 }}
                 className="h-7 text-xs"
                 step={step}

@@ -23,7 +23,7 @@ import {useAppSelector} from "@/hooks/redux";
 // SSR(서버 사이드 렌더링) 비활성화
 // Konva.js와 같은 캔버스 라이브러리는 브라우저 환경에 의존하므로,
 // 서버에서 렌더링되지 않도록 동적으로 임포트합니다.
-const DynamicCanvasStage = dynamic(() => import('@/components/workspace/canvas-stage'), {
+const DynamicCanvasStage = dynamic(() => import('@/components/workspace/workspace-canvas'), {
     ssr: false,
 });
 
@@ -60,7 +60,7 @@ const WorkspaceContent = () => {
 
                     <ResizableHandle withHandle/>
 
-                    {/* 중앙 패널: Canvas + Overlays */}
+                    {/* 중앙 패널: WorkspaceCanvas + Overlays */}
                     <ResizablePanel defaultSize={60} minSize={40}>
                         <div className="relative h-full w-full overflow-hidden bg-muted/20">
                             <DynamicCanvasStage/>

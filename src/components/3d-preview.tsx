@@ -3,7 +3,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {useSettings} from "@/contexts/settings-context";
 import {Canvas} from "@react-three/fiber";
-import {OrbitControls, Grid, Text} from "@react-three/drei";
+import {OrbitControls, Grid, Text, OrthographicCamera} from "@react-three/drei";
 import * as THREE from 'three';
 import {AnyNodeConfig} from "@/types/custom-konva-config";
 import {useAppSelector} from "@/hooks/redux";
@@ -21,6 +21,7 @@ interface MotionBoard3DProps {
     pathData?: PathPoint[];        // 전체 경로
     activeCount?: number;          // 현재 진행 지점(포함)까지의 포인트 개수
     imageShapes?: Extract<AnyNodeConfig, { type: 'image' }>[];
+    orthographicView?:boolean;
 }
 
 /**
@@ -365,12 +366,12 @@ function GCodePath({pathData = [], scaleFactor, activeCount = 0}: {
 }
 
 const Preview3D = ({
-                       toolheadPos, pathData = [], activeCount = 0, imageShapes
+                       toolheadPos, pathData = [], activeCount = 0, imageShapes,orthographicView = true
                    }: MotionBoard3DProps) => {
     const {workArea} = useSettings();
     const SCALE_FACTOR = 10;
 
-    // Redux에서 직접 이미지 shapes를 가져오는 대안
+    // Redux에서 직접 이미지 shapes를 가져옴
     const allShapes = useAppSelector((state) => state.shapes.shapes);
     const imageShapesFromRedux = useMemo(() =>
             allShapes.filter((shape): shape is Extract<AnyNodeConfig, { type: 'image' }> =>
@@ -410,12 +411,43 @@ const Preview3D = ({
         return labels;
     }, [workArea]);
 
+    // 직교 카메라용 줌 레벨을 적당한 크기로 조정
+    const orthographicZoom = useMemo(() => {
+        const maxDimension = Math.max(scaledWorkArea.width, scaledWorkArea.height);
+        // 줌을 적당한 크기로 설정 (너무 크지도 작지도 않게)
+        return Math.max(3, 100 / maxDimension); // 줌을 줄여서 전체적으로 보이게
+    }, [scaledWorkArea]);
+
+
     return (
         <Canvas
-            camera={{position: [gridCenter, scaledWorkArea.height * 1.5, gridCenter], fov: 75}}
             style={{background: '#111111'}}
             gl={{powerPreference: 'high-performance', antialias: true}}
         >
+            {/* 조건부로 카메라 타입 선택 */}
+            {orthographicView ? (
+                <OrthographicCamera
+                    makeDefault
+                    zoom={orthographicZoom}
+                    // 카메라를 비스듬히 위에서 보는 각도로 배치 (첫 번째 사진처럼)
+                    position={[scaledWorkArea.width / 2, scaledWorkArea.height * 1.2, scaledWorkArea.height / 2]}
+                    near={0.1}
+                    far={1000}
+                    // 작업 영역 중앙을 바라보도록 설정
+                    onUpdate={(camera) => {
+                        // 먼저 회전 설정
+                        camera.rotation.set(0, -Math.PI / 2, 0);
+                        camera.up.set(0, 1, 0);
+                        // 그 다음 lookAt 설정
+                        camera.lookAt(scaledWorkArea.width / 2, 0, scaledWorkArea.height / 2);
+                        camera.updateProjectionMatrix();
+                    }}
+                />
+            ) : (
+                // 원근 카메라는 Canvas의 기본 설정을 사용
+                <></>
+            )}
+
             <ambientLight intensity={1.2}/>
             <directionalLight
                 position={[scaledWorkArea.width * 2, scaledWorkArea.height * 2, scaledWorkArea.height * 2]}
@@ -442,22 +474,22 @@ const Preview3D = ({
                 scaleFactor={SCALE_FACTOR}
             />
 
-            {/* 휠 클릭(중클릭)으로 패닝: OrbitControls의 mouseButtons 매핑 */}
+            {/* OrbitControls 설정 - 직교 보기에서는 회전 제한 가능 */}
             <OrbitControls
                 target={[scaledWorkArea.width / 2, 0, scaledWorkArea.height / 2]}
                 enableDamping
                 enablePan
-                enableRotate
-                // 기본은 MIDDLE=DOLLY, RIGHT=PAN 이므로, MIDDLE로 PAN 하도록 재매핑
                 mouseButtons={{
                     LEFT: THREE.MOUSE.ROTATE,
                     MIDDLE: THREE.MOUSE.PAN,
-                    // RIGHT: THREE.MOUSE.DOLLY
                 }}
-                // 휠로 줌(도리) 유지
-                // zoomSpeed, panSpeed 등 필요 시 추가 조절 가능
+                enableZoom
+                // 직교 카메라에서는 거리 제한 대신 줌 제한 사용
+                minZoom={orthographicView ? 1 : undefined}
+                maxZoom={orthographicView ? 100 : undefined}
+                minDistance={orthographicView ? undefined : 5}
+                maxDistance={orthographicView ? undefined : 100}
             />
-
         </Canvas>
     );
 };

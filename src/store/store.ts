@@ -4,12 +4,14 @@ import shapesReducer from './slices/shapes-slice';
 import historyReducer from './slices/history-slice';
 import toolReducer from './slices/tool-slice';
 import gcodeReducer from './slices/gcode-slice';
+import pathReducer from './slices/path-slice';
 
 export const store = configureStore({
     reducer: {
         shapes: shapesReducer,
         history: historyReducer,
         tool: toolReducer,
+        path: pathReducer,
         gcode: gcodeReducer,
     },
     middleware: (getDefaultMiddleware) =>

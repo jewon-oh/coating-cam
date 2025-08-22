@@ -24,14 +24,12 @@ import { useSettings } from "@/contexts/settings-context";
 import {GCODE_HOOKS, GCodeHook} from "@/types/gcode";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
-import {updateGcodeSettings} from "@/store/slices/gcode-slice";
-import {useAppDispatch} from "@/hooks/redux";
 
 export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}   >
             {/* 핵심: flex column + max-h, 중간 래퍼 min-h-0 + overflow-y-auto */}
-            <DialogContent className="max-w-5xl p-0 flex flex-col max-h-[90vh] top-[0%] translate-y-[0%] top-16">
+            <DialogContent className="max-w-5xl p-0 flex flex-col max-h-[90vh] translate-y-[0%] top-16">
                 {/* 헤더 */}
                 <div className="px-6 pt-6">
                     <DialogHeader className="p-0">
@@ -89,16 +87,13 @@ function GeneralSettings() {
     const [widthText, setWidthText] = useState(String(workArea.width));
     const [heightText, setHeightText] = useState(String(workArea.height));
 
-    const diapatch = useAppDispatch();
     const commitWorkArea = useCallback(() => {
         const w = Math.max(1, Math.floor(Number(widthText)));
         const h = Math.max(1, Math.floor(Number(heightText)));
         if (Number.isFinite(w) && Number.isFinite(h)) {
             setWorkArea({ width: w, height: h });
-            // todo: workArea 리팩터링 필요
-            diapatch(updateGcodeSettings({["workArea"]:{ width: w, height: h }}));
         }
-    }, [widthText, heightText, setWorkArea, diapatch]);
+    }, [widthText, heightText, setWorkArea]);
 
     const themeLabel = useMemo(() => {
         switch (runtimeTheme) {
@@ -152,7 +147,7 @@ function GeneralSettings() {
                             // 즉시 UI 적용(shadcn/next-themes)
                             setTheme(v as any);
                             // 설정 파일에도 저장
-                            setThemePersisted(v as any);
+                            setThemePersisted(v);
                         }}
                     >
                         <SelectTrigger className="h-9">
@@ -261,7 +256,7 @@ function GCodeSnippetsSection() {
     }, [addGcodeSnippet, newName, newHook]);
 
     const moveWithinHook = useCallback(
-        (hook: GCodeHook, id: string, dir: "up" | "down") => {
+        (hook: string, id: string, dir: "up" | "down") => {
             const list = grouped.get(hook) ?? [];
             const ids = list.map((s) => s.id);
             const idx = ids.indexOf(id);

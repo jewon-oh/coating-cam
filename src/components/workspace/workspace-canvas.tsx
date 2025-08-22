@@ -10,7 +10,7 @@ import {unselectAllShapes, updateShape} from '@/store/slices/shapes-slice';
 import {redoWithSync, undoWithSync} from '@/store/thunks/history-thunk';
 
 // 커스텀 훅들
-import {useCanvasInteractions} from '@/hooks/use-canvas-interactions';
+import {useShapeLayerInteractions} from '@/hooks/use-shape-layer-interactions';
 import {useTransformerHandlers} from '@/hooks/use-transformer-handlers';
 import {useSettings} from '@/contexts/settings-context';
 import {useCanvas} from '@/contexts/canvas-context';
@@ -30,8 +30,10 @@ import {
 } from "@/components/ui/context-menu";
 import {flipImageData} from "@/lib/flip-image-data";
 
+import { PathLayer } from './path-layer';
+
 // ===== 메인 컴포넌트 =====
-export default function CanvasStage() {
+export default function WorkspaceCanvas() {
     // Redux 상태
     const dispatch = useAppDispatch();
     const shapes = useAppSelector((state) => state.shapes.shapes);
@@ -52,7 +54,7 @@ export default function CanvasStage() {
     const {isGridVisible, gridSize, workArea} = useSettings();
 
     // 참조들
-    const layerRef = useRef<Konva.Layer>(null);
+    const shapeLayerRef = useRef<Konva.Layer>(null);
     const transformerRef = useRef<Konva.Transformer>(null);
     const selectionRectRef = useRef<Konva.Rect>(null);
     const imageGroupRef = useRef<Konva.Group>(null);
@@ -88,7 +90,7 @@ export default function CanvasStage() {
         handleStageDragMove,
         handleStageDragEnd,
         handleWheel,
-    } = useCanvasInteractions(setStage, selectionRectRef, isPanning, setIsPanning);
+    } = useShapeLayerInteractions(setStage, selectionRectRef, isPanning, setIsPanning);
 
     // ===== 계산된 값들 =====
     const selectedShapes = useMemo(() =>
@@ -167,7 +169,7 @@ export default function CanvasStage() {
                     }
                 }
                 setLoading({isLoading: false});
-                layerRef.current?.batchDraw();
+                shapeLayerRef.current?.batchDraw();
             }, 0);
         };
 
@@ -344,18 +346,16 @@ export default function CanvasStage() {
     // ===== 코팅 타입별 스타일 유틸리티 (isLocked 고려) =====
     const getCoatingVisualStyle = (shape: AnyNodeConfig) => {
         const isLocked = shape.isLocked;
-        // 잠긴 객체는 항상 회색 계열로 표시
+        // 잠긴 객체
         if (isLocked) {
             return {
-                fill: shape.fill ? `${shape.fill}40` : '#f8f9fa', // 원래 색상에 투명도 적용
-                stroke: '#6c757d',
-                strokeWidth: 1,
+                fill: shape.fill,
+                stroke: shape.stroke,
+                strokeWidth: shape.strokeWidth,
                 dash: [4, 4],
-                opacity: 0.6
+                opacity: 0.9
             };
         }
-
-        // ... 나머지 코팅 타입별 스타일 코드는 동일 ...
 
         // 코팅이 제외된 경우
         if (shape.skipCoating) {
@@ -369,7 +369,51 @@ export default function CanvasStage() {
         }
 
         // 개별 코팅 설정이 없는 경우 기본 스타일
-        if (shape.type === 'image') return { opacity: 1 }
+        if (shape.type === 'image'){
+            switch (shape.coatingType) {
+                case 'fill':
+                    return {
+                        fill: '#2196f3',
+                        stroke: '#2196f3',
+                        strokeWidth: 2,
+                        opacity: 1,
+                        shadowColor: '#2196f3',
+                        shadowBlur: 5,
+                        shadowOpacity: 0.3
+                    };
+
+                case 'outline':
+                    return {
+                        fill: 'transparent',
+                        stroke: '#ff9800',
+                        strokeWidth: 3,
+                        opacity: 1,
+                        shadowColor: '#ff9800',
+                        shadowBlur: 8,
+                        shadowOpacity: 0.4
+                    };
+
+                case 'masking':
+                    return {
+                        fill: '#f44336',
+                        stroke: '#f44336',
+                        strokeWidth: 2,
+                        dash: [6, 3],
+                        opacity: 1,
+                        shadowColor: '#f44336',
+                        shadowBlur: 4,
+                        shadowOpacity: 0.2
+                    };
+
+                default:
+                    return {
+                        fill: shape.fill || '#e9ecef',
+                        stroke: '#6c757d',
+                        strokeWidth: 1,
+                        opacity: 1
+                    };
+            }
+        }
 
         // 코팅 타입별 스타일
         switch (shape.coatingType) {
@@ -420,7 +464,7 @@ export default function CanvasStage() {
     // ===== 코팅 순서 표시 유틸리티 (isLocked 고려) =====
     const renderCoatingOrderBadge = (shape: AnyNodeConfig, stageScale: number) => {
         // 잠긴 객체이거나 코팅 설정이 없으면 배지 표시 안 함
-        if (shape.isLocked || !shape.useCustomCoating || shape.skipCoating || !shape.coatingOrder) {
+        if (shape.isLocked || shape.skipCoating || !shape.coatingOrder) {
             return null;
         }
 
@@ -484,7 +528,7 @@ export default function CanvasStage() {
                     if (shapeGroupRef.current?.children.length) {
                         shapeGroupRef.current.cache();
                     }
-                    layerRef.current?.batchDraw();
+                    shapeLayerRef.current?.batchDraw();
                 } catch (error) {
                     console.error('❌ 캐시 활성화 실패:', error);
                     setIsCacheEnabled(false);
@@ -499,7 +543,7 @@ export default function CanvasStage() {
         if (transformerRef.current) {
             const nodesToSet: Konva.Shape[] = [];
             selectedShapeIds.forEach(id => {
-                const foundNode = layerRef.current?.findOne(`#${id}`);
+                const foundNode = shapeLayerRef.current?.findOne(`#${id}`);
                 if (foundNode) {
                     nodesToSet.push(foundNode as Konva.Shape);
                 }
@@ -604,8 +648,8 @@ export default function CanvasStage() {
                         scaleY={stage.scaleY}
                         x={stage.x}
                         y={stage.y}
-                        onMouseDown={(e) => handleMouseDown(e, layerRef)}
-                        onDragStart={(e) => handleStageDragStart(e, layerRef)}
+                        onMouseDown={(e) => handleMouseDown(e, shapeLayerRef)}
+                        onDragStart={(e) => handleStageDragStart(e, shapeLayerRef)}
                         onDragMove={handleStageDragMove}
                         onDragEnd={handleStageDragEnd}
                         onMouseMove={handleMouseMove}
@@ -617,8 +661,7 @@ export default function CanvasStage() {
                         listening={!isTransforming}
                         draggable={isPanning}
                     >
-
-                        <Layer ref={layerRef}>
+                        <Layer>
                             {/* 캔버스 배경: 뷰포트 크기에 맞춰 월드 좌표로 채우기 */}
                             {(() => {
                                 const sx = stage.scaleX || 1;
@@ -678,6 +721,8 @@ export default function CanvasStage() {
                                 viewportHeight={stage.height}
                             />
 
+                        </Layer>
+                        <Layer ref={shapeLayerRef}>
                             {/* 이미지 그룹 (스타일 적용) */}
                             <Group ref={imageGroupRef} listening={tool === 'select'}>
                                 {imageShapes.map((shape) => {
@@ -783,16 +828,6 @@ export default function CanvasStage() {
                                     }
                                 })}
                             </Group>
-
-                            {/* 코팅 순서 배지 */}
-                            <Group listening={false}>
-                                {shapes
-                                    .filter(shape => shape.visible !== false)
-                                    .map(shape => renderCoatingOrderBadge(shape, stage.scaleX))
-                                }
-                            </Group>
-
-
                             {/* Transformer */}
                             <Transformer
                                 ref={transformerRef}
@@ -824,6 +859,21 @@ export default function CanvasStage() {
                                 listening={false}
                             />
                         </Layer>
+                        {/* Path 레이어 */}
+                        {/*<PathLayer*/}
+                        {/*    pathGroups={pathGroups}*/}
+                        {/*    selectedSegmentId={selectedSegmentId}*/}
+                        {/*    selectedGroupId={selectedGroupId}*/}
+                        {/*    selectedEndpoint={selectedEndpoint}*/}
+                        {/*    tool={pathTool}*/}
+                        {/*    isActive={pathEditorMode}*/}
+                        {/*    canvasScale={scale}*/}
+                        {/*    onSegmentSelect={onSegmentSelect}*/}
+                        {/*    onGroupSelect={onGroupSelect}*/}
+                        {/*    onEndpointDrag={onEndpointDrag}*/}
+                        {/*    onSegmentSplit={onSegmentSplit}*/}
+                        {/*    onAddSegment={onAddSegment}*/}
+                        {/*/>*/}
                     </Stage>
                 </div>
             </ContextMenuTrigger>

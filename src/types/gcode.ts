@@ -62,7 +62,7 @@ export interface GcodeSettings {
     enableMasking: boolean;      // 마스킹 사용 여부
     maskingClearance: number;    // 마스킹 여유 거리 (mm)
 
-    workArea: { width: number; height: number };
+    // workArea: { width: number; height: number };
     travelAvoidanceStrategy: 'lift' | 'contour'; // 이동 회피 전략 추가
     unit?: 'mm';
 }
@@ -72,5 +72,5 @@ export interface GCodeState {
     gcodePath: number[][];
     lastGenerated: number | null;
     isGenerating: boolean;
-    gcodeSettings: GcodeSettings;
+    // gcodeSettings: GcodeSettings;
 }

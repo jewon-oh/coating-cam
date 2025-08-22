@@ -1,20 +1,15 @@
 "use client";
 
-import React, {useState, useEffect, useMemo, useRef, useCallback} from 'react';
+import React, {useState, useEffect, useMemo, useRef} from 'react';
 import {useAppSelector} from '@/hooks/redux';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable';
 import {Slider} from '@/components/ui/slider';
-import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause, RefreshCw} from 'lucide-react';
-// import {generateCoatingGCode} from '@/lib/coating-gcode-generator';
-// import {setGCode, setGenerating} from '@/store/slices/gcode-slice';
+import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause} from 'lucide-react';
 import Preview3D, {PathPoint} from '@/components/3d-preview';
 import {AnyNodeConfig} from "@/types/custom-konva-config";
-import {setGCode, setGenerating} from "@/store/slices/gcode-slice";
-import {generateCoatingGCode} from "@/lib/generate-coating-gcode-with-snippets";
-// import {useSettings} from '@/contexts/settings-context';
 
 /**
  * G0/G1 라인에서 좌표 추출
@@ -70,6 +65,13 @@ export default function PreviewPage() {
     const localPathData = useMemo(() => parseGCodeToPathData(gcode || ''), [gcode]);
     const maxStep = Math.max(0, localPathData.length - 1);
     const [step, setStep] = useState<number>(0);
+
+    // G-code가 로드되면 마지막 스텝으로 초기화
+    useEffect(() => {
+        if (maxStep > 0) {
+            setStep(maxStep);
+        }
+    }, [maxStep]);
 
     // 애니메이션 상태
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -140,23 +142,29 @@ export default function PreviewPage() {
         if (localPathData.length === 0) return;
 
         if (isPlaying) {
-            // 애니메이션 정지
+            // 애니메이션 일시정지
             setIsPlaying(false);
             if (animationRef.current) {
                 clearInterval(animationRef.current);
                 animationRef.current = null;
             }
         } else {
-            // 애니메이션 시작
+            // 애니메이션 시작 또는 재개
             setIsPlaying(true);
             let currentStep = step;
+
+            // 만약 애니메이션이 끝에 도달했다면 처음부터 다시 시작
+            if (currentStep >= maxStep) {
+                currentStep = 0;
+                setStep(0);
+            }
 
             animationRef.current = setInterval(() => {
                 currentStep++;
                 if (currentStep <= maxStep) {
                     setStep(currentStep);
                 } else {
-                    // 애니메이션 완료
+                    // 애니메이션 완료되면 정지
                     setIsPlaying(false);
                     if (animationRef.current) {
                         clearInterval(animationRef.current);
@@ -412,6 +420,7 @@ export default function PreviewPage() {
                                         pathData={localPathData}                 // 전체 경로 그대로 전달
                                         activeCount={Math.min(step + 1, localPathData.length)} // 진행 개수만 전달
                                         imageShapes={imageShapes} // 여러 이미지 전달
+                                        orthographicView={true}
                                     />
                                 ) : (
                                     <div className="h-full flex items-center justify-center text-muted-foreground">

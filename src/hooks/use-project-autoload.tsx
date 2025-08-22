@@ -5,14 +5,15 @@ import { useCanvas } from "@/contexts/canvas-context";
 import { useAppDispatch } from "@/hooks/redux";
 import { resetHistory } from "@/store/slices/history-slice";
 import { setAllShapes } from "@/store/slices/shapes-slice";
-import { updateGcodeSettings } from "@/store/slices/gcode-slice";
 import { ProjectFileType } from "@/types/project";
 import { useRouter } from "next/router";
+import {useSettings} from "@/contexts/settings-context";
 
 export function useProjectAutoLoad() {
     const { setLoading } = useCanvas();
     const dispatch = useAppDispatch();
     const router = useRouter();
+    const {updateGcodeSettings} = useSettings();
 
     useEffect(() => {
         const loadProject = async () => {
@@ -65,7 +66,7 @@ export function useProjectAutoLoad() {
                 console.log(`[Project Load] Project file version: ${parsedVersion}`);
 
                 dispatch(setAllShapes(parsedShapes));
-                dispatch(updateGcodeSettings(parsedGcodeSettings));
+                updateGcodeSettings(parsedGcodeSettings)
                 dispatch(resetHistory(parsedShapes));
 
                 setLoading({ message:"완료!"});
@@ -84,5 +85,5 @@ export function useProjectAutoLoad() {
         if (router.isReady) {
             void loadProject();
         }
-    }, [router.isReady, router.query, setLoading, dispatch]);
+    }, [router.isReady, router.query, setLoading, dispatch, updateGcodeSettings]);
 }

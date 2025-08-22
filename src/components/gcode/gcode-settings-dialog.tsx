@@ -13,13 +13,13 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppSelector, useAppDispatch } from '@/hooks/redux';
-import { setGCode, setGenerating, updateGcodeSettings } from '@/store/slices/gcode-slice';
+import { setGCode, setGenerating } from '@/store/slices/gcode-slice';
 import { Input } from '../ui/input';
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSettings } from '@/contexts/settings-context';
-import {generateCoatingGCodeWithSnippets} from "@/lib/generate-coating-gcode-with-snippets";
+import {generateGcode} from "@/lib/gcode/generate-gcode";
 import {Progress} from "@/components/ui/progress";
 
 interface GCodeSettingsDialogProps {
@@ -61,8 +61,8 @@ export const GCodeSettingsDialog: React.FC<GCodeSettingsDialogProps> = ({ isOpen
     const router = useRouter();
     const dispatch = useAppDispatch();
     const { shapes } = useAppSelector((state) => state.shapes);
-    const {gcodeSettings,isGenerating} = useAppSelector((state) => state.gcode);
-    const {gcodeSnippets,workArea} = useSettings();
+    const {isGenerating} = useAppSelector((state) => state.gcode);
+    const {gcodeSnippets,gcodeSettings,updateGcodeSettings,workArea} = useSettings();
 
     // 로딩 상태를 위한 새로운 상태 추가
     const [progress, setProgress] = useState(0);
@@ -77,32 +77,28 @@ export const GCodeSettingsDialog: React.FC<GCodeSettingsDialogProps> = ({ isOpen
     }, [isOpen]);
     /**
      * 인풋(Input) 요소의 변경을 처리하는 함수.
-     * value를 float로 파싱하여 Redux 스토어에 디스패치합니다.
+     * value를 float로 파싱하여 Settings Context에 업데이트합니다.
      */
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        // Redux 액션을 직접 디스패치합니다.
-        dispatch(updateGcodeSettings({ [name]: parseFloat(value) }));
+        updateGcodeSettings({ [name]: parseFloat(value) });
     };
 
     /**
      * 셀렉트(Select) 요소의 변경을 처리하는 함수.
-     * string 값을 Redux 스토어에 디스패치합니다.
+     * string 값을 Settings Context에 업데이트합니다.
      */
     const handleSelectChange = (name: string, value: string) => {
-        // Redux 액션을 직접 디스패치합니다.
-        dispatch(updateGcodeSettings({ [name]: value }));
+        updateGcodeSettings({ [name]: value });
     };
 
     /**
      * 체크박스(Checkbox) 요소의 변경을 처리하는 함수.
-     * boolean 값을 Redux 스토어에 디스패치합니다.
+     * boolean 값을 Settings Context에 업데이트합니다.
      */
     const handleCheckboxChange = (name: string, checked: boolean) => {
-        // Redux 액션을 직접 디스패치합니다.
-        dispatch(updateGcodeSettings({ [name]: checked }));
+        updateGcodeSettings({ [name]: checked });
     };
-
 
     const handleGenerate = async () => {
         if (shapes.length === 0) {
@@ -122,15 +118,13 @@ export const GCodeSettingsDialog: React.FC<GCodeSettingsDialogProps> = ({ isOpen
                 console.log(`Progress: ${progress.toFixed(1)}% - ${message}`);
             };
 
-            // 설정 동기화
-            dispatch(updateGcodeSettings(gcodeSettings));
-
             onProgress(1, 'G-code 생성 시작...');
 
             // G-code 생성 - await 사용으로 완료까지 대기
-            const gcode = await generateCoatingGCodeWithSnippets(
+            const gcode = await generateGcode(
                 shapes,
                 gcodeSettings,
+                workArea,
                 gcodeSnippets,
                 onProgress
             );
@@ -159,7 +153,6 @@ export const GCodeSettingsDialog: React.FC<GCodeSettingsDialogProps> = ({ isOpen
             onClose();
         }
     };
-
 
     // 마스킹 가능한 도형 개수 계산
     const maskingShapes = shapes.filter(shape =>

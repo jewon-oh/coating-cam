@@ -12,7 +12,7 @@ import React, {
     useState,
 } from "react";
 import {nanoid} from "nanoid";
-import type {GCodeHook, GCodeSnippet} from "@/types/gcode";
+import type {GCodeHook, GcodeSettings, GCodeSnippet} from "@/types/gcode";
 import {DEFAULT_SETTINGS, SettingsType, ThemeMode} from "@/types/settings";
 
 
@@ -120,6 +120,11 @@ type SettingsContextType = {
     workArea: { width: number; height: number };
     setWorkArea: (wa: { width: number; height: number }) => void;
 
+    // G-Code 설정 추가
+    gcodeSettings: GcodeSettings;
+    updateGcodeSettings: (patch: Partial<GcodeSettings>) => void;
+    setGcodeSettings: (settings: GcodeSettings) => void;
+
     // G-Code 스니펫 API
     gcodeSnippets: GCodeSnippet[];
     setAllGcodeSnippets: (list: GCodeSnippet[]) => void;
@@ -139,6 +144,7 @@ type SettingsContextType = {
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
+
 export function SettingsProvider({children}: { children: React.ReactNode }) {
     const bridge = useSettingsBridge();
 
@@ -153,11 +159,19 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
     const [theme, setTheme] = useState<ThemeMode>(DEFAULT_SETTINGS.theme);
     const [workArea, setWorkArea] = useState(DEFAULT_SETTINGS.workArea);
 
+    // G-Code 설정 상태 추가
+    const [gcodeSettings, setGcodeSettings] = useState<GcodeSettings>(DEFAULT_SETTINGS.gcodeSettings);
+
     // G-Code 스니펫 (useReducer)
     const [gcodeSnippets, dispatchSnippets] = useReducer(
         snippetsReducer,
         DEFAULT_SETTINGS.gcodeSnippets
     );
+
+    // G-Code 설정 업데이트 함수
+    const updateGcodeSettings = useCallback((patch: Partial<GcodeSettings>) => {
+        setGcodeSettings(prev => ({ ...prev, ...patch }));
+    }, []);
 
     // 최초 로드
     const loadedRef = useRef(false);
@@ -179,6 +193,9 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
                 setSnappingEnabled(!!settings.grid?.snapping);
                 setTheme((settings.theme as ThemeMode) ?? DEFAULT_SETTINGS.theme);
                 setWorkArea(settings.workArea ?? DEFAULT_SETTINGS.workArea);
+
+                // G-Code 설정 로드
+                setGcodeSettings(settings.gcodeSettings ?? DEFAULT_SETTINGS.gcodeSettings);
 
                 dispatchSnippets({
                     type: "setAll",
@@ -225,6 +242,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
                 snapping: isSnappingEnabled,
             },
             theme,
+            gcodeSettings,
             gcodeSnippets,
         };
         scheduleSave(snapshot);
@@ -234,6 +252,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         isSnappingEnabled,
         theme,
         workArea,
+        gcodeSettings,
         gcodeSnippets,
         scheduleSave,
     ]);
@@ -264,6 +283,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         []
     );
 
+
     const removeGcodeSnippet = useCallback((id: string) => {
         dispatchSnippets({type: "remove", payload: {id}});
     }, []);
@@ -279,7 +299,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         []
     );
 
-    const value = useMemo<SettingsContextType>(
+    const value = useMemo(
         () => ({
             // 기존 설정
             isGridVisible,
@@ -293,7 +313,12 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
             workArea,
             setWorkArea,
 
-            // 스니펫
+            // G-Code 설정
+            gcodeSettings,
+            updateGcodeSettings,
+            setGcodeSettings,
+
+            // G-Code 스니펫
             gcodeSnippets,
             setAllGcodeSnippets,
             addGcodeSnippet,
@@ -308,6 +333,8 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
             isSnappingEnabled,
             theme,
             workArea,
+            gcodeSettings,
+            updateGcodeSettings,
             gcodeSnippets,
             setAllGcodeSnippets,
             addGcodeSnippet,
