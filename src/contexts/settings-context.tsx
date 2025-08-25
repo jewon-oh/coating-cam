@@ -13,12 +13,11 @@ import React, {
 } from "react";
 import {nanoid} from "nanoid";
 import type {GCodeHook, GcodeSettings, GCodeSnippet} from "@/types/gcode";
-import {DEFAULT_SETTINGS, SettingsType, ThemeMode} from "@/types/settings";
-
+import {DEFAULT_SETTINGS, SettingsType} from "@/types/settings";
 
 function useSettingsBridge() {
     const bridge =
-        (typeof window !== "undefined" && (window as any).settingsApi) || null;
+        (typeof window !== "undefined" && window.settingsApi) || null;
     return bridge as null | {
         load: () => Promise<SettingsType>;
         save: (data: SettingsType) => Promise<{ ok: boolean }>;
@@ -179,7 +178,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         let mounted = true;
         (async () => {
             try {
-                let s: SettingsType | null = null;
+                let s: SettingsType | null;
                 if (bridge) s = await bridge.load();
                 else {
                     const raw = localStorage.getItem("app.settings.v1");

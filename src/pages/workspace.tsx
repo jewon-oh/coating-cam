@@ -15,7 +15,7 @@ import {WorkspaceOverlays} from "@/components/workspace/workspace-overlays";
 
 // Redux 액션 및 훅
 import ToolContextPanel from "@/components/tool-context-panel";
-import {useProjectAutoLoad} from "@/hooks/use-project-autoload";
+import {useProjectAutoLoad} from "@/hooks/project/use-project-autoload";
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from "@/components/ui/resizable";
 import {PropertyPanel} from "@/components/property-panel";
 import {useAppSelector} from "@/hooks/redux";

@@ -1,11 +1,11 @@
 import React, { useMemo, useCallback} from "react";
 import {Stage, Layer, Rect, Circle, Group} from 'react-konva';
 import {motion} from "framer-motion";
-import {AnyNodeConfig} from "@/types/custom-konva-config";
+import {CustomShapeConfig} from "@/types/custom-konva-config";
 import Konva from "konva";
 
 interface MinimapProps {
-    shapes: AnyNodeConfig[];
+    shapes: CustomShapeConfig[];
     viewport: {
         x: number;
         y: number;
@@ -185,7 +185,7 @@ export default function Minimap({
                                     perfectDrawEnabled: false,
                                 };
 
-                                const getShapeColor = (shape: AnyNodeConfig) => {
+                                const getShapeColor = (shape: CustomShapeConfig) => {
                                     if (shape.skipCoating) return '#9ca3af';
                                     switch (shape.coatingType) {
                                         case 'fill': return '#3b82f6';

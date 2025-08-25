@@ -42,14 +42,17 @@ const EPSILON = {
     POSITION: 0.25, // quarter pixel to reduce thrash
 } as const;
 
+// 기본 줌 레벨 상수 추가
+const DEFAULT_ZOOM_LEVEL = 2; // 원하는 기본 배율로 설정 (1.5배, 2배, 3배 등)
+
 const DEFAULT_STAGE_STATE: StageState = {
-    scaleX: -1,
-    scaleY: 1,
+    scaleX: -DEFAULT_ZOOM_LEVEL, // X축 반전과 함께 확대
+    scaleY: DEFAULT_ZOOM_LEVEL,  // Y축 확대
     x: 0,
     y: 0,
     width: 0,
     height: 0,
-    scale: 1,
+    scale: DEFAULT_ZOOM_LEVEL,
 } as const;
 
 const DEFAULT_LOADING_STATE: LoadingState = {
@@ -99,10 +102,13 @@ function useStageState() {
                 return prev;
             }
 
+            // 높은 배율에서 더 좋은 초기 위치 설정
+            const zoomLevel = Math.abs(prev.scaleX);
+
             // 원점(0,0)이 보이도록 초기 위치 설정
             // scaleX가 -1일 때: 우상단이 원점이므로 살짝 좌하단으로 이동
-            const offsetX = width * 0.8;  // 화면 너비의 80% 지점
-            const offsetY = height * 0.2; // 화면 높이의 20% 지점
+            const offsetX = width * (0.8 / zoomLevel);  // 배율에 따라 오프셋 조정
+            const offsetY = height * (0.2 / zoomLevel); // 배율에 따라 오프셋 조정
 
             return {
                 ...prev,

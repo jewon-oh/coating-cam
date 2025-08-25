@@ -1,4 +1,4 @@
-import { AnyNodeConfig } from '@/types/custom-konva-config';
+import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { GcodeSettings } from '@/types/gcode';
 import { PathGroup } from '@/types/gcode-path';
 import { ShapeToPathConverter } from '../shape-to-path-converter';
@@ -23,7 +23,7 @@ export class ShapeBasedPathEditor {
     /**
      * Shape들로부터 편집 가능한 경로들을 생성
      */
-    async generateEditablePaths(shapes: AnyNodeConfig[]): Promise<PathGroup[]> {
+    async generateEditablePaths(shapes: CustomShapeConfig[]): Promise<PathGroup[]> {
         return await this.shapeConverter.convertShapesToPaths(shapes);
     }
 
@@ -41,7 +41,7 @@ export class ShapeBasedPathEditor {
     /**
      * 전체 워크플로우: Shape -> Path -> 편집 -> G-Code
      */
-    async createEditableWorkflow(shapes: AnyNodeConfig[]): Promise<{
+    async createEditableWorkflow(shapes: CustomShapeConfig[]): Promise<{
         pathGroups: PathGroup[];
         generateGCode: (editedGroups: PathGroup[]) => string;
     }> {

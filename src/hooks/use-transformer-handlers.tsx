@@ -3,7 +3,7 @@ import type Konva from 'konva';
 import {useAppDispatch, useAppSelector} from '@/hooks/redux';
 import {batchUpdateShapes} from '@/store/slices/shapes-slice';
 import {setPresent} from '@/store/slices/history-slice';
-import type {AnyNodeConfig} from '@/types/custom-konva-config';
+import type {CustomShapeConfig} from '@/types/custom-konva-config';
 
 /**
  * Transformer(크기 조절/회전)과 관련된 상태와 핸들러를 캡슐화한 훅
@@ -179,7 +179,7 @@ export function useTransformerHandlers(
             const newWidth = node.width() * oldScaleX;
             const newHeight = node.height() * oldScaleY;
 
-            const newAttrs: AnyNodeConfig = {
+            const newAttrs: CustomShapeConfig = {
                 ...shape,
                 y: node.y(),
                 rotation: newRotation,
@@ -213,10 +213,10 @@ export function useTransformerHandlers(
             node.scaleY(1);
 
             return { id: shape.id!, props: newAttrs };
-        }).filter((u): u is { id: string; props: AnyNodeConfig } => u !== null);
+        }).filter((u): u is { id: string; props: CustomShapeConfig } => u !== null);
 
         if (updates.length > 0) {
-            dispatch(batchUpdateShapes(updates as { id: string; props: Partial<AnyNodeConfig> }[]));
+            dispatch(batchUpdateShapes(updates as { id: string; props: Partial<CustomShapeConfig> }[]));
             const updatedShapesForHistory = shapes.map(s => {
                 const update = updates.find(u => u.id === s.id);
                 return update ? { ...s, ...update.props } : s;

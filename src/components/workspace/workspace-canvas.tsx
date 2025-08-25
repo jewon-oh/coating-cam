@@ -17,7 +17,7 @@ import {useCanvas} from '@/contexts/canvas-context';
 
 // 컴포넌트 및 타입
 import {TransformerConfig} from "konva/lib/shapes/Transformer";
-import {AnyNodeConfig} from '@/types/custom-konva-config';
+import {CustomShapeConfig} from '@/types/custom-konva-config';
 import CanvasGrid from "@/components/workspace/canvas-grid";
 import {
     ContextMenu,
@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/context-menu";
 import {flipImageData} from "@/lib/flip-image-data";
 
-import { PathLayer } from './path-layer';
 
 // ===== 메인 컴포넌트 =====
 export default function WorkspaceCanvas() {
@@ -42,6 +41,7 @@ export default function WorkspaceCanvas() {
 
     // 로컬 상태
     const [isPanning, setIsPanning] = useState(false);
+    const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
     const [isHoveringShape, setIsHoveringShape] = useState<string | null>(null);
     const [isCacheEnabled, setIsCacheEnabled] = useState(false);
     const [isCanvasFocused, setIsCanvasFocused] = useState(false);
@@ -90,7 +90,7 @@ export default function WorkspaceCanvas() {
         handleStageDragMove,
         handleStageDragEnd,
         handleWheel,
-    } = useShapeLayerInteractions(setStage, selectionRectRef, isPanning, setIsPanning);
+    } = useShapeLayerInteractions(setStage, selectionRectRef, isPanning, setIsPanning,isMarqueeSelecting,setIsMarqueeSelecting);
 
     // ===== 계산된 값들 =====
     const selectedShapes = useMemo(() =>
@@ -237,7 +237,7 @@ export default function WorkspaceCanvas() {
 
 
     // ===== 도형 공통 속성 생성기 (isLocked 속성 사용) =====
-    const makeCommonProps = useCallback((shape: Partial<AnyNodeConfig>) => {
+    const makeCommonProps = useCallback((shape: Partial<CustomShapeConfig>) => {
         // 새로운 isLocked 속성 사용 (기본값은 false)
         const isLocked = shape.isLocked;
         const isInteractionBlocked = isPanning || isLocked;
@@ -299,7 +299,7 @@ export default function WorkspaceCanvas() {
         } : {};
 
         // 코팅 타입별 스타일 적용
-        const coatingStyle = getCoatingVisualStyle(shape as AnyNodeConfig);
+        const coatingStyle = getCoatingVisualStyle(shape as CustomShapeConfig);
 
         return {
             ...baseProps,
@@ -310,7 +310,7 @@ export default function WorkspaceCanvas() {
     }, [tool, isHoveringShape, handleSelect, handleDragStart, handleDragMove, handleDragEnd, isPanning, stage.scaleX]);
 
     // ===== 이미지 스타일 적용 (isLocked 속성 사용) =====
-    const makeImageProps = useCallback((shape: AnyNodeConfig) => {
+    const makeImageProps = useCallback((shape: CustomShapeConfig) => {
         const isLocked = shape.isLocked;
         const baseProps = makeCommonProps(shape);
         const coatingStyle = getCoatingVisualStyle(shape);
@@ -344,7 +344,7 @@ export default function WorkspaceCanvas() {
     }, [makeCommonProps, isPanning]);
 
     // ===== 코팅 타입별 스타일 유틸리티 (isLocked 고려) =====
-    const getCoatingVisualStyle = (shape: AnyNodeConfig) => {
+    const getCoatingVisualStyle = (shape: CustomShapeConfig) => {
         const isLocked = shape.isLocked;
         // 잠긴 객체
         if (isLocked) {
@@ -462,7 +462,7 @@ export default function WorkspaceCanvas() {
     };
 
     // ===== 코팅 순서 표시 유틸리티 (isLocked 고려) =====
-    const renderCoatingOrderBadge = (shape: AnyNodeConfig, stageScale: number) => {
+    const renderCoatingOrderBadge = (shape: CustomShapeConfig, stageScale: number) => {
         // 잠긴 객체이거나 코팅 설정이 없으면 배지 표시 안 함
         if (shape.isLocked || shape.skipCoating || !shape.coatingOrder) {
             return null;
@@ -659,7 +659,7 @@ export default function WorkspaceCanvas() {
                         onClick={handleCanvasClick}
                         onContextMenu={onStageContextMenu}
                         listening={!isTransforming}
-                        draggable={isPanning}
+                        draggable={isPanning || isMarqueeSelecting}
                     >
                         <Layer>
                             {/* 캔버스 배경: 뷰포트 크기에 맞춰 월드 좌표로 채우기 */}

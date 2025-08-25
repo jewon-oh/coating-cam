@@ -1,4 +1,4 @@
-import { AnyNodeConfig } from '@/types/custom-konva-config';
+import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { GcodeSettings } from '@/types/gcode';
 import { Point } from '@/lib/gcode/point';
 
@@ -7,10 +7,10 @@ import { Point } from '@/lib/gcode/point';
  */
 export class MaskingManager {
     private readonly settings: GcodeSettings;
-    private readonly maskShapes: AnyNodeConfig[];
+    private readonly maskShapes: CustomShapeConfig[];
     private readonly maskClearance: number;
 
-    constructor(settings: GcodeSettings, maskShapes: AnyNodeConfig[]) {
+    constructor(settings: GcodeSettings, maskShapes: CustomShapeConfig[]) {
         this.settings = settings;
         this.maskShapes = maskShapes;
         // 마스킹 여유 거리에 코팅 라인 폭 절반을 더합니다.
@@ -29,7 +29,7 @@ export class MaskingManager {
      */
     public applyMaskingToSegments(
         segments: { start: Point; end: Point }[],
-        coatingShape: AnyNodeConfig
+        coatingShape: CustomShapeConfig
     ): { start: Point; end: Point }[] {
         if (!this.hasMasks()) {
             return segments;
@@ -45,12 +45,12 @@ export class MaskingManager {
     /**
      * 충돌하는 모든 마스킹 도형의 배열을 반환합니다.
      */
-    public findIntersectingMasks(start: Point, end: Point): AnyNodeConfig[] {
+    public findIntersectingMasks(start: Point, end: Point): CustomShapeConfig[] {
         if (!this.hasMasks()) {
             return [];
         }
 
-        const intersectingMasks: AnyNodeConfig[] = [];
+        const intersectingMasks: CustomShapeConfig[] = [];
         for (const mask of this.maskShapes) {
             let intersects = false;
             if (mask.type === 'rectangle') {
@@ -76,7 +76,7 @@ export class MaskingManager {
     /**
      * 개별 마스크의 클리어런스를 가져옵니다.
      */
-    private getMaskClearance(mask: AnyNodeConfig): number {
+    private getMaskClearance(mask: CustomShapeConfig): number {
         if (mask.coatingType === 'masking' && typeof mask.maskingClearance === 'number') {
             return mask.maskingClearance + this.settings.coatingWidth / 2;
         }
@@ -88,7 +88,7 @@ export class MaskingManager {
      */
     private splitSegmentByMasks(
         segment: { start: Point; end: Point },
-        coatingShape: AnyNodeConfig
+        coatingShape: CustomShapeConfig
     ): { start: Point; end: Point }[] {
         if (!this.settings.enableMasking || this.maskShapes.length === 0) {
             return [segment];
@@ -205,7 +205,7 @@ export class MaskingManager {
     }
 
     private getLineRectIntersectionParams(
-        p1: Point, p2: Point, mask: AnyNodeConfig
+        p1: Point, p2: Point, mask: CustomShapeConfig
     ): [number, number] | null {
         const clearance = this.getMaskClearance(mask);
         const rect = {
@@ -244,7 +244,7 @@ export class MaskingManager {
     }
 
     private getLineCircleIntersectionParams(
-        p1: Point, p2: Point, mask: AnyNodeConfig
+        p1: Point, p2: Point, mask: CustomShapeConfig
     ): [number, number] | null {
         if (typeof mask.x !== 'number' || typeof mask.y !== 'number' || typeof mask.radius !== 'number') return null;
 
@@ -292,7 +292,7 @@ export class MaskingManager {
     /**
      * 포인트가 특정 마스크 내부에 있는지 확인합니다.
      */
-    private isPointInMask(point: Point, mask: AnyNodeConfig): boolean {
+    private isPointInMask(point: Point, mask: CustomShapeConfig): boolean {
         const clearance = this.getMaskClearance(mask);
 
         if (mask.type === 'rectangle') {

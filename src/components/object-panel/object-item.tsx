@@ -1,5 +1,5 @@
 import React, {useMemo, useCallback, useEffect, useRef, useState, memo} from "react";
-import type {AnyNodeConfig} from "@/types/custom-konva-config";
+import type {CustomShapeConfig} from "@/types/custom-konva-config";
 import {cn} from "@/lib/utils";
 import {
     Circle as CircleIcon, Copy, Edit2,
@@ -14,7 +14,7 @@ import {
 import {Input} from "@/components/ui/input";
 import {ellipsizeEnd} from "@/lib/ellipsize";
 import {ToggleIconButton} from "@/components/object-panel/toggle-icon-button";
-import {useItemActions} from "@/hooks/use-item-actions";
+import {useItemActions} from "@/hooks/object-panel/use-item-actions";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -42,10 +42,10 @@ const shapeTypeNames = {
 } as const;
 
 interface ObjectItemProps {
-    shape: AnyNodeConfig;
+    shape: CustomShapeConfig;
     isSelected: boolean;
     onSelect: (id: string, e: React.MouseEvent) => void;
-    onPatch: (id: string, patch: Partial<AnyNodeConfig>) => void;
+    onPatch: (id: string, patch: Partial<CustomShapeConfig>) => void;
 }
 
 export const ObjectItem = memo<ObjectItemProps>(({

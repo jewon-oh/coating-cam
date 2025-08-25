@@ -17,7 +17,7 @@ import {
     Move
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
-import {AnyNodeConfig} from '@/types/custom-konva-config';
+import {CustomShapeConfig} from '@/types/custom-konva-config';
 import {
     ContextMenu,
     ContextMenuContent,
@@ -25,17 +25,17 @@ import {
     ContextMenuSeparator,
     ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {useItemActions} from '@/hooks/use-item-actions'; // 커스텀 훅 임포트
+import {useItemActions} from '@/hooks/object-panel/use-item-actions'; // 커스텀 훅 임포트
 
 
 interface GroupItemProps {
-    shape: AnyNodeConfig;
+    shape: CustomShapeConfig;
     isSelected: boolean;
     isOpen: boolean;
     memberCount?: number;
     onToggleOpen: () => void;
     onSelect: (id: string, e: React.MouseEvent) => void;
-    onPatch: (id: string, patch: Partial<AnyNodeConfig>) => void;
+    onPatch: (id: string, patch: Partial<CustomShapeConfig>) => void;
     onUngroup?: (groupId: string) => void;
     onDuplicate?: (groupId: string) => void;
     onDelete?: (groupId: string) => void;

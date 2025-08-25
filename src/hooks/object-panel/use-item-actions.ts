@@ -1,10 +1,10 @@
 // hooks/useItemActions.ts
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { AnyNodeConfig } from '@/types/custom-konva-config';
+import type { CustomShapeConfig } from '@/types/custom-konva-config';
 
 interface UseItemActionsProps {
-    shape: AnyNodeConfig;
-    onPatch: (id: string, patch: Partial<AnyNodeConfig>) => void;
+    shape: CustomShapeConfig;
+    onPatch: (id: string, patch: Partial<CustomShapeConfig>) => void;
     onToggleVisibility?: (id: string) => void;
     onToggleLock?: (id: string) => void;
 }

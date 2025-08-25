@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import { AnyNodeConfig } from '@/types/custom-konva-config';
+import { CustomShapeConfig } from '@/types/custom-konva-config';
 
 interface TreeNode {
     id: string;
-    shape: AnyNodeConfig;
+    shape: CustomShapeConfig;
     depth: number;
     hasChildren: boolean;
     isExpanded: boolean;
@@ -11,12 +11,12 @@ interface TreeNode {
 }
 
 export function useVirtualTree(
-    shapes: AnyNodeConfig[],
+    shapes: CustomShapeConfig[],
     expandedIds: Set<string>,
     filteredShapeIds?: Set<string>
 ) {
     const tree = useMemo(() => {
-        const childrenMap = new Map<string | null, AnyNodeConfig[]>();
+        const childrenMap = new Map<string | null, CustomShapeConfig[]>();
 
         // 필터링된 shapes만 처리
         const validShapes = filteredShapeIds

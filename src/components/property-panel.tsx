@@ -10,7 +10,7 @@ import {Separator} from '@/components/ui/separator';
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from '@/components/ui/collapsible';
 import {useAppSelector, useAppDispatch} from '@/hooks/redux';
 import {updateShape, batchUpdateShapes} from '@/store/slices/shapes-slice';
-import {AnyNodeConfig} from '@/types/custom-konva-config';
+import {CustomShapeConfig} from '@/types/custom-konva-config';
 import {SmallNumberField} from '@/components/small-number-field';
 import {
     Settings,
@@ -60,7 +60,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
 
         // 다중 선택 시 공통 속성만 추출
         const first = selectedShapes[0];
-        const common: Partial<AnyNodeConfig> = {
+        const common: Partial<CustomShapeConfig> = {
             type: selectedShapes.every(s => s.type === first.type) ? first.type : undefined,
             visible: selectedShapes.every(s => s.visible === first.visible) ? first.visible : undefined,
             isLocked: selectedShapes.every(s => s.isLocked === first.isLocked) ? first.isLocked : undefined,
@@ -202,25 +202,6 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                         <CollapsibleContent className="space-y-3 pt-2">
                             {singleSelectedShape && (
                                 <div className="space-y-3 p-3 bg-accent/10 rounded-md border">
-                                    <div className="text-xs font-medium text-muted-foreground mb-2">
-                                        📐 기본 변형 설정
-                                    </div>
-
-                                    {/* 위치 */}
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <SmallNumberField
-                                            id="obj-x"
-                                            label="X"
-                                            value={Math.round(singleSelectedShape.x || 0)}
-                                            onChange={(value) => handlePropertyUpdate('x', value || 0)}
-                                        />
-                                        <SmallNumberField
-                                            id="obj-y"
-                                            label="Y"
-                                            value={Math.round(singleSelectedShape.y || 0)}
-                                            onChange={(value) => handlePropertyUpdate('y', value || 0)}
-                                        />
-                                    </div>
 
                                     {/* 크기 - 사각형, 이미지, 폴리곤 */}
                                     {(singleSelectedShape.type === 'rectangle' ||
@@ -229,18 +210,36 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         <div className="grid grid-cols-2 gap-2">
                                             <SmallNumberField
                                                 id="obj-width"
-                                                label="너비"
+                                                label="가로"
                                                 value={Math.round(singleSelectedShape.width || 0)}
                                                 onChange={(value) => handlePropertyUpdate('width', value || 0)}
                                             />
                                             <SmallNumberField
                                                 id="obj-height"
-                                                label="높이"
+                                                label="세로"
                                                 value={Math.round(singleSelectedShape.height || 0)}
                                                 onChange={(value) => handlePropertyUpdate('height', value || 0)}
                                             />
                                         </div>
                                     )}
+
+
+                                    {/* 위치 */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <SmallNumberField
+                                            id="obj-x"
+                                            label="기준점 X"
+                                            value={Math.round(singleSelectedShape.x || 0)}
+                                            onChange={(value) => handlePropertyUpdate('x', value || 0)}
+                                        />
+                                        <SmallNumberField
+                                            id="obj-y"
+                                            label="기준점 Y"
+                                            value={Math.round(singleSelectedShape.y || 0)}
+                                            onChange={(value) => handlePropertyUpdate('y', value || 0)}
+                                        />
+                                    </div>
+
 
                                     {/* 원 반지름 */}
                                     {singleSelectedShape.type === 'circle' && (
@@ -308,10 +307,6 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-3 pt-2">
                             <div className="space-y-3 p-3 bg-accent/10 rounded-md border">
-                                <div className="text-xs font-medium text-muted-foreground mb-2">
-                                    🎨 표시 및 잠금 설정
-                                </div>
-
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         {commonProperties?.visible !== false ? <Eye className="w-3 h-3"/> :
@@ -370,28 +365,28 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                             {!commonProperties?.skipCoating && singleSelectedShape && (
                                 <>
                                     {/* 코팅 타입 */}
-                                    <div>
-                                        <span className="text-xs block mb-1">코팅 타입</span>
-                                        <Select
-                                            value={singleSelectedShape.coatingType || 'fill'}
-                                            onValueChange={(value) => handlePropertyUpdate('coatingType', value)}
-                                        >
-                                            <SelectTrigger className="h-7 text-xs">
-                                                <SelectValue/>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="fill"><Columns4/> 채우기</SelectItem>
-                                                <SelectItem value="outline"><SquaresUnite/> 윤곽선</SelectItem>
-                                                <SelectItem value="masking"><SquareX/> 마스킹</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    {/*<div>*/}
+                                    {/*    <span className="text-xs block mb-1">코팅 타입</span>*/}
+                                    {/*    <Select*/}
+                                    {/*        value={singleSelectedShape.coatingType || 'fill'}*/}
+                                    {/*        onValueChange={(value) => handlePropertyUpdate('coatingType', value)}*/}
+                                    {/*    >*/}
+                                    {/*        <SelectTrigger className="h-7 text-xs">*/}
+                                    {/*            <SelectValue/>*/}
+                                    {/*        </SelectTrigger>*/}
+                                    {/*        <SelectContent>*/}
+                                    {/*            <SelectItem value="fill"><Columns4/> 채우기</SelectItem>*/}
+                                    {/*            <SelectItem value="outline"><SquaresUnite/> 윤곽선</SelectItem>*/}
+                                    {/*            <SelectItem value="masking"><SquareX/> 마스킹</SelectItem>*/}
+                                    {/*        </SelectContent>*/}
+                                    {/*    </Select>*/}
+                                    {/*</div>*/}
 
                                     {/* 코팅 타입별 설정 - 배경색 적용 */}
                                     {singleSelectedShape.coatingType === 'fill' && (
                                         <div
                                             className="space-y-3 p-3 bg-sky-50 dark:bg-sky-950/20 rounded-md border border-sky-200 dark:border-sky-800">
-                                            <div className="text-xs font-medium text-sky-700 dark:text-sky-300 mb-2">
+                                            <div className="flex flex-row items-center text-xs font-medium text-sky-700 dark:text-sky-300 mb-2">
                                                 <Columns4/> 채우기 설정
                                             </div>
                                             <div className="text-[10px] text-sky-600 dark:text-sky-400 mb-3">
@@ -470,7 +465,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         <div
                                             className="space-y-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-md border border-yellow-200 dark:border-yellow-800">
                                             <div
-                                                className="text-xs font-medium text-yellow-700 dark:text-yellow-300 mb-2">
+                                                className="flex flex-row items-center text-xs font-medium text-yellow-700 dark:text-yellow-300 mb-2">
                                                 <SquaresUnite/> 윤곽선 설정
                                             </div>
                                             <div className="text-[10px] text-yellow-600 dark:text-yellow-400 mb-3">
@@ -567,7 +562,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                     {singleSelectedShape.coatingType === 'masking' && (
                                         <div
                                             className="space-y-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-md border border-red-200 dark:border-red-800">
-                                            <div className="text-xs font-medium text-red-700 dark:text-red-300 mb-2">
+                                            <div className="flex flex-row items-center text-xs font-medium text-red-700 dark:text-red-300 mb-2">
                                                 <SquareX/> 마스킹 설정
                                             </div>
                                             <div className="text-[10px] text-red-600 dark:text-red-400 mb-3">

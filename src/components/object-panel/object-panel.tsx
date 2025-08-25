@@ -21,7 +21,7 @@ import {
     toggleGroupLock,
 } from "@/store/slices/shapes-slice";
 import {setPresent} from "@/store/slices/history-slice";
-import type {AnyNodeConfig} from "@/types/custom-konva-config";
+import type {CustomShapeConfig} from "@/types/custom-konva-config";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {ScrollArea} from "@/components/ui/scroll-area";
 import {Badge} from "@/components/ui/badge";
@@ -29,7 +29,7 @@ import {
     Layers,
 } from "lucide-react";
 import {cn} from "@/lib/utils";
-import {useVirtualTree} from "@/hooks/use-virtual-tree";
+import {useVirtualTree} from "@/hooks/object-panel/use-virtual-tree";
 import {GroupItem} from "@/components/object-panel/group-item";
 import {ObjectItem} from "@/components/object-panel/object-item";
 import debounce from "lodash/debounce";
@@ -155,7 +155,7 @@ export const ObjectPanel = memo(() => {
 
     // 속성 패치 (디바운스)
     const debouncedUpdate = useMemo(
-        () => debounce((id: string, patch: Partial<AnyNodeConfig>) => {
+        () => debounce((id: string, patch: Partial<CustomShapeConfig>) => {
             dispatch(updateShape({id, updatedProps: patch}));
         }, 50),
         [dispatch]
@@ -163,7 +163,7 @@ export const ObjectPanel = memo(() => {
 
     useEffect(() => () => debouncedUpdate.cancel(), [debouncedUpdate]);
 
-    const handlePatch = useCallback((id: string, patch: Partial<AnyNodeConfig>) => {
+    const handlePatch = useCallback((id: string, patch: Partial<CustomShapeConfig>) => {
         debouncedUpdate(id, patch);
     }, [debouncedUpdate]);
 

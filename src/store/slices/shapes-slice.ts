@@ -1,8 +1,8 @@
 import {createSelector, createSlice, PayloadAction} from '@reduxjs/toolkit';
-import {AnyNodeConfig} from '@/types/custom-konva-config';
+import {CustomShapeConfig} from '@/types/custom-konva-config';
 
 interface ShapesState {
-    shapes: AnyNodeConfig[];      // 모든 도형들
+    shapes: CustomShapeConfig[];      // 모든 도형들
     selectedShapeIds: string[];       // 선택된 도형 ID들
     isGroupSelected: boolean;         // 그룹 선택 여부
     lastUpdateTimestamp: number;      // 성능 최적화용 캐시
@@ -24,7 +24,7 @@ export const selectGroupsWithMembers = createSelector(
     [selectShapes],
     (shapes) => {
         const groups = shapes.filter(s => s.type === 'group');
-        const membersByGroup = new Map<string, AnyNodeConfig[]>();
+        const membersByGroup = new Map<string, CustomShapeConfig[]>();
 
         groups.forEach(group => {
             const members = shapes.filter(s => s.parentId === group.id && s.type !== 'group');
@@ -38,7 +38,7 @@ export const selectGroupsWithMembers = createSelector(
 export const selectShapeHierarchy = createSelector(
     [selectShapes],
     (shapes) => {
-        const childrenMap = new Map<string | null, AnyNodeConfig[]>();
+        const childrenMap = new Map<string | null, CustomShapeConfig[]>();
         const parentMap = new Map<string, string | null>();
 
         shapes.forEach(shape => {
@@ -55,7 +55,7 @@ export const selectShapeHierarchy = createSelector(
     }
 );
 // Helper 함수: 고유 이름 생성
-const generateUniqueName = (shapes: AnyNodeConfig[], baseName: string): string => {
+const generateUniqueName = (shapes: CustomShapeConfig[], baseName: string): string => {
     let count = 1;
     let newName = baseName;
     const existingNames = shapes.map(shape => shape.name);
@@ -67,7 +67,7 @@ const generateUniqueName = (shapes: AnyNodeConfig[], baseName: string): string =
 };
 
 // 기존 SerializableShapePayload 유지...
-interface SerializableShapePayload extends Omit<AnyNodeConfig, 'image'> {
+interface SerializableShapePayload extends Omit<CustomShapeConfig, 'image'> {
     imageDataUrl?: string;
 }
 
@@ -81,7 +81,7 @@ const shapesSlice = createSlice({
             const baseName = action.payload.name || action.payload.type || 'Shape';
             const uniqueName = generateUniqueName(state.shapes, baseName);
 
-            const newShape: AnyNodeConfig = {
+            const newShape: CustomShapeConfig = {
                 ...action.payload,
                 type: action.payload.type,
                 id: action.payload.id,
@@ -105,7 +105,7 @@ const shapesSlice = createSlice({
             const baseName = action.payload.name || action.payload.type || 'Shape';
             const uniqueName = generateUniqueName(state.shapes, baseName);
 
-            const newShape: AnyNodeConfig = {
+            const newShape: CustomShapeConfig = {
                 ...action.payload,
                 type: action.payload.type,
                 id: action.payload.id,
@@ -125,7 +125,7 @@ const shapesSlice = createSlice({
 
 
         // updateShape는 Immer가 있으니 현재 형태 유지 가능
-        updateShape: (state, action: PayloadAction<{ id: string; updatedProps: Partial<AnyNodeConfig> }>) => {
+        updateShape: (state, action: PayloadAction<{ id: string; updatedProps: Partial<CustomShapeConfig> }>) => {
             const index = state.shapes.findIndex(s => s.id === action.payload.id);
             if (index !== -1) {
                 Object.assign(state.shapes[index], {...state.shapes[index], ...action.payload.updatedProps});
@@ -135,7 +135,7 @@ const shapesSlice = createSlice({
 
 
         // 배치 작업을 위한 새 리듀서
-        batchUpdateShapes: (state, action: PayloadAction<Array<{ id: string; props: Partial<AnyNodeConfig> }>>) => {
+        batchUpdateShapes: (state, action: PayloadAction<Array<{ id: string; props: Partial<CustomShapeConfig> }>>) => {
             const updateMap = new Map(action.payload.map(update => [update.id, update.props]));
 
             Object.assign(state, {
@@ -152,7 +152,7 @@ const shapesSlice = createSlice({
             // });
             // state.lastUpdateTimestamp = Date.now();
         },
-        updateMultipleShapes: (state, action: PayloadAction<{ id: string; props: Partial<AnyNodeConfig> }[]>) => {
+        updateMultipleShapes: (state, action: PayloadAction<{ id: string; props: Partial<CustomShapeConfig> }[]>) => {
             // action.payload.forEach(update => {
             //     const index = state.shapes.findIndex(s => s.id === update.id);
             //     if (index !== -1) {
@@ -174,7 +174,7 @@ const shapesSlice = createSlice({
             state.selectedShapeIds = [];
             state.isGroupSelected = false;
         },
-        setAllShapes: (state, action: PayloadAction<AnyNodeConfig[]>) => {
+        setAllShapes: (state, action: PayloadAction<CustomShapeConfig[]>) => {
             Object.assign(state, {
                 shapes: action.payload.map((s, i) => ({
                     ...s,
@@ -204,6 +204,23 @@ const shapesSlice = createSlice({
             state.selectedShapeIds = action.payload;
             state.isGroupSelected = true;
         },
+        selectAllShapes: (state) => {
+            // 모든 가시적이고 잠기지 않은 도형들의 ID를 수집
+            const selectableIds = state.shapes
+                .filter(shape =>
+                    shape.visible !== false && // 보이는 도형만
+                    !shape.isLocked &&         // 잠기지 않은 도형만
+                    shape.id                   // ID가 있는 도형만
+                )
+                .map(shape => shape.id!)
+                .filter(Boolean);            // undefined 제거
+
+            // 선택 가능한 도형이 있으면 모두 선택
+            if (selectableIds.length > 0) {
+                state.selectedShapeIds = selectableIds;
+            }
+        },
+
         unselectShape: (state, action: PayloadAction<string>) => {
             state.selectedShapeIds = state.selectedShapeIds.filter(id => id !== action.payload);
         },
@@ -237,7 +254,7 @@ const shapesSlice = createSlice({
             const updateMap = new Map(updates.map(update => [update.id, update.props]));
 
             // 그룹 노드 생성
-            const groupNode: AnyNodeConfig = {
+            const groupNode: CustomShapeConfig = {
                 id: groupId,
                 parentId: null,
                 type: 'group',
@@ -247,7 +264,7 @@ const shapesSlice = createSlice({
                 listening: false,
                 visible: true,
                 isLocked: false,
-            } as AnyNodeConfig;
+            } as CustomShapeConfig;
 
             Object.assign(state, {
                 shapes: [
@@ -346,6 +363,7 @@ export const {
     setAllShapes,
     selectShape,
     selectGroup,
+    selectAllShapes,
     unselectShape,
     unselectAllShapes,
     toggleShapeVisibility,

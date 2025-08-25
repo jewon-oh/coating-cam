@@ -1,5 +1,5 @@
 // G-Code 생성에 필요한 커스텀 도형, 설정, 스니펫 타입들을 가져옵니다.
-import {AnyNodeConfig} from '@/types/custom-konva-config';
+import {CustomShapeConfig} from '@/types/custom-konva-config';
 import {GcodeSettings, GCodeSnippet, GCodeHook} from '@/types/gcode';
 import {GCodeEmitter} from "@/lib/gcode/gcode-emitter";
 import {PathGenerator} from "@/lib/gcode/path-generator";
@@ -9,14 +9,14 @@ import {ProgressCallback} from "@/lib/gcode/progress-callback";
 /**
  * Generates G-code for coating based on the provided shapes, settings, and work area dimensions.
  *
- * @param {AnyNodeConfig[]} shapes - An array of shape configurations defining the geometry to be coated.
+ * @param {CustomShapeConfig[]} shapes - An array of shape configurations defining the geometry to be coated.
  * @param {GcodeSettings} settings - The G-code configuration settings for generation.
  * @param {{ width: number, height: number }} workArea - The dimensions of the work area to constrain the generated paths.
  * @param {ProgressCallback} [onProgress] - Optional callback function invoked to report progress during path generation.
  * @return {Promise<string>} A promise that resolves to the generated G-code as a string.
  */
 export async function generateCoatingGCode(
-    shapes: AnyNodeConfig[],
+    shapes: CustomShapeConfig[],
     settings: GcodeSettings,
     workArea: { width: number; height: number },
     onProgress?: ProgressCallback
@@ -81,7 +81,7 @@ function emit(snippets: GCodeSnippet[], hook: GCodeHook, vars: Vars): string {
  * @returns 최종 G-code 문자열
  */
 export async function generateGcode(
-    shapes: AnyNodeConfig[],
+    shapes: CustomShapeConfig[],
     settings: GcodeSettings,
     workArea: { width: number; height: number },
     snippets: GCodeSnippet[],

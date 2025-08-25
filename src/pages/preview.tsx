@@ -9,7 +9,7 @@ import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components
 import {Slider} from '@/components/ui/slider';
 import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause} from 'lucide-react';
 import Preview3D, {PathPoint} from '@/components/3d-preview';
-import {AnyNodeConfig} from "@/types/custom-konva-config";
+import {CustomShapeConfig} from "@/types/custom-konva-config";
 
 /**
  * G0/G1 라인에서 좌표 추출
@@ -86,7 +86,7 @@ export default function PreviewPage() {
 
     // 이미지 shapes만 필터링
     const imageShapes = useMemo(() =>
-            shapes.filter((shape): shape is Extract<AnyNodeConfig, { type: 'image' }> =>
+            shapes.filter((shape): shape is Extract<CustomShapeConfig, { type: 'image' }> =>
                 shape.type === 'image'
             ),
         [shapes]

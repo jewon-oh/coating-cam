@@ -1,4 +1,4 @@
-import { AnyNodeConfig } from '@/types/custom-konva-config';
+import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { GcodeSettings } from '@/types/gcode';
 import { Point } from '@/lib/gcode/point';
 import { MaskingManager } from "@/lib/gcode/mask-manager";
@@ -20,7 +20,7 @@ export class PathCalculator {
     /**
      * 메인 계산 메서드 - 단순화된 접근
      */
-    public async calculateForShape(boundary: AnyNodeConfig): Promise<{ start: Point; end: Point }[]> {
+    public async calculateForShape(boundary: CustomShapeConfig): Promise<{ start: Point; end: Point }[]> {
         if (boundary.coatingType === 'fill') {
             return this.calculateFillSegments(boundary);
         } else if (boundary.coatingType === 'outline') {
@@ -32,7 +32,7 @@ export class PathCalculator {
     /**
      * Fill 세그먼트 계산 - 대폭 단순화
      */
-    private async calculateFillSegments(boundary: AnyNodeConfig): Promise<{ start: Point; end: Point }[]> {
+    private async calculateFillSegments(boundary: CustomShapeConfig): Promise<{ start: Point; end: Point }[]> {
         const lineSpacing = this.getLineSpacing(boundary);
         const pattern = this.getFillPattern(boundary);
         const bounds = this.getBounds(boundary);
@@ -51,7 +51,7 @@ export class PathCalculator {
      * 간단한 Auto 패턴 결정 - 복잡한 분석 제거
      */
     private async determineSimpleOptimalPattern(
-        boundary: AnyNodeConfig,
+        boundary: CustomShapeConfig,
         bounds: { x: number; y: number; width: number; height: number }
     ): Promise<'horizontal' | 'vertical'> {
         // 마스킹이 없으면 단순한 휴리스틱
@@ -76,7 +76,7 @@ export class PathCalculator {
      * 간단한 마스크 밀도 샘플링
      */
     private async sampleMaskDensity(
-        boundary: AnyNodeConfig,
+        boundary: CustomShapeConfig,
         bounds: { x: number; y: number; width: number; height: number },
         gridSize: number
     ): Promise<number> {
@@ -107,7 +107,7 @@ export class PathCalculator {
      * 스트리밍 Fill 세그먼트 생성 - 메모리 효율적
      */
     private async generateStreamingFillSegments(
-        boundary: AnyNodeConfig,
+        boundary: CustomShapeConfig,
         bounds: { x: number; y: number; width: number; height: number },
         pattern: 'horizontal' | 'vertical',
         lineSpacing: number
@@ -128,7 +128,7 @@ export class PathCalculator {
      * 수평 라인 생성 - Snake 패턴 적용
      */
     private async generateHorizontalLines(
-        boundary: AnyNodeConfig,
+        boundary: CustomShapeConfig,
         bounds: { x: number; y: number; width: number; height: number },
         lineSpacing: number,
         coatingWidth: number,
@@ -171,7 +171,7 @@ export class PathCalculator {
      * 수직 라인 생성 - Snake 패턴 적용
      */
     private async generateVerticalLines(
-        boundary: AnyNodeConfig,
+        boundary: CustomShapeConfig,
         bounds: { x: number; y: number; width: number; height: number },
         lineSpacing: number,
         coatingWidth: number,
@@ -213,7 +213,7 @@ export class PathCalculator {
     /**
      * Outline 세그먼트 계산 - 기존 로직 유지하되 단순화
      */
-    private calculateOutlineSegments(boundary: AnyNodeConfig): { start: Point; end: Point }[] {
+    private calculateOutlineSegments(boundary: CustomShapeConfig): { start: Point; end: Point }[] {
         const segments: { start: Point; end: Point }[] = [];
         const outlineOffset = this.getLineSpacing(boundary);
         const passes = this.getOutlinePasses(boundary);
@@ -233,26 +233,26 @@ export class PathCalculator {
     // 기존의 헬퍼 메서드들 유지 (getBounds, generateRectangleOutline 등)
     // 하지만 복잡한 분석 메서드들은 제거
 
-    private getLineSpacing(shape: AnyNodeConfig): number {
+    private getLineSpacing(shape: CustomShapeConfig): number {
         return shape.lineSpacing ?? this.settings.lineSpacing;
     }
 
-    private getFillPattern(shape: AnyNodeConfig): 'horizontal' | 'vertical' | 'auto' {
+    private getFillPattern(shape: CustomShapeConfig): 'horizontal' | 'vertical' | 'auto' {
         return shape.fillPattern ?? this.settings.fillPattern;
     }
 
-    private getCoatingWidth(shape: AnyNodeConfig): number {
+    private getCoatingWidth(shape: CustomShapeConfig): number {
         return shape.coatingWidth ?? this.settings.coatingWidth;
     }
 
-    private getOutlinePasses(shape: AnyNodeConfig): number {
+    private getOutlinePasses(shape: CustomShapeConfig): number {
         if (shape.coatingType === 'outline' && typeof shape.outlinePasses === 'number' && shape.outlinePasses > 0) {
             return shape.outlinePasses;
         }
         return 1;
     }
 
-    private getOutlineStartPoint(shape: AnyNodeConfig): 'outside' | 'center' | 'inside' {
+    private getOutlineStartPoint(shape: CustomShapeConfig): 'outside' | 'center' | 'inside' {
         if (shape.coatingType === 'outline' && shape.outlineStartPoint) {
             return shape.outlineStartPoint;
         }
@@ -260,7 +260,7 @@ export class PathCalculator {
     }
 
     // 기존 메서드들 유지하되 간소화...
-    private getBounds(shape: AnyNodeConfig): { x: number; y: number; width: number; height: number } | null {
+    private getBounds(shape: CustomShapeConfig): { x: number; y: number; width: number; height: number } | null {
         if (shape.type === 'rectangle' || shape.type === 'image') {
             return {
                 x: shape.x ?? 0,
@@ -281,7 +281,7 @@ export class PathCalculator {
         return null;
     }
 
-    private isPointInBoundary(point: Point, boundary: AnyNodeConfig): boolean {
+    private isPointInBoundary(point: Point, boundary: CustomShapeConfig): boolean {
         if (boundary.type === 'rectangle' || boundary.type === 'image') {
             const x = boundary.x ?? 0;
             const y = boundary.y ?? 0;
@@ -302,7 +302,7 @@ export class PathCalculator {
         return false;
     }
 
-    private getHorizontalLineSegmentsInBounds(y: number, boundary: AnyNodeConfig): { start: Point; end: Point }[] {
+    private getHorizontalLineSegmentsInBounds(y: number, boundary: CustomShapeConfig): { start: Point; end: Point }[] {
         const bounds = this.getBounds(boundary);
         if (!bounds) return [];
 
@@ -325,7 +325,7 @@ export class PathCalculator {
         return [];
     }
 
-    private getVerticalLineSegmentsInBounds(x: number, boundary: AnyNodeConfig): { start: Point; end: Point }[] {
+    private getVerticalLineSegmentsInBounds(x: number, boundary: CustomShapeConfig): { start: Point; end: Point }[] {
         const bounds = this.getBounds(boundary);
         if (!bounds) return [];
 
@@ -349,7 +349,7 @@ export class PathCalculator {
     }
 
     // 기존의 outline 관련 메서드들도 유지...
-    private generateRectangleOutline(shape: AnyNodeConfig, offset: number, passes: number, startPoint: 'outside' | 'center' | 'inside'): { start: Point; end: Point }[] {
+    private generateRectangleOutline(shape: CustomShapeConfig, offset: number, passes: number, startPoint: 'outside' | 'center' | 'inside'): { start: Point; end: Point }[] {
         // 기존 구현 유지
         const segments: { start: Point; end: Point }[] = [];
         const x = shape.x ?? 0;
@@ -392,7 +392,7 @@ export class PathCalculator {
     }
 
 
-    private generateCircleOutline(shape: AnyNodeConfig, offset: number, passes: number, startPoint: 'outside' | 'center' | 'inside'): { start: Point; end: Point }[] {
+    private generateCircleOutline(shape: CustomShapeConfig, offset: number, passes: number, startPoint: 'outside' | 'center' | 'inside'): { start: Point; end: Point }[] {
         const segments: { start: Point; end: Point }[] = [];
         const centerX = shape.x ?? 0;
         const centerY = shape.y ?? 0;
@@ -431,7 +431,7 @@ export class PathCalculator {
         return segments;
     }
 
-    private generateImageOutline(shape: AnyNodeConfig, offset: number, passes: number, startPoint: 'outside' | 'center' | 'inside'): { start: Point; end: Point }[] {
+    private generateImageOutline(shape: CustomShapeConfig, offset: number, passes: number, startPoint: 'outside' | 'center' | 'inside'): { start: Point; end: Point }[] {
         // 이미지는 사각형으로 처리
         return this.generateRectangleOutline(shape, offset, passes, startPoint);
     }

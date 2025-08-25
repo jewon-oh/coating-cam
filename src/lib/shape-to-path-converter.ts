@@ -1,4 +1,4 @@
-import { AnyNodeConfig } from '@/types/custom-konva-config';
+import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { GcodeSettings } from '@/types/gcode';
 import { PathSegment, PathGroup } from '@/types/gcode-path';
 import { PathGenerator } from '@/lib/gcode/path-generator';
@@ -18,7 +18,7 @@ export class ShapeToPathConverter {
     /**
      * Shape들을 PathGroup들로 변환
      */
-    async convertShapesToPaths(shapes: AnyNodeConfig[]): Promise<PathGroup[]> {
+    async convertShapesToPaths(shapes: CustomShapeConfig[]): Promise<PathGroup[]> {
         const pathGroups: PathGroup[] = [];
 
         // 각 shape를 개별 PathGroup으로 변환
@@ -36,7 +36,7 @@ export class ShapeToPathConverter {
     /**
      * 단일 Shape를 PathGroup으로 변환
      */
-    private async convertShapeToPathGroup(shape: AnyNodeConfig, index: number): Promise<PathGroup | null> {
+    private async convertShapeToPathGroup(shape: CustomShapeConfig, index: number): Promise<PathGroup | null> {
         try {
             // PathGenerator를 사용하여 경로 계산
             const pathGenerator = new PathGenerator(this.settings, this.workArea, [shape]);
@@ -71,7 +71,7 @@ export class ShapeToPathConverter {
     /**
      * Shape로부터 실제 경로 세그먼트를 추출
      */
-    private async extractSegmentsFromShape(shape: AnyNodeConfig): Promise<Array<{
+    private async extractSegmentsFromShape(shape: CustomShapeConfig): Promise<Array<{
         start: { x: number; y: number };
         end: { x: number; y: number };
         type: 'G0' | 'G1';
@@ -94,7 +94,7 @@ export class ShapeToPathConverter {
     /**
      * 사각형 경로 생성
      */
-    private generateRectangleSegments(shape: AnyNodeConfig): Array<{
+    private generateRectangleSegments(shape: CustomShapeConfig): Array<{
         start: { x: number; y: number };
         end: { x: number; y: number };
         type: 'G0' | 'G1';
@@ -137,7 +137,7 @@ export class ShapeToPathConverter {
     /**
      * 원 경로 생성
      */
-    private generateCircleSegments(shape: AnyNodeConfig): Array<{
+    private generateCircleSegments(shape: CustomShapeConfig): Array<{
         start: { x: number; y: number };
         end: { x: number; y: number };
         type: 'G0' | 'G1';
@@ -176,7 +176,7 @@ export class ShapeToPathConverter {
     /**
      * 이미지 경로 생성 (외곽선만)
      */
-    private generateImageSegments(shape: AnyNodeConfig): Array<{
+    private generateImageSegments(shape: CustomShapeConfig): Array<{
         start: { x: number; y: number };
         end: { x: number; y: number };
         type: 'G0' | 'G1';
@@ -188,7 +188,7 @@ export class ShapeToPathConverter {
     /**
      * Shape 타입에 따른 색상 반환
      */
-    private getShapeColor(shape: AnyNodeConfig): string {
+    private getShapeColor(shape: CustomShapeConfig): string {
         switch (shape.type) {
             case 'rectangle': return '#3b82f6'; // 파란색
             case 'circle': return '#10b981'; // 초록색

@@ -1,5 +1,5 @@
 import { GcodeSettings } from "@/types/gcode";
-import { AnyNodeConfig } from "@/types/custom-konva-config";
+import { CustomShapeConfig } from "@/types/custom-konva-config";
 import { GCodeEmitter } from "@/lib/gcode/gcode-emitter";
 import { ProgressCallback } from "@/lib/gcode/progress-callback";
 import { PathCalculator } from "@/lib/gcode/path-calculator";
@@ -9,7 +9,7 @@ import { PathOptimizer } from "@/lib/gcode/path-optimizer";
 /**
  * 도형이 코팅에서 제외되어야 하는지 확인합니다.
  */
-function shouldSkipCoating(shape: Partial<AnyNodeConfig>): boolean {
+function shouldSkipCoating(shape: Partial<CustomShapeConfig>): boolean {
     return shape.skipCoating === true;
 }
 
@@ -19,14 +19,14 @@ function shouldSkipCoating(shape: Partial<AnyNodeConfig>): boolean {
  */
 export class PathGenerator {
     private readonly settings: GcodeSettings;
-    private readonly coatingShapes: AnyNodeConfig[];
+    private readonly coatingShapes: CustomShapeConfig[];
 
     // 모듈 인스턴스
     private readonly calculator: PathCalculator;
     private readonly masker: MaskingManager;
     private readonly optimizer: PathOptimizer;
 
-    constructor(settings: GcodeSettings, workArea: { width: number; height: number }, shapes: AnyNodeConfig[]) {
+    constructor(settings: GcodeSettings, workArea: { width: number; height: number }, shapes: CustomShapeConfig[]) {
         this.settings = settings;
         // 코팅에서 제외되지 않은 도형들만 필터링
         const activeShapes = shapes.filter(s => !shouldSkipCoating(s));
@@ -36,7 +36,7 @@ export class PathGenerator {
             return s.coatingType === 'fill' || s.coatingType === 'outline';
         });
 
-        let maskShapes: AnyNodeConfig[] = [];
+        let maskShapes: CustomShapeConfig[] = [];
         if (settings.enableMasking) {
             // 마스킹 도형들: 코팅 경로에 장애물 역할을 하는 도형들
             maskShapes = activeShapes.filter((s) => {

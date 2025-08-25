@@ -12,7 +12,7 @@ import {
 } from '@/store/slices/shapes-slice';
 import {setPresent} from '@/store/slices/history-slice';
 import {setTool} from '@/store/slices/tool-slice';
-import type {AnyNodeConfig} from '@/types/custom-konva-config';
+import type {CustomShapeConfig} from '@/types/custom-konva-config';
 import {useSettings} from '@/contexts/settings-context';
 import {StageState} from "@/contexts/canvas-context";
 
@@ -27,7 +27,7 @@ export function useShapeLayerInteractions(
 ) {
     const dispatch = useAppDispatch();
     const {shapes, selectedShapeIds} = useAppSelector((state) => state.shapes);
-    const tool = useAppSelector((state) => state.tool.tool) as Tool;
+    const {tool,defaultCoatingType} = useAppSelector((state) => state.tool);
     const {isSnappingEnabled, gridSize,gcodeSettings} = useSettings();
 
     // 최신 스냅샷 저장용
@@ -248,8 +248,8 @@ export function useShapeLayerInteractions(
     }, [dispatch, selectedShapeIds]);
 
     // 클립보드: 도형 배열 또는 그룹 번들
-    type ClipboardGroupsPayload = { kind: 'groups'; groups: Array<{ group: AnyNodeConfig; members: AnyNodeConfig[] }> };
-    type ClipboardShapesPayload = { kind: 'shapes'; items: AnyNodeConfig[] };
+    type ClipboardGroupsPayload = { kind: 'groups'; groups: Array<{ group: CustomShapeConfig; members: CustomShapeConfig[] }> };
+    type ClipboardShapesPayload = { kind: 'shapes'; items: CustomShapeConfig[] };
     type ClipboardPayload = ClipboardGroupsPayload | ClipboardShapesPayload | null;
     const clipboardRef = useRef<ClipboardPayload>(null);
 
@@ -262,15 +262,15 @@ export function useShapeLayerInteractions(
         }
 
         // Build children map to compute group memberships (descendants)
-        const childrenByParent = new Map<string | null, AnyNodeConfig[]>();
+        const childrenByParent = new Map<string | null, CustomShapeConfig[]>();
         current.forEach(s => {
             const p = s.parentId || null;
             const arr = childrenByParent.get(p) || [];
             arr.push(s);
             childrenByParent.set(p, arr);
         });
-        const collectDescendants = (parentId: string): AnyNodeConfig[] => {
-            const out: AnyNodeConfig[] = [];
+        const collectDescendants = (parentId: string): CustomShapeConfig[] => {
+            const out: CustomShapeConfig[] = [];
             const stack: string[] = [parentId];
             while (stack.length) {
                 const pid = stack.pop()!;
@@ -287,7 +287,7 @@ export function useShapeLayerInteractions(
         // Try to detect if the selection matches one or more whole groups
         const groups = current.filter(s => s.type === 'group');
         const remaining = new Set(selectedSet);
-        const matchedGroups: Array<{ group: AnyNodeConfig; members: AnyNodeConfig[] }> = [];
+        const matchedGroups: Array<{ group: CustomShapeConfig; members: CustomShapeConfig[] }> = [];
         for (const g of groups) {
             const members = collectDescendants(g.id!);
             if (members.length === 0) continue;
@@ -325,14 +325,14 @@ export function useShapeLayerInteractions(
         const base = shapesRef.current || [];
 
         if (payload.kind === 'groups') {
-            const additions: AnyNodeConfig[] = [];
+            const additions: CustomShapeConfig[] = [];
             const newSelectIds: string[] = [];
             for (const {group, members} of payload.groups as Array<{
-                group: AnyNodeConfig;
-                members: AnyNodeConfig[]
+                group: CustomShapeConfig;
+                members: CustomShapeConfig[]
             }>) {
                 const newGroupId = crypto.randomUUID();
-                const newGroup: AnyNodeConfig = {
+                const newGroup: CustomShapeConfig = {
                     id: newGroupId,
                     parentId: null,
                     type: 'group',
@@ -340,23 +340,23 @@ export function useShapeLayerInteractions(
                     listening: false,
                     visible: true,
                     x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1,
-                } as AnyNodeConfig;
+                } as CustomShapeConfig;
                 additions.push(newGroup);
                 for (const m of members) {
                     const newId = crypto.randomUUID();
-                    const dup: AnyNodeConfig = {
+                    const dup: CustomShapeConfig = {
                         ...m,
                         id: newId,
                         parentId: newGroupId,
                         name: `${m.name || m.type} Copy`,
                         x: (m.x || 0) + 20,
                         y: (m.y || 0) + 20,
-                    } as AnyNodeConfig;
+                    } as CustomShapeConfig;
                     additions.push(dup);
                     newSelectIds.push(newId);
                 }
             }
-            const next = [...base, ...additions] as AnyNodeConfig[];
+            const next = [...base, ...additions] as CustomShapeConfig[];
             dispatch(setAllShapes(next));
             dispatch(setPresent(next));
             dispatch(selectGroup(newSelectIds));
@@ -364,14 +364,14 @@ export function useShapeLayerInteractions(
         }
 
         if (payload.kind === 'shapes') {
-            const pasted = (payload.items as AnyNodeConfig[]).map((s) => ({
+            const pasted = (payload.items as CustomShapeConfig[]).map((s) => ({
                 ...s,
                 id: crypto.randomUUID(),
                 name: `${s.name} Copy`,
                 x: (s.x || 0) + 20,
                 y: (s.y || 0) + 20,
             }));
-            const next = [...base, ...pasted] as AnyNodeConfig[];
+            const next = [...base, ...pasted] as CustomShapeConfig[];
             dispatch(setAllShapes(next));
             dispatch(setPresent(next));
             dispatch(selectGroup(pasted.map((p) => p.id!)));
@@ -509,8 +509,10 @@ export function useShapeLayerInteractions(
         if (!stage) {
             return;
         }
-
-        stopPan(stage);
+        if (isPanning) {
+            stopPan(stage);
+            return;
+        }
 
         // 박스 선택 종료
         if (isDragSelectingRef.current && dragSelectStartClientRef.current && tool === 'select') {
@@ -550,7 +552,7 @@ export function useShapeLayerInteractions(
                         const width = Math.abs(ept.x - s.x);
                         const height = Math.abs(ept.y - s.y);
 
-                        const rect: AnyNodeConfig = {
+                        const rect: CustomShapeConfig = {
                             id: crypto.randomUUID(),
                             parentId: null,
                             type: 'rectangle',
@@ -563,8 +565,9 @@ export function useShapeLayerInteractions(
                             listening: false,
                             visible: true,
                             isLocked: false,
+                            coatingType: defaultCoatingType,
                         };
-                        const next = [...shapesRef.current, rect] as AnyNodeConfig[];
+                        const next = [...shapesRef.current, rect] as CustomShapeConfig[];
                         dispatch(addShape(rect));
                         dispatch(setPresent(next));
                     } else if (tool === 'circle') {
@@ -572,7 +575,7 @@ export function useShapeLayerInteractions(
                         const cy = (s.y + ept.y) / 2;
                         const r = Math.max(Math.abs(ept.x - s.x), Math.abs(ept.y - s.y)) / 2;
 
-                        const circle: AnyNodeConfig = {
+                        const circle: CustomShapeConfig = {
                             id: crypto.randomUUID(),
                             parentId: null,
                             type: 'circle',
@@ -587,8 +590,10 @@ export function useShapeLayerInteractions(
                             listening: false,
                             visible: true,
                             isLocked: false,
+                            coatingType: defaultCoatingType,
+
                         };
-                        const next = [...shapesRef.current, circle] as AnyNodeConfig[];
+                        const next = [...shapesRef.current, circle] as CustomShapeConfig[];
                         dispatch(addShape(circle));
                         dispatch(setPresent(next));
                     }
@@ -596,9 +601,7 @@ export function useShapeLayerInteractions(
                 dispatch(setTool('select'));
             }
         }
-
-        stopPan(stage);
-    }, [tool, stopPan, getPointerClient, updateSelectionRect, performDragSelection, destroyTempShape, dispatch, snapPoint, toStagePoint]);
+    }, [isPanning, tool, stopPan, getPointerClient, updateSelectionRect, performDragSelection, destroyTempShape, dispatch, snapPoint, toStagePoint, defaultCoatingType]);
 
     const handleMouseLeave = useCallback((e: KonvaEventObject<MouseEvent>) => {
         const stage = e.target.getStage();
@@ -648,7 +651,7 @@ export function useShapeLayerInteractions(
         }
 
         // 위치 업데이트 및 히스토리 기록 로직 (위와 동일)
-        const updates: { id: string; props: Partial<AnyNodeConfig> }[] = [];
+        const updates: { id: string; props: Partial<CustomShapeConfig> }[] = [];
 
         if (selectedShapeIds.includes(shape.id!)) {
             selectedShapeIds.forEach(shapeId => {
@@ -690,8 +693,7 @@ export function useShapeLayerInteractions(
 
     }, [dispatch, selectedShapeIds]);
 
-
-    // Stage 전용 드래그 시작 핸들러 (그리기 용)
+    // Stage 전용 드래그 시작 핸들러
     const handleStageDragStart = useCallback((e: KonvaEventObject<MouseEvent>, layerRef?: React.RefObject<Konva.Layer | null>) => {
         const stage = e.target.getStage();
         if (!stage) return;
@@ -701,17 +703,8 @@ export function useShapeLayerInteractions(
 
         const client = getPointerClient(stage);
         if (!client) return;
-
-
-        // 그리기 시작
-        if ((tool === 'circle' || tool === 'rectangle') && e.target === stage) {
-            isDrawingRef.current = true;
-            drawStartClientRef.current = client;
-            const sp = snapPoint(toStagePoint(stage, client));
-            createTempShape(tool, layer, sp.x, sp.y);
-            return;
-        }
-    }, [createTempShape, getPointerClient, snapPoint, toStagePoint, tool]);
+        
+    }, [getPointerClient]);
 
     // Stage 전용 드래그 이동 핸들러
     const handleStageDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
@@ -729,39 +722,12 @@ export function useShapeLayerInteractions(
             }));
             return;
         }
-
-        // 박스 선택 중
-        if (isDragSelectingRef.current && dragSelectStartClientRef.current && tool === 'select') {
-            const cur = getPointerClient(stage);
-            if (!cur) return;
-
-            const s = toStagePoint(stage, dragSelectStartClientRef.current);
-            const c = toStagePoint(stage, cur);
-
-            const x = Math.min(s.x, c.x);
-            const y = Math.min(s.y, c.y);
-            const w = Math.abs(c.x - s.x);
-            const h = Math.abs(c.y - s.y);
-
-            updateSelectionRect(x, y, w, h, true);
-            return;
-        }
-
-        // 그리기 중
-        if (isDrawingRef.current && drawStartClientRef.current && (tool === 'circle' || tool === 'rectangle')) {
-            const cur = getPointerClient(stage);
-            if (!cur) return;
-            const s = toStagePoint(stage, drawStartClientRef.current);
-            const c = toStagePoint(stage, cur);
-            updateTempShape(s, c);
-            return;
-        }
-    }, [ isPanning, setStage, tool, toStagePoint, updateSelectionRect, getPointerClient, updateTempShape]);
+        
+    }, [isPanning, setStage]);
 
     const handleStageDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
         const stage = e.target.getStage();
         if (!stage) return;
-
 
         // 드래그 종료 시 최종 위치 동기화 후 패닝 종료
         if (isPanning) {
@@ -773,98 +739,7 @@ export function useShapeLayerInteractions(
             stopPan(stage);
         }
 
-        // 박스 선택 종료
-        if (isDragSelectingRef.current && dragSelectStartClientRef.current && tool === 'select') {
-            const endClient = getPointerClient(stage);
-            const startClient = dragSelectStartClientRef.current;
-
-            isDragSelectingRef.current = false;
-            dragSelectStartClientRef.current = null;
-
-            if (endClient) {
-                const dist = Math.hypot(endClient.x - startClient.x, endClient.y - startClient.y);
-                if (dist > 3) performDragSelection(startClient, endClient,stage);
-            }
-            updateSelectionRect(0, 0, 0, 0, false);
-            return;
-        }
-
-        // 그리기 종료 → 실제 도형 추가
-        if (isDrawingRef.current && drawStartClientRef.current && (tool === 'circle' || tool === 'rectangle')) {
-            const endClient = getPointerClient(stage);
-            const startClient = drawStartClientRef.current;
-
-            isDrawingRef.current = false;
-            drawStartClientRef.current = null;
-            destroyTempShape();
-
-            if (!endClient) {
-                dispatch(setTool('select'));
-                return;
-            }
-            const dist = Math.hypot(endClient.x - startClient.x, endClient.y - startClient.y);
-            if (dist <= 3) {
-                dispatch(setTool('select'));
-                return;
-            }
-
-            const s = snapPoint(toStagePoint(stage, startClient));
-            const e = snapPoint(toStagePoint(stage, endClient));
-
-            if (tool === 'rectangle') {
-                const x = Math.min(s.x, e.x);
-                const y = Math.min(s.y, e.y);
-                const width = Math.abs(e.x - s.x);
-                const height = Math.abs(e.y - s.y);
-
-                const rect: AnyNodeConfig = {
-                    id: crypto.randomUUID(),
-                    parentId: null,
-                    type: 'rectangle',
-                    name: 'Rectangle',
-                    x, y, width, height,
-                    // fill: 'rgba(59,130,246,0.5)',
-                    rotation: 0,
-                    scaleX: 1,
-                    scaleY: 1,
-                    isLocked: false,
-                    visible: true,
-                    coatingType: 'masking', // 기본은 마스킹
-                    coatingHeight: gcodeSettings.coatingHeight
-                };
-                const next = [...shapesRef.current, rect] as AnyNodeConfig[];
-                dispatch(addShape(rect));
-                dispatch(setPresent(next));
-            } else if (tool === 'circle') {
-                const cx = (s.x + e.x) / 2;
-                const cy = (s.y + e.y) / 2;
-                const r = Math.max(Math.abs(e.x - s.x), Math.abs(e.y - s.y)) / 2;
-
-                const circle: AnyNodeConfig = {
-                    id: crypto.randomUUID(),
-                    parentId: null,
-                    type: 'circle',
-                    name: 'Circle',
-                    x: cx,
-                    y: cy,
-                    radius: r,
-                    // fill: 'rgba(59,130,246,0.5)',
-                    rotation: 0,
-                    scaleX: 1,
-                    scaleY: 1,
-                    isLocked: false,
-                    visible: true,
-                    coatingType: 'masking', // 기본은 마스킹
-                    coatingHeight: gcodeSettings.coatingHeight
-                };
-                const next = [...shapesRef.current, circle] as AnyNodeConfig[];
-                dispatch(addShape(circle));
-                dispatch(setPresent(next));
-            }
-
-            dispatch(setTool('select'));
-        }
-    }, [destroyTempShape, dispatch, gcodeSettings.coatingHeight, getPointerClient, isPanning, performDragSelection, setStage, snapPoint, stopPan, toStagePoint, tool, updateSelectionRect])
+    }, [isPanning, setStage, stopPan])
 
     // 휠 줌: rAF 스로틀 + 스케일 클램프 (Stage 중심이 아닌 포인터 중심 줌)
     const rafIdRef = useRef<number | null>(null);
@@ -934,7 +809,7 @@ export function useShapeLayerInteractions(
                 .filter(pid => current.some(x => x.id === pid && x.type === 'group'))
         );
 
-        let next: AnyNodeConfig[];
+        let next: CustomShapeConfig[];
         const memberIds = selectedShapes.filter(s => s.type !== 'group').map(s => s.id!)
 
         if (existingGroupIds.size === 1) {
@@ -943,7 +818,7 @@ export function useShapeLayerInteractions(
             next = current.map(s => (memberIds.includes(s.id!) ? {
                 ...s,
                 parentId: targetGroupId
-            } : s)) as AnyNodeConfig[];
+            } : s)) as CustomShapeConfig[];
             dispatch(setAllShapes(next));
             dispatch(setPresent(next));
             dispatch(selectGroup(memberIds));
@@ -952,7 +827,7 @@ export function useShapeLayerInteractions(
 
         // Fallback: create a new logical group and move all selected into it
         const groupId = crypto.randomUUID();
-        const groupNode: AnyNodeConfig = {
+        const groupNode: CustomShapeConfig = {
             id: groupId,
             parentId: null,
             type: 'group' as const,
@@ -964,12 +839,12 @@ export function useShapeLayerInteractions(
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
-        } as unknown as AnyNodeConfig;
+        } as unknown as CustomShapeConfig;
 
         next = [...current.map(s => (memberIds.includes(s.id!) ? {
             ...s,
             parentId: groupId
-        } : s)), groupNode] as AnyNodeConfig[];
+        } : s)), groupNode] as CustomShapeConfig[];
         dispatch(setAllShapes(next));
         dispatch(setPresent(next));
         // Select member shapes rather than the logical group node (Transformer usability)

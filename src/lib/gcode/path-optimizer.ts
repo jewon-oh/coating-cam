@@ -1,5 +1,5 @@
 import { GcodeSettings } from '@/types/gcode';
-import { AnyNodeConfig } from '@/types/custom-konva-config';
+import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { Point } from '@/lib/gcode/point';
 import { ProgressCallback } from '@/lib/gcode/progress-callback';
 import { GCodeEmitter } from '@/lib/gcode/gcode-emitter';
@@ -7,7 +7,7 @@ import { GCodeEmitter } from '@/lib/gcode/gcode-emitter';
 /**
  * 개별 도형의 코팅 높이를 계산합니다.
  */
-function getCoatingHeight(shape: AnyNodeConfig, settings: GcodeSettings): number {
+function getCoatingHeight(shape: CustomShapeConfig, settings: GcodeSettings): number {
     if (typeof shape.coatingHeight === 'number') {
         return shape.coatingHeight;
     }
@@ -17,7 +17,7 @@ function getCoatingHeight(shape: AnyNodeConfig, settings: GcodeSettings): number
 /**
  * 개별 도형의 코팅 속도를 계산합니다.
  */
-function getCoatingSpeed(shape: AnyNodeConfig, settings: GcodeSettings): number {
+function getCoatingSpeed(shape: CustomShapeConfig, settings: GcodeSettings): number {
     if (typeof shape.coatingSpeed === 'number') {
         return shape.coatingSpeed;
     }
@@ -29,9 +29,9 @@ function getCoatingSpeed(shape: AnyNodeConfig, settings: GcodeSettings): number 
  */
 export class PathOptimizer {
     private readonly settings: GcodeSettings;
-    private readonly maskShapes: AnyNodeConfig[];
+    private readonly maskShapes: CustomShapeConfig[];
 
-    constructor(settings: GcodeSettings, maskShapes: AnyNodeConfig[]) {
+    constructor(settings: GcodeSettings, maskShapes: CustomShapeConfig[]) {
         this.settings = settings;
         this.maskShapes = maskShapes;
     }
@@ -42,7 +42,7 @@ export class PathOptimizer {
     public async optimizeAndEmit(
         segments: { start: Point; end: Point }[],
         emitter: GCodeEmitter,
-        coatingShape: AnyNodeConfig,
+        coatingShape: CustomShapeConfig,
         onProgress?: ProgressCallback
     ): Promise<void> {
         if (segments.length === 0) return;
@@ -151,7 +151,7 @@ export class PathOptimizer {
     /**
      * 여러 마스크가 충돌할 때 효과적인 회피 전략을 결정합니다.
      */
-    private getEffectiveAvoidanceStrategy(intersectedMasks: AnyNodeConfig[]): 'lift' | 'contour' {
+    private getEffectiveAvoidanceStrategy(intersectedMasks: CustomShapeConfig[]): 'lift' | 'contour' {
         // 단일 마스크인 경우 해당 마스크의 개별 설정 확인
         if (intersectedMasks.length === 1) {
             const mask = intersectedMasks[0];
@@ -299,7 +299,7 @@ export class PathOptimizer {
     /**
      * 단일 장애물에 대한 최적의 우회 경로를 계획합니다.
      */
-    private planDetourPath(start: Point, end: Point, obstacle: AnyNodeConfig): Point[] {
+    private planDetourPath(start: Point, end: Point, obstacle: CustomShapeConfig): Point[] {
         if (obstacle.type === 'rectangle') {
             const maskClearance = this.getMaskClearance(obstacle);
             const mx = (obstacle.x ?? 0) - maskClearance;
@@ -356,12 +356,12 @@ export class PathOptimizer {
     /**
      * 충돌하는 모든 마스킹 도형의 배열을 반환합니다.
      */
-    private findIntersectingMasks(start: Point, end: Point): AnyNodeConfig[] {
+    private findIntersectingMasks(start: Point, end: Point): CustomShapeConfig[] {
         if (!this.settings.enableMasking || this.maskShapes.length === 0) {
             return [];
         }
 
-        const intersectingMasks: AnyNodeConfig[] = [];
+        const intersectingMasks: CustomShapeConfig[] = [];
         for (const mask of this.maskShapes) {
             let intersects = false;
             if (mask.type === 'rectangle') {
@@ -385,7 +385,7 @@ export class PathOptimizer {
         return intersectingMasks;
     }
 
-    private getMaskClearance(mask: AnyNodeConfig): number {
+    private getMaskClearance(mask: CustomShapeConfig): number {
         if (mask.coatingType === 'masking' && typeof mask.maskingClearance === 'number') {
             return mask.maskingClearance + this.settings.coatingWidth / 2;
         }

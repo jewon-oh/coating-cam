@@ -5,7 +5,7 @@ import {useSettings} from "@/contexts/settings-context";
 import {Canvas} from "@react-three/fiber";
 import {OrbitControls, Grid, Text, OrthographicCamera} from "@react-three/drei";
 import * as THREE from 'three';
-import {AnyNodeConfig} from "@/types/custom-konva-config";
+import {CustomShapeConfig} from "@/types/custom-konva-config";
 import {useAppSelector} from "@/hooks/redux";
 
 
@@ -20,7 +20,7 @@ interface MotionBoard3DProps {
     toolheadPos: number[];         // [x,y,z,...]
     pathData?: PathPoint[];        // 전체 경로
     activeCount?: number;          // 현재 진행 지점(포함)까지의 포인트 개수
-    imageShapes?: Extract<AnyNodeConfig, { type: 'image' }>[];
+    imageShapes?: Extract<CustomShapeConfig, { type: 'image' }>[];
     orthographicView?:boolean;
 }
 
@@ -68,7 +68,7 @@ function MultipleCanvasImages({
                                   imageShapes = [],
                                   scaleFactor,
                               }: {
-    imageShapes: Extract<AnyNodeConfig, { type: 'image' }>[];
+    imageShapes: Extract<CustomShapeConfig, { type: 'image' }>[];
     scaleFactor: number;
 }) {
     const [textures, setTextures] = useState<Map<string, THREE.Texture>>(new Map());
@@ -374,7 +374,7 @@ const Preview3D = ({
     // Redux에서 직접 이미지 shapes를 가져옴
     const allShapes = useAppSelector((state) => state.shapes.shapes);
     const imageShapesFromRedux = useMemo(() =>
-            allShapes.filter((shape): shape is Extract<AnyNodeConfig, { type: 'image' }> =>
+            allShapes.filter((shape): shape is Extract<CustomShapeConfig, { type: 'image' }> =>
                 shape.type === 'image'
             ),
         [allShapes]

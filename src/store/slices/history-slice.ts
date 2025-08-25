@@ -1,13 +1,13 @@
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { AnyNodeConfig } from '@/types/custom-konva-config';
+import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { current, isDraft } from 'immer';
 
 // 히스토리 상태 타입 정의
 interface HistoryState {
-    past: AnyNodeConfig[][];
-    present: AnyNodeConfig[];
-    future: AnyNodeConfig[][];
+    past: CustomShapeConfig[][];
+    present: CustomShapeConfig[];
+    future: CustomShapeConfig[][];
     maxHistorySize: number;
     lastActionTimestamp: number;
 }
@@ -22,15 +22,15 @@ const initialState: HistoryState = {
 };
 
 // 유틸리티 함수들
-const createDeepCopy = (shapes: AnyNodeConfig[]): AnyNodeConfig[] => {
+const createDeepCopy = (shapes: CustomShapeConfig[]): CustomShapeConfig[] => {
     return shapes.map(shape => ({ ...shape }));
 };
 
-const trimHistoryArray = (array: AnyNodeConfig[][], maxSize: number): AnyNodeConfig[][] => {
+const trimHistoryArray = (array: CustomShapeConfig[][], maxSize: number): CustomShapeConfig[][] => {
     return array.length > maxSize ? array.slice(-maxSize) : array;
 };
 
-const areShapesEqual = (shapes1: AnyNodeConfig[], shapes2: AnyNodeConfig[]): boolean => {
+const areShapesEqual = (shapes1: CustomShapeConfig[], shapes2: CustomShapeConfig[]): boolean => {
     if (shapes1.length !== shapes2.length) return false;
 
     return shapes1.every((shape1, index) => {
@@ -38,7 +38,7 @@ const areShapesEqual = (shapes1: AnyNodeConfig[], shapes2: AnyNodeConfig[]): boo
         if (!shape2 || shape1.id !== shape2.id) return false;
 
         // 주요 속성들만 비교하여 성능 최적화
-        const keysToCompare: (keyof AnyNodeConfig)[] = [
+        const keysToCompare: (keyof CustomShapeConfig)[] = [
             'id', 'type', 'name', 'x', 'y', 'width', 'height', 'radius',
             'rotation', 'scaleX', 'scaleY', 'visible', 'listening', 'parentId'
         ];
@@ -91,7 +91,7 @@ const historySlice = createSlice({
             }
         },
 
-        setPresent: (state, action: PayloadAction<AnyNodeConfig[]>) => {
+        setPresent: (state, action: PayloadAction<CustomShapeConfig[]>) => {
             const newShapes = action.payload;
             const currentShapes = isDraft(state.present) ? current(state.present) : state.present;
 
@@ -117,7 +117,7 @@ const historySlice = createSlice({
             }
         },
 
-        resetHistory: (state, action: PayloadAction<AnyNodeConfig[]>) => {
+        resetHistory: (state, action: PayloadAction<CustomShapeConfig[]>) => {
             state.past = [];
             state.present = createDeepCopy(action.payload);
             state.future = [];
