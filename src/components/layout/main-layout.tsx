@@ -16,8 +16,7 @@ function MainHeader() {
     const [isSettingsOpen, setSettingsOpen] = useState(false);
 
     const navLinks = [
-        { href: '/workspace', label: '마스킹' },
-        { href: '/path-edit', label: '경로 확인' },
+        { href: '/workspace', label: '작업 공간' },
         { href: '/preview', label: '3D 미리보기' },
     ];
 

@@ -28,7 +28,7 @@ import {
     Palette,
     Move,
     Target,
-    SkipForward, Columns4, SquaresUnite, SquareX, Syringe
+    SkipForward, Columns4, SquaresUnite, SquareX, Syringe, MoveHorizontal, MoveVertical
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {ScrollArea} from "@/components/ui/scroll-area";
@@ -409,9 +409,8 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="global">전역 설정 사용</SelectItem>
-                                                    <SelectItem value="auto">자동</SelectItem>
-                                                    <SelectItem value="horizontal">수평</SelectItem>
-                                                    <SelectItem value="vertical">수직</SelectItem>
+                                                    <SelectItem value="horizontal"><MoveHorizontal size={16}/>수평</SelectItem>
+                                                    <SelectItem value="vertical"><MoveVertical size={16}/>수직</SelectItem>
                                                 </SelectContent>
                                             </Select>
 

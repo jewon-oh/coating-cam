@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PathSegment, PathGroup } from '@/types/gcode-path';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,20 +8,26 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { updatePathGroup, updateSegment } from '@/store/slices/path-slice';
 
-interface PathPropertiesPanelProps {
-    selectedSegment: PathSegment | null;
-    selectedGroup: PathGroup | null;
-    onSegmentUpdate: (segmentId: string, updates: Partial<PathSegment>) => void;
-    onGroupUpdate: (groupId: string, updates: Partial<PathGroup>) => void;
-}
+export function PathPropertyPanel() {
+    const dispatch = useAppDispatch();
 
-export function PathPropertiesPanel({
-                                        selectedSegment,
-                                        selectedGroup,
-                                        onSegmentUpdate,
-                                        onGroupUpdate
-                                    }: PathPropertiesPanelProps) {
+    // Redux 스토어에서 선택된 ID와 모든 그룹 가져오기
+    const { pathGroups, selectedGroupId, selectedSegmentId } = useAppSelector(state => state.paths);
+
+    // 상태로부터 선택된 항목 파생
+    const selectedGroup = useMemo(() => {
+        if (!selectedGroupId) return null;
+        return pathGroups.find(g => g.id === selectedGroupId) || null;
+    }, [pathGroups, selectedGroupId]);
+
+    const selectedSegment = useMemo(() => {
+        if (!selectedSegmentId || !selectedGroup) return null;
+        return selectedGroup.segments.find(s => s.id === selectedSegmentId) || null;
+    }, [selectedGroup, selectedSegmentId]);
+
     const [segmentForm, setSegmentForm] = useState<Partial<PathSegment>>({});
     const [groupForm, setGroupForm] = useState<Partial<PathGroup>>({});
 
@@ -40,14 +46,20 @@ export function PathPropertiesPanel({
     }, [selectedGroup]);
 
     const handleSegmentSubmit = () => {
-        if (selectedSegment && segmentForm) {
-            onSegmentUpdate(selectedSegment.id, segmentForm);
+        if (selectedSegment && selectedGroup && segmentForm) {
+            dispatch(updateSegment({
+                id: selectedGroup.id,
+                updates: segmentForm
+            }));
         }
     };
 
     const handleGroupSubmit = () => {
         if (selectedGroup && groupForm) {
-            onGroupUpdate(selectedGroup.id, groupForm);
+            dispatch(updatePathGroup({
+                id: selectedGroup.id,
+                updates: groupForm
+            }));
         }
     };
 

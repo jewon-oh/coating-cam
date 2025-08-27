@@ -114,8 +114,8 @@ type SettingsContextType = {
     setGridSize: (n: number) => void;
     isSnappingEnabled: boolean;
     setSnappingEnabled: (v: boolean) => void;
-    theme: ThemeMode;
-    setTheme: (t: ThemeMode) => void;
+    theme: 'light' | 'dark' | 'system';
+    setTheme: (t: 'light' | 'dark' | 'system') => void;
     workArea: { width: number; height: number };
     setWorkArea: (wa: { width: number; height: number }) => void;
 
@@ -155,7 +155,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
     const [isSnappingEnabled, setSnappingEnabled] = useState(
         DEFAULT_SETTINGS.grid.snapping
     );
-    const [theme, setTheme] = useState<ThemeMode>(DEFAULT_SETTINGS.theme);
+    const [theme, setTheme] = useState<"light" | "dark" | "system">(DEFAULT_SETTINGS.theme);
     const [workArea, setWorkArea] = useState(DEFAULT_SETTINGS.workArea);
 
     // G-Code 설정 상태 추가
@@ -190,7 +190,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
                 setGridVisible(!!settings.grid?.visible);
                 setGridSize(Number.isFinite(settings.grid?.size) ? settings.grid!.size : DEFAULT_SETTINGS.grid.size);
                 setSnappingEnabled(!!settings.grid?.snapping);
-                setTheme((settings.theme as ThemeMode) ?? DEFAULT_SETTINGS.theme);
+                setTheme((settings.theme) ?? DEFAULT_SETTINGS.theme);
                 setWorkArea(settings.workArea ?? DEFAULT_SETTINGS.workArea);
 
                 // G-Code 설정 로드

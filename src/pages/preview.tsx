@@ -8,7 +8,7 @@ import {ScrollArea} from '@/components/ui/scroll-area';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable';
 import {Slider} from '@/components/ui/slider';
 import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause} from 'lucide-react';
-import Preview3D, {PathPoint} from '@/components/3d-preview';
+import Preview3D, {PathPoint} from '@/components/preview-3d/preview-3d';
 import {CustomShapeConfig} from "@/types/custom-konva-config";
 
 /**
@@ -420,7 +420,6 @@ export default function PreviewPage() {
                                         pathData={localPathData}                 // 전체 경로 그대로 전달
                                         activeCount={Math.min(step + 1, localPathData.length)} // 진행 개수만 전달
                                         imageShapes={imageShapes} // 여러 이미지 전달
-                                        orthographicView={true}
                                     />
                                 ) : (
                                     <div className="h-full flex items-center justify-center text-muted-foreground">

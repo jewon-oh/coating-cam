@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useRef, RefObject, useState, useEffect, useMemo, useCallback } from 'react';
 import type Konva from 'konva';
 
@@ -30,6 +29,11 @@ interface CanvasContextValue {
     // 로딩 상태
     loading: LoadingState;
     setLoading: (loading: Partial<LoadingState>) => void;
+
+    // 포커스 상태
+    isCanvasFocused: boolean;
+    handleCanvasFocus: () => void;
+    handleCanvasBlur: () => void;
 
     // 유틸리티 메서드
     resetStage: () => void;
@@ -120,8 +124,6 @@ function useStageState() {
         });
     }, [setStage]);
 
-
-
     return { stage, setStage, resetStage, updateStageSize };
 }
 
@@ -136,8 +138,26 @@ function useLoadingState() {
         }, 0);
     }, []);
 
-
     return { loading, setLoading };
+}
+
+// === 커스텀 훅: 포커스 상태 관리 ===
+function useCanvasFocusState() {
+    const [isCanvasFocused, setIsCanvasFocused] = useState(false);
+
+    const handleCanvasFocus = useCallback(() => {
+        setIsCanvasFocused(true);
+    }, []);
+
+    const handleCanvasBlur = useCallback(() => {
+        setIsCanvasFocused(false);
+    }, []);
+
+    return {
+        isCanvasFocused,
+        handleCanvasFocus,
+        handleCanvasBlur
+    };
 }
 
 // === 커스텀 훅: 리사이즈 관리 ===
@@ -230,9 +250,10 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
     const stageRef = useRef<Konva.Stage>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-    // 상태 관리 훅
+    // 상태 관리 훅들
     const { stage, setStage, resetStage, updateStageSize } = useStageState();
     const { loading, setLoading } = useLoadingState();
+    const { isCanvasFocused, handleCanvasFocus, handleCanvasBlur } = useCanvasFocusState();
 
     // 리사이즈 관리
     useCanvasResize(canvasContainerRef, stageRef, updateStageSize);
@@ -245,9 +266,12 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
         setStage,
         loading,
         setLoading,
+        isCanvasFocused,
+        handleCanvasFocus,
+        handleCanvasBlur,
         resetStage,
         updateStageSize,
-    }), [stage, setStage, loading, setLoading, resetStage, updateStageSize]);
+    }), [stage, setStage, loading, setLoading, isCanvasFocused, handleCanvasFocus, handleCanvasBlur, resetStage, updateStageSize]);
 
     return (
         <CanvasContext.Provider value={contextValue}>
@@ -288,5 +312,16 @@ export function useCanvasLoading() {
         startLoading,
         stopLoading,
         setLoading,
+    };
+}
+
+// === 편의 훅: 포커스 상태만 사용하는 경우 ===
+export function useCanvasFocus() {
+    const { isCanvasFocused, handleCanvasFocus, handleCanvasBlur } = useCanvas();
+
+    return {
+        isCanvasFocused,
+        handleCanvasFocus,
+        handleCanvasBlur,
     };
 }

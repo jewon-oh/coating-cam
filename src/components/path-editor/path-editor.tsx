@@ -2,11 +2,11 @@
 
 import React, { useState, useCallback } from 'react';
 import { PathGroup, PathSegment } from '@/types/gcode-path';
-import { usePathEditor } from '@/hooks/use-path-layer-interactions';
+import { usePathEditor } from '@/hooks/use-path-events';
 import { PathCanvas } from './path-canvas';
 import { PathToolbar } from './path-toolbar';
 import { PathLayersPanel } from './path-layers-panel';
-import { PathPropertiesPanel } from './path-properties-panel';
+import { PathPropertyPanel } from './path-property-panel';
 import { PathToGcodeConverter } from '@/lib/gcode/path-to-gcode-converter';
 import { useSettings } from '@/contexts/settings-context';
 import { toast } from 'sonner';
@@ -154,7 +154,7 @@ export default function PathEditor({ initialPaths, onPathsChange, workArea }: Pa
 
     {/* 속성 패널 */}
     {showProperties && (
-        <PathPropertiesPanel
+        <PathPropertyPanel
             selectedSegment={selectedSegment}
         selectedGroup={selectedGroup}
         onSegmentUpdate={handleSegmentUpdate}

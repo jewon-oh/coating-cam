@@ -44,6 +44,8 @@ export type GCodeContextVars = {
     [key: string]: any;
 };
 
+export type FillPattern = 'horizontal' | 'vertical' | 'auto';
+
 export interface GcodeSettings {
     // 코팅 관련 설정
     coatingWidth: number;        // 코팅 폭 (mm)
@@ -56,7 +58,7 @@ export interface GcodeSettings {
     coatingHeight: number;       // 코팅 높이 (mm)
 
     // 패턴 설정
-    fillPattern: 'horizontal' | 'vertical' | 'auto';  // 채우기 패턴
+    fillPattern: FillPattern;  // 채우기 패턴
 
     // 마스킹 설정
     enableMasking: boolean;      // 마스킹 사용 여부

@@ -13,7 +13,7 @@ import {
     selectSelectedShapeIds,
     updateShape,
     selectShape,
-    selectGroup,
+    selectMultipleShapes,
     unselectAllShapes,
     ungroupShapes,
     removeShapes,
@@ -93,9 +93,9 @@ export const ObjectPanel = memo(() => {
             const memberIds = collectDescendantShapeIds(id);
 
             if (e.metaKey || e.ctrlKey) {
-                dispatch(selectGroup(Array.from(new Set([...selectedShapeIds, ...memberIds]))));
+                dispatch(selectMultipleShapes(Array.from(new Set([...selectedShapeIds, ...memberIds]))));
             } else {
-                dispatch(selectGroup(memberIds));
+                dispatch(selectMultipleShapes(memberIds));
             }
             return;
         }
@@ -119,7 +119,7 @@ export const ObjectPanel = memo(() => {
                         const shape = shapes.find(s => s.id === id);
                         return shape && shape.type !== 'group' && !shape.listening;
                     });
-                dispatch(selectGroup(rangeIds));
+                dispatch(selectMultipleShapes(rangeIds));
             }
         } else if (e.metaKey || e.ctrlKey) {
             // 다중 선택
@@ -128,7 +128,7 @@ export const ObjectPanel = memo(() => {
                 : [...selectedShapeIds, id];
 
             if (newSelection.length > 0) {
-                dispatch(selectGroup(newSelection));
+                dispatch(selectMultipleShapes(newSelection));
             } else {
                 dispatch(unselectAllShapes());
             }

@@ -200,7 +200,7 @@ const shapesSlice = createSlice({
             state.selectedShapeIds = [action.payload];
             state.isGroupSelected = false;
         },
-        selectGroup: (state, action: PayloadAction<string[]>) => {
+        selectMultipleShapes: (state, action: PayloadAction<string[]>) => {
             state.selectedShapeIds = action.payload;
             state.isGroupSelected = true;
         },
@@ -362,7 +362,7 @@ export const {
     removeShapes,
     setAllShapes,
     selectShape,
-    selectGroup,
+    selectMultipleShapes,
     selectAllShapes,
     unselectShape,
     unselectAllShapes,

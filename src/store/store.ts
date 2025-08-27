@@ -5,6 +5,7 @@ import historyReducer from './slices/history-slice';
 import toolReducer from './slices/tool-slice';
 import gcodeReducer from './slices/gcode-slice';
 import pathReducer from './slices/path-slice';
+import {historySyncListener} from "@/store/history-sync-listener";
 
 export const store = configureStore({
     reducer: {
@@ -21,7 +22,7 @@ export const store = configureStore({
                 ignoredActions: ['shapes/addShape', 'shapes/updateShape'],
                 ignoredPaths: ['shapes.shapes.image'],
             },
-        }),
+        }).prepend(historySyncListener.middleware),
     devTools: process.env.NODE_ENV !== 'production',
 });
 

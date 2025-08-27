@@ -10,7 +10,6 @@ import {
     splitSegment,
     setSelectedSegment,
     setSelectedGroup,
-    setSelectedEndpoint,
     setTool,
     undo,
     redo,
@@ -35,7 +34,7 @@ export function useReduxPathEditor() {
         isGenerating,
         lastModified,
         lastGeneratedFromShapes,
-    } = useSelector((state: RootState) => state.path);
+    } = useSelector((state: RootState) => state.paths);
 
     // 히스토리 상태
     const canUndo = historyIndex > 0;
