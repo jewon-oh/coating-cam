@@ -1,8 +1,8 @@
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 import type Konva from 'konva';
 import {useAppDispatch, useAppSelector} from '@/hooks/redux';
-import {batchUpdateShapes} from '@/store/slices/shapes-slice';
-import {setPresent} from '@/store/slices/history-slice';
+import {batchUpdateShapes} from '@/store/slices/shape-slice';
+import {setPresent} from '@/store/slices/shape-history-slice';
 import type {CustomShapeConfig} from '@/types/custom-konva-config';
 
 /**

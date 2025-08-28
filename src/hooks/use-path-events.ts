@@ -1,213 +1,229 @@
-import { useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '@/store';
-import {
-    setPathGroups,
-    updatePathGroups,
-    addSegment,
-    removeSegment,
-    updateSegment,
-    splitSegment,
-    setSelectedSegment,
-    setSelectedGroup,
-    setTool,
-    undo,
-    redo,
-    toggleGroupVisibility,
-    toggleGroupLock,
-    removePathGroup,
-    updatePathGroup,
-} from '@/store/slices/path-slice';
-import { PathGroup, PathSegment } from '@/types/gcode-path';
+import { useCallback, useState } from 'react';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { setSelectedPath } from '@/store/slices/path-slice';
 
-export function useReduxPathEditor() {
-    const dispatch = useDispatch<AppDispatch>();
+// Path 전용 기능별 훅들 (향후 구현 예정)
+import { usePathDrawing } from './path/use-path-drawing';
+import { usePathSelection } from './path/use-path-selection';
+import { usePathEditing } from './path/use-path-editing';
+import { usePathMovement } from './path/use-path-movement';
 
-    const {
-        pathGroups,
-        selectedSegmentId,
-        selectedGroupId,
-        selectedEndpoint,
-        tool,
-        history,
-        historyIndex,
-        isGenerating,
-        lastModified,
-        lastGeneratedFromShapes,
-    } = useSelector((state: RootState) => state.paths);
+export function usePathEvents() {
+    const dispatch = useAppDispatch();
+    const { tool } = useAppSelector((state) => state.tool);
+    const { pathGroups, selectedPathId } = useAppSelector((state) => state.paths);
 
-    // 히스토리 상태
-    const canUndo = historyIndex > 0;
-    const canRedo = historyIndex < history.length - 1;
+    // 임시 로컬 상태들 (향후 개별 훅으로 분리)
+    const [isDrawingPath, setIsDrawingPath] = useState(false);
+    const [isDragSelecting, setIsDragSelecting] = useState(false);
+    const [hasClipboardData, setHasClipboardData] = useState(false);
 
-    // Shape 변경 감지를 위한 shapes 상태
-    const { lastModified: shapesLastModified } = useSelector((state: RootState) => state.shapes);
-    const hasUnsavedChanges = lastGeneratedFromShapes !== null &&
-        shapesLastModified > lastGeneratedFromShapes;
+    // 향후 구현될 기능별 훅들
+    const drawing = usePathDrawing();
+    const selection = usePathSelection();
+    const editing = usePathEditing();
+    const movement = usePathMovement();
 
-    // 액션 핸들러들
-    const handleSetPathGroups = useCallback((pathGroups: PathGroup[]) => {
-        dispatch(setPathGroups(pathGroups));
-    }, [dispatch]);
+    // 마우스 이벤트 핸들러들
+    const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        console.log('usePathEvents: handleMouseDown', tool);
 
-    const handleUpdatePathGroups = useCallback((pathGroups: PathGroup[]) => {
-        dispatch(updatePathGroups(pathGroups));
-    }, [dispatch]);
+        switch (tool) {
+            case 'path-pen':
+                console.log('Path pen tool - drawing start');
+                setIsDrawingPath(true);
+                // drawing.startDrawing(e);
+                return;
 
-    const handleGroupSelect = useCallback((groupId: string) => {
-        dispatch(setSelectedGroup(groupId || null));
-    }, [dispatch]);
+            case 'path-line':
+                console.log('Path line tool - drawing start');
+                setIsDrawingPath(true);
+                // drawing.startLineDrawing(e);
+                return;
 
-    const handleSegmentSelect = useCallback((segmentId: string) => {
-        dispatch(setSelectedSegment(segmentId || null));
-    }, [dispatch]);
+            case 'path-select':
+                // selection.startDragSelection(e);
+                return;
 
-    const handleEndpointDrag = useCallback((
-        segmentId: string,
-        endpoint: 'start' | 'end',
-        newPos: { x: number; y: number }
-    ) => {
-        dispatch(updateSegment({
-            id: segmentId,
-            updates: { [endpoint]: newPos }
-        }));
-    }, [dispatch]);
-
-    const handleSegmentSplit = useCallback((segmentId: string, splitPoint: { x: number; y: number }) => {
-        dispatch(splitSegment({ segmentId, splitPoint }));
-    }, [dispatch]);
-
-    const handleSegmentMerge = useCallback((segmentId1: string, segmentId2: string) => {
-        // 병합 로직은 복잡하므로 별도 thunk로 구현하거나
-        // 여기서 직접 구현
-        const group = pathGroups.find(g =>
-            g.segments.some(s => s.id === segmentId1) &&
-            g.segments.some(s => s.id === segmentId2)
-        );
-
-        if (!group) return;
-
-        const seg1 = group.segments.find(s => s.id === segmentId1);
-        const seg2 = group.segments.find(s => s.id === segmentId2);
-
-        if (!seg1 || !seg2) return;
-
-        // 연결 가능한지 확인
-        const canMerge = (
-            (Math.abs(seg1.end.x - seg2.start.x) < 0.01 && Math.abs(seg1.end.y - seg2.start.y) < 0.01) ||
-            (Math.abs(seg1.start.x - seg2.end.x) < 0.01 && Math.abs(seg1.start.y - seg2.end.y) < 0.01)
-        );
-
-        if (!canMerge) return;
-
-        const mergedSegment: PathSegment = {
-            id: `merged-${Date.now()}`,
-            start: seg1.start,
-            end: seg2.end,
-            type: seg1.type,
-            speed: seg1.speed,
-            z: seg1.z,
-            feedRate: seg1.feedRate,
-            comment: `${seg1.comment || ''} + ${seg2.comment || ''}`
-        };
-
-        const newSegments = group.segments
-            .filter(s => s.id !== segmentId1 && s.id !== segmentId2)
-            .concat([mergedSegment]);
-
-        dispatch(updatePathGroup({
-            id: group.id,
-            updates: { segments: newSegments }
-        }));
-    }, [dispatch, pathGroups]);
-
-    const handleSegmentDelete = useCallback((segmentId?: string) => {
-        const targetId = segmentId || selectedSegmentId;
-        if (targetId) {
-            dispatch(removeSegment(targetId));
+            case 'path-node':
+                // 노드 편집 모드
+                console.log('Path node editing');
+                return;
         }
-    }, [dispatch, selectedSegmentId]);
+    }, [tool]);
 
-    const handleAddSegment = useCallback((
-        groupId: string,
-        segmentData: {
-            start: { x: number; y: number };
-            end: { x: number; y: number };
-            type: 'G0' | 'G1';
+    const handleMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        if (isDrawingPath) {
+            console.log('Path drawing - mouse move');
+            // drawing.updateDrawing(e);
+            return;
         }
-    ) => {
-        const newSegment: PathSegment = {
-            id: `segment-${Date.now()}-${Math.random()}`,
-            ...segmentData,
-            speed: segmentData.type === 'G0' ? 3000 : 1000,
-            z: segmentData.type === 'G0' ? 5 : 0,
-            feedRate: segmentData.type === 'G0' ? 3000 : 1000,
-        };
 
-        dispatch(addSegment({ groupId, segment: newSegment }));
+        // if (selection.updateDragSelection(e)) return;
+    }, [isDrawingPath]);
+
+    const handleMouseUp = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        if (isDrawingPath) {
+            console.log('Path drawing - finish');
+            setIsDrawingPath(false);
+            // drawing.finishDrawing(e);
+            return;
+        }
+
+        // selection.finishDragSelection(e);
+    }, [isDrawingPath]);
+
+    const handleMouseLeave = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        if (isDrawingPath) {
+            console.log('Path drawing - cancel');
+            setIsDrawingPath(false);
+            // drawing.cancelDrawing();
+        }
+
+        if (isDragSelecting) {
+            setIsDragSelecting(false);
+            // selection.cancelDragSelection();
+        }
+    }, [isDrawingPath, isDragSelecting]);
+
+    // 개별 경로 클릭 선택
+    const handleSelect = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        const pathId = e.target.id();
+        if (pathId) {
+            console.log('Path selected:', pathId);
+            dispatch(setSelectedPath(pathId));
+        }
     }, [dispatch]);
 
-    const handleGroupVisibilityToggle = useCallback((groupId: string) => {
-        dispatch(toggleGroupVisibility(groupId));
+    // 컨텍스트 메뉴 처리
+    const handleContextMenu = useCallback((e: KonvaEventObject<PointerEvent>) => {
+        console.log('Path context menu');
+        e.evt.preventDefault();
+        // selection.handleContextMenuSelection(e);
+    }, []);
+
+    // 캔버스 클릭 핸들러
+    const handleCanvasClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        if (e.target === e.target.getStage()) {
+            dispatch(setSelectedPath(null));
+        }
     }, [dispatch]);
 
-    const handleGroupLockToggle = useCallback((groupId: string) => {
-        dispatch(toggleGroupLock(groupId));
-    }, [dispatch]);
+    // 드래그 핸들러들 (향후 구현)
+    const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
+        console.log('Path drag start');
+        // movement.handleDragStart(e);
+    }, []);
 
-    const handleGroupDelete = useCallback((groupId: string) => {
-        dispatch(removePathGroup(groupId));
-    }, [dispatch]);
+    const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
+        console.log('Path drag move');
+        // movement.handleDragMove(e);
+    }, []);
 
-    const handleSegmentUpdate = useCallback((segmentId: string, updates: Partial<PathSegment>) => {
-        dispatch(updateSegment({ id: segmentId, updates }));
-    }, [dispatch]);
+    const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
+        console.log('Path drag end');
+        // movement.handleDragEnd(e);
+    }, []);
 
-    const handleGroupUpdate = useCallback((groupId: string, updates: Partial<PathGroup>) => {
-        dispatch(updatePathGroup({ id: groupId, updates }));
-    }, [dispatch]);
+    // 편집 기능들 (향후 구현)
+    const handleDelete = useCallback(() => {
+        if (selectedPathId) {
+            console.log('Delete path:', selectedPathId);
+            // editing.handleDelete();
+        }
+    }, [selectedPathId]);
 
-    const handleUndo = useCallback(() => {
-        dispatch(undo());
-    }, [dispatch]);
+    const handleCopy = useCallback(() => {
+        if (selectedPathId) {
+            console.log('Copy path:', selectedPathId);
+            setHasClipboardData(true);
+            // editing.handleCopy();
+        }
+    }, [selectedPathId]);
 
-    const handleRedo = useCallback(() => {
-        dispatch(redo());
-    }, [dispatch]);
+    const handlePaste = useCallback(() => {
+        if (hasClipboardData) {
+            console.log('Paste path');
+            // editing.handlePaste();
+        }
+    }, [hasClipboardData]);
 
-    const handleSetTool = useCallback((tool: 'select' | 'add' | 'delete' | 'split' | 'merge') => {
-        dispatch(setTool(tool));
-    }, [dispatch]);
+    const handleCut = useCallback(() => {
+        if (selectedPathId) {
+            console.log('Cut path:', selectedPathId);
+            setHasClipboardData(true);
+            // editing.handleCut();
+        }
+    }, [selectedPathId]);
+
+    const handleSelectAll = useCallback(() => {
+        console.log('Select all paths');
+        // selection.handleSelectAll();
+    }, []);
+
+    const handleNudge = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
+        if (selectedPathId) {
+            console.log('Nudge path:', direction);
+            // movement.handleNudge(direction);
+        }
+    }, [selectedPathId]);
+
+    // Path 전용 기능들
+    const handleNodeEdit = useCallback(() => {
+        console.log('Node edit mode');
+        // 노드 편집 기능
+    }, []);
+
+    const handlePathClose = useCallback(() => {
+        console.log('Close path');
+        // 경로 닫기
+    }, []);
+
+    const handlePathOpen = useCallback(() => {
+        console.log('Open path');
+        // 경로 열기
+    }, []);
 
     return {
-        // 상태
-        pathGroups,
-        selectedSegmentId,
-        selectedGroupId,
-        selectedEndpoint,
-        tool,
-        canUndo,
-        canRedo,
-        isGenerating,
-        hasUnsavedChanges,
+        // 마우스 이벤트 핸들러들
+        handleMouseDown,
+        handleMouseMove,
+        handleMouseUp,
+        handleMouseLeave,
+        handleSelect,
+        handleContextMenu,
+        handleCanvasClick,
 
-        // 액션 핸들러
-        handleSetPathGroups,
-        handleUpdatePathGroups,
-        handleGroupSelect,
-        handleSegmentSelect,
-        handleEndpointDrag,
-        handleSegmentSplit,
-        handleSegmentMerge,
-        handleSegmentDelete,
-        handleAddSegment,
-        handleGroupVisibilityToggle,
-        handleGroupLockToggle,
-        handleGroupDelete,
-        handleSegmentUpdate,
-        handleGroupUpdate,
-        handleUndo,
-        handleRedo,
-        handleSetTool,
+        // 드래그 핸들러들
+        handleDragStart,
+        handleDragMove,
+        handleDragEnd,
+
+        // 편집 기능들
+        handleDelete,
+        handleCopy,
+        handlePaste,
+        handleCut,
+        handleSelectAll,
+        handleNudge,
+
+        // Path 전용 기능들
+        handleNodeEdit,
+        handlePathClose,
+        handlePathOpen,
+
+        // 상태들
+        isDrawing: isDrawingPath,
+        isDragSelecting,
+        selectedPathIds: selectedPathId ? [selectedPathId] : [],
+        hasClipboardData,
+        isSnappingEnabled: false, // 향후 구현
+
+        // Path 전용 상태들
+        isNodeEditing: tool === 'path-node',
+        currentTool: tool,
+        pathGroups,
+        selectedPathId,
     };
 }

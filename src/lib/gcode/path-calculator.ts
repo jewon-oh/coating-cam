@@ -8,12 +8,10 @@ import { MaskingManager } from "@/lib/gcode/mask-manager";
  */
 export class PathCalculator {
     private readonly settings: GcodeSettings;
-    private readonly workArea: { width: number; height: number };
     private readonly masker: MaskingManager;
 
-    constructor(settings: GcodeSettings, workArea: { width: number; height: number }, masker: MaskingManager) {
+    constructor(settings: GcodeSettings, masker: MaskingManager) {
         this.settings = settings;
-        this.workArea = workArea;
         this.masker = masker;
     }
 

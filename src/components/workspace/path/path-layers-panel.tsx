@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PathGroup, PathSegment } from '@/types/gcode-path';
+import { PathGroup, PathSegment } from '@/types/path';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

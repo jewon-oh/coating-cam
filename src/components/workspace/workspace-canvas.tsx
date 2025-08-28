@@ -1,28 +1,28 @@
 "use client";
 
-import React, { useRef, useMemo } from 'react';
-import { Stage, Layer, Rect } from 'react-konva';
+import React, {useRef, useMemo} from 'react';
+import {Stage, Layer, Rect} from 'react-konva';
 import type Konva from 'konva';
 
 // Redux 상태 관리
-import { useAppSelector } from '@/hooks/redux';
+import {useAppSelector} from '@/hooks/redux';
 
 // 커스텀 훅들
-import { useTransformerHandlers } from '@/hooks/use-transformer-handlers';
-import { useSettings } from '@/contexts/settings-context';
-import { useCanvas } from '@/contexts/canvas-context';
-import { useStageEvents } from '@/hooks/use-stage-events';
+import {useTransformerHandlers} from '@/hooks/use-transformer-handlers';
+import {useSettings} from '@/contexts/settings-context';
+import {useCanvas} from '@/contexts/canvas-context';
+import {useStageEvents} from '@/hooks/use-stage-events';
 
 // 컴포넌트 및 타입
 import CanvasGrid from '@/components/workspace/canvas-grid';
-import { ShapeLayer } from '@/components/workspace/shape-layer';
-import { useShapeEvents } from '@/hooks/use-shape-events';
-import { useGlobalKeyboard } from '@/hooks/use-global-keyboard';
+import {ShapeLayer} from '@/components/workspace/shape/shape-layer';
+import {PathLayer} from "@/components/workspace/path-layer";
+import {useGlobalKeyboard} from '@/hooks/use-global-keyboard';
 
 // ===== 메인 컴포넌트 =====
 export default function WorkspaceCanvas() {
     // Redux 상태에서 tool과 workspaceMode 모두 가져오기
-    const { tool, workspaceMode } = useAppSelector((state) => state.tool);
+    const {tool, workspaceMode} = useAppSelector((state) => state.tool);
 
     // Context에서 캔버스 상태 가져오기
     const {
@@ -35,15 +35,13 @@ export default function WorkspaceCanvas() {
     } = useCanvas();
 
     // 설정 가져오기
-    const { isGridVisible, gridSize, workArea } = useSettings();
+    const {isGridVisible, gridSize, workArea} = useSettings();
 
     // 참조들
-    const shapeLayerRef = useRef<Konva.Layer>(null);
     const transformerRef = useRef<Konva.Transformer>(null);
-    const selectionRectRef = useRef<Konva.Rect>(null);
 
     // 변형 핸들러
-    const { isTransforming } = useTransformerHandlers(transformerRef);
+    const {isTransforming} = useTransformerHandlers(transformerRef);
 
     // 통합된 이벤트 핸들러들 (패닝과 shape 이벤트 모두 포함)
     const {
@@ -56,14 +54,18 @@ export default function WorkspaceCanvas() {
         handleWheel,
         handleCanvasClick,
         isPanning,
-        handleShapeSelect,
-        handleShapeContextMenu,
-        handleShapeDragStart,
-        handleShapeDragMove,
-        handleShapeDragEnd,
-        selectedShapeIds,
+
+        handleDelete,
+        handleCopy,
+        handlePaste,
+        handleCut,
+        handleGroup,
+        handleUngroup,
+        handleSelectAll,
+        handleNudge,
+
     } = useStageEvents({
-        workspaceMode,
+        workspaceMode
     });
 
     // 커서 스타일 매핑 테이블
@@ -89,28 +91,17 @@ export default function WorkspaceCanvas() {
         return cursorMapping[modeKey] || "default";
     }, [workspaceMode, tool, isPanning, isTransforming, cursorMapping]);
 
-    // Shape 이벤트 핸들러
-    const shapeEvents = workspaceMode === 'shape' ? useShapeEvents() : null;
-
-    // 전역 키보드 이벤트 설정
-    const keyboardHandlers = useMemo(() => {
-        if (workspaceMode === 'shape' && shapeEvents) {
-            return {
-                onDelete: shapeEvents.handleDelete,
-                onCopy: shapeEvents.handleCopy,
-                onPaste: shapeEvents.handlePaste,
-                onCut: shapeEvents.handleCut,
-                onGroup: shapeEvents.handleGroup,
-                onUngroup: shapeEvents.handleUngroup,
-                onSelectAll: shapeEvents.handleSelectAll,
-                onNudge: shapeEvents.handleNudge,
-            };
-        }
-        return {};
-    }, [workspaceMode, shapeEvents]);
-
     // 전역 키보드 이벤트 등록
-    useGlobalKeyboard(keyboardHandlers);
+    useGlobalKeyboard({
+        onDelete: handleDelete,
+        onCopy: handleCopy,
+        onPaste: handlePaste,
+        onCut: handleCut,
+        onGroup: handleGroup,
+        onUngroup: handleUngroup,
+        onSelectAll: handleSelectAll,
+        onNudge: handleNudge
+    });
 
     // ===== 렌더링 =====
     return (
@@ -206,31 +197,11 @@ export default function WorkspaceCanvas() {
 
                 {/* workspaceMode에 따라 다른 레이어 렌더링 */}
                 {workspaceMode === "shape" && (
-                    <ShapeLayer
-                        ref={shapeLayerRef}
-                        onShapeSelect={handleShapeSelect}
-                        onShapeContextMenu={handleShapeContextMenu}
-                        onShapeDragStart={handleShapeDragStart}
-                        onShapeDragMove={handleShapeDragMove}
-                        onShapeDragEnd={handleShapeDragEnd}
-                        isPanning={isPanning}
-                        selectedShapeIds={selectedShapeIds || []}
-                    />
+                    <ShapeLayer isPanning={isPanning}/>
                 )}
 
                 {workspaceMode === "path" && (
-                    <Layer>
-                        <Rect
-                            x={100}
-                            y={100}
-                            width={200}
-                            height={100}
-                            fill="rgba(255, 0, 0, 0.3)"
-                            stroke="red"
-                            strokeWidth={2}
-                            listening={false}
-                        />
-                    </Layer>
+                    <PathLayer/>
                 )}
             </Stage>
         </div>

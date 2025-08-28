@@ -9,7 +9,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import {Separator} from '@/components/ui/separator';
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from '@/components/ui/collapsible';
 import {useAppSelector, useAppDispatch} from '@/hooks/redux';
-import {updateShape, batchUpdateShapes} from '@/store/slices/shapes-slice';
+import {updateShape, batchUpdateShapes} from '@/store/slices/shape-slice';
 import {CustomShapeConfig} from '@/types/custom-konva-config';
 import {SmallNumberField} from '@/components/small-number-field';
 import {

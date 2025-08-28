@@ -8,10 +8,10 @@ import {Toolbar} from "@/components/tool/toolbar";
 import React, {useState} from "react";
 import {WorkspaceOverlays} from "@/components/workspace/workspace-overlays";
 
-import ToolContextPanel from "@/components/tool-context-panel";
+import ToolContextPanel from "@/components/workspace/tool-context-panel";
 import {useProjectAutoLoad} from "@/hooks/project/use-project-autoload";
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from "@/components/ui/resizable";
-import {PropertyPanel} from "@/components/property-panel";
+import {PropertyPanel} from "@/components/workspace/shape/property-panel";
 import {useAppSelector} from "@/hooks/redux";
 
 const DynamicCanvasStage = dynamic(() => import('@/components/workspace/workspace-canvas'), {
@@ -25,8 +25,6 @@ const WorkspaceContent = () => {
     const selectedShapeIds = useAppSelector((state) => state.shapes.selectedShapeIds);
     const { workspaceMode, tool } = useAppSelector((state) => state.tool);
     const hasSelectedShapes = selectedShapeIds.length > 0;
-
-
 
     return (
         <div className="h-full w-full flex flex-col bg-background text-foreground relative">

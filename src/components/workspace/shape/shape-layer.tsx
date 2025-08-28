@@ -6,58 +6,36 @@ import type Konva from 'konva';
 
 // Redux 상태 관리
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { updateShape } from '@/store/slices/shapes-slice';
+import { updateShape } from '@/store/slices/shape-slice';
 
 // 타입 및 유틸리티
 import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { useCanvas } from '@/contexts/canvas-context';
 import { useTransformerHandlers } from '@/hooks/use-transformer-handlers';
+import { useShapeEvents } from '@/hooks/use-shape-events';
 import { TransformerConfig } from "konva/lib/shapes/Transformer";
 
 interface ShapeLayerProps {
-    // 외부에서 전달받는 이벤트 핸들러들
-    onShapeSelect?: (e: Konva.KonvaEventObject<MouseEvent>) => void;
-    onShapeContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
-    onShapeDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
-    onShapeDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
-    onShapeDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
-    // 상태들
     isPanning?: boolean;
-    selectedShapeIds?: string[];
 }
 
-export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
-                                                                              onShapeSelect,
-                                                                              onShapeContextMenu,
-                                                                              onShapeDragStart,
-                                                                              onShapeDragMove,
-                                                                              onShapeDragEnd,
-                                                                              isPanning = false,
-                                                                              selectedShapeIds = []
-                                                                          }, ref) => {
-
-    // Redux 상태에서 직접 데이터 가져오기
+export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
+    // Redux 상태
     const dispatch = useAppDispatch();
-    const { shapes } = useAppSelector((state) => state.shapes);
+    const { shapes, selectedShapeIds } = useAppSelector((state) => state.shapes);
     const { tool } = useAppSelector((state) => state.tool);
 
-    // 설정 및 컨텍스트
+    // Context 및 훅
     const { stage, setLoading } = useCanvas();
+    const shapeEvents = useShapeEvents();
 
     // 로컬 상태
     const [isHoveringShape, setIsHoveringShape] = React.useState<string | null>(null);
 
     // 참조들
+    const layerRef = useRef<Konva.Layer>(null);
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
-    const imageGroupRef = useRef<Konva.Group>(null);
-    const shapeGroupRef = useRef<Konva.Group>(null);
     const transformerRef = useRef<Konva.Transformer>(null);
-    const shapesRef = useRef(shapes);
-
-    // shapes 참조 업데이트
-    useEffect(() => {
-        shapesRef.current = shapes;
-    }, [shapes]);
 
     // Transformer 핸들러
     const {
@@ -71,6 +49,7 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
     const { imageShapes, otherShapes } = useMemo(() => {
         const visibleShapes = shapes.filter(s => s.visible !== false);
 
+        // 코팅 타입에 따른 정렬 (fill이 masking보다 앞에 오도록)
         visibleShapes.sort((a, b) => {
             const aIsFill = a.coatingType === 'fill';
             const bIsMasking = b.coatingType === 'masking';
@@ -88,8 +67,8 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
     }, [shapes]);
 
     const hasImages = useMemo(() =>
-        shapes.some(shape =>
-            selectedShapeIds.includes(shape.id ?? "") && shape.type === 'image'
+        selectedShapeIds.some(id =>
+            shapes.find(shape => shape.id === id)?.type === 'image'
         ), [shapes, selectedShapeIds]
     );
 
@@ -108,7 +87,6 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
         },
         keepRatio: false,
     }), []);
-
 
     // ===== 이미지 로딩 =====
     const loadImage = useCallback((imageDataUrl: string, shapeId?: string): HTMLImageElement | null => {
@@ -130,9 +108,7 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
                     }
                 }
                 setLoading({ isLoading: false });
-                if (ref && 'current' in ref && ref.current) {
-                    ref.current.batchDraw();
-                }
+                layerRef.current?.batchDraw();
             }, 0);
         };
 
@@ -151,7 +127,7 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
         img.src = imageDataUrl;
         imageCache.current.set(imageDataUrl, img);
         return img.complete ? img : null;
-    }, [imageCache, setLoading, shapes, dispatch, ref]);
+    }, [shapes, dispatch, setLoading]);
 
     // ===== 스타일 유틸리티들 =====
     const getCoatingVisualStyle = useCallback((shape: CustomShapeConfig) => {
@@ -227,13 +203,13 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
             draggable: tool === 'select' && !isPanning && !isLocked,
             onClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
                 e.evt.preventDefault();
-                if (!isPanning && !isLocked && onShapeSelect) {
-                    onShapeSelect(e);
+                if (!isPanning && !isLocked) {
+                    shapeEvents.handleSelect(e);
                 }
             },
             onContextMenu: (e: Konva.KonvaEventObject<PointerEvent>) => {
-                if (!isPanning && !isLocked && onShapeContextMenu) {
-                    onShapeContextMenu(e);
+                if (!isPanning && !isLocked) {
+                    shapeEvents.handleContextMenu(e);
                 }
             },
             onMouseEnter: () => {
@@ -246,10 +222,10 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
                     setIsHoveringShape(null);
                 }
             },
-            ...((!isPanning && !isLocked) && onShapeDragStart && onShapeDragMove && onShapeDragEnd && {
-                onDragStart: onShapeDragStart,
-                onDragMove: onShapeDragMove,
-                onDragEnd: onShapeDragEnd,
+            ...((!isPanning && !isLocked) && {
+                onDragStart: shapeEvents.handleDragStart,
+                onDragMove: shapeEvents.handleDragMove,
+                onDragEnd: shapeEvents.handleDragEnd,
             }),
             perfectDrawEnabled: false,
             listening: tool === 'select' && !isPanning && !isLocked
@@ -264,13 +240,14 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
         const coatingStyle = getCoatingVisualStyle(shape as CustomShapeConfig);
 
         return { ...baseProps, ...coatingStyle, ...hoverEffect };
-    }, [tool, isHoveringShape, isPanning, getCoatingVisualStyle, onShapeSelect, onShapeContextMenu, onShapeDragStart, onShapeDragMove, onShapeDragEnd]);
+    }, [isPanning, tool, isHoveringShape, getCoatingVisualStyle, shapeEvents]);
 
     const makeImageProps = useCallback((shape: CustomShapeConfig) => {
         const isLocked = shape.isLocked;
         const baseProps = makeCommonProps(shape);
 
-        const { fill, stroke, strokeWidth, dash, shadowColor, shadowBlur, shadowOpacity, ...validImageProps } = baseProps;
+        // Image 컴포넌트에서 사용할 수 없는 속성들 제거
+        const { shadowColor, shadowBlur, shadowOpacity, ...validImageProps } = baseProps;
 
         const imageSpecificStyle = {
             opacity: isLocked ? 0.4 : (baseProps.opacity || 1),
@@ -331,20 +308,27 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
 
     // Transformer 노드 업데이트
     useEffect(() => {
-        if (transformerRef.current && ref && 'current' in ref && ref.current) {
+        if (transformerRef.current && layerRef.current) {
             const nodesToSet = selectedShapeIds
-                .map(id => ref.current!.findOne(`#${id}`))
+                .map(id => layerRef.current!.findOne(`#${id}`))
                 .filter(Boolean);
 
             transformerRef.current.nodes(nodesToSet as Konva.Shape[]);
             transformerRef.current.getLayer()?.batchDraw();
         }
-    }, [selectedShapeIds, shapes, ref]);
+    }, [selectedShapeIds, shapes]);
+
+    // 메모리 정리
+    useEffect(() => {
+        return () => {
+            imageCache.current.clear();
+        };
+    }, []);
 
     return (
-        <Layer ref={ref}>
+        <Layer ref={layerRef}>
             {/* 이미지 그룹 */}
-            <Group ref={imageGroupRef} listening={tool === 'select'}>
+            <Group listening={tool === 'select'}>
                 {imageShapes.map((shape) => {
                     const imageElement = shape.imageDataUrl ? loadImage(shape.imageDataUrl, shape.id) : null;
 
@@ -405,7 +389,7 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
             </Group>
 
             {/* 도형 그룹 */}
-            <Group ref={shapeGroupRef} listening={true}>
+            <Group listening={true}>
                 {otherShapes.map((shape) => {
                     const commonProps = makeCommonProps(shape);
 
@@ -478,6 +462,4 @@ export const ShapeLayer = React.forwardRef<Konva.Layer, ShapeLayerProps>(({
             />
         </Layer>
     );
-});
-
-ShapeLayer.displayName = 'ShapeLayer';
+}

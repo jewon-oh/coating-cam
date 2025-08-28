@@ -2,9 +2,9 @@
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { setTool } from '@/store/slices/tool-slice';
-import { unselectAllShapes } from '@/store/slices/shapes-slice';
+import { unselectAllShapes } from '@/store/slices/shape-slice';
 import { useCanvas } from '@/contexts/canvas-context';
-import {undo,redo} from "@/store/slices/history-slice";
+import {undo,redo} from "@/store/slices/shape-history-slice";
 
 interface GlobalKeyboardHandlers {
     onDelete?: () => void;

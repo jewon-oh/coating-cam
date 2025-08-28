@@ -71,8 +71,8 @@ interface SerializableShapePayload extends Omit<CustomShapeConfig, 'image'> {
     imageDataUrl?: string;
 }
 
-const shapesSlice = createSlice({
-    name: 'shapes',
+const shapeSlice = createSlice({
+    name: 'shape',
     initialState,
     reducers: {
         // addShape: Object.assign으로 배열 교체 금지 → push 사용
@@ -374,6 +374,6 @@ export const {
     toggleGroupVisibility,
     toggleGroupLock,
 
-} = shapesSlice.actions;
+} = shapeSlice.actions;
 
-export default shapesSlice.reducer;
+export default shapeSlice.reducer;

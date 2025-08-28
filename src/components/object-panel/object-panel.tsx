@@ -19,8 +19,8 @@ import {
     removeShapes,
     toggleGroupVisibility,
     toggleGroupLock,
-} from "@/store/slices/shapes-slice";
-import {setPresent} from "@/store/slices/history-slice";
+} from "@/store/slices/shape-slice";
+import {setPresent} from "@/store/slices/shape-history-slice";
 import type {CustomShapeConfig} from "@/types/custom-konva-config";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {ScrollArea} from "@/components/ui/scroll-area";

@@ -314,14 +314,3 @@ export function useCanvasLoading() {
         setLoading,
     };
 }
-
-// === 편의 훅: 포커스 상태만 사용하는 경우 ===
-export function useCanvasFocus() {
-    const { isCanvasFocused, handleCanvasFocus, handleCanvasBlur } = useCanvas();
-
-    return {
-        isCanvasFocused,
-        handleCanvasFocus,
-        handleCanvasBlur,
-    };
-}

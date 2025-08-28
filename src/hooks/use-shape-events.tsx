@@ -1,7 +1,7 @@
 import  { useCallback } from 'react';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { unselectAllShapes } from '@/store/slices/shapes-slice';
+import { unselectAllShapes } from '@/store/slices/shape-slice';
 
 // 분리된 훅들 import
 import { useShapeDrawing } from './shape/use-shape-drawing';
@@ -61,7 +61,7 @@ export function useShapeEvents() {
 
     // 컨텍스트 메뉴 처리
     const handleContextMenu = useCallback((e: KonvaEventObject<PointerEvent>) => {
-        return selection.handleContextMenuSelection(e);
+        // return selection.handleContextMenuSelection(e);
     }, [selection]);
 
     // 캔버스 클릭 핸들러
@@ -79,19 +79,24 @@ export function useShapeEvents() {
         handleSelect,
         handleContextMenu,
         handleCanvasClick,
-        handleShapeDragStart: movement.handleDragStart,
-        handleShapeDragMove: movement.handleDragMove,
-        handleShapeDragEnd: movement.handleDragEnd,
+
+        handleDragStart: movement.handleDragStart,
+        handleDragMove: movement.handleDragMove,
+        handleDragEnd: movement.handleDragEnd,
+
         handleDelete: editing.handleDelete,
         handleCopy: editing.handleCopy,
         handlePaste: editing.handlePaste,
         handleCut: editing.handleCut,
         handleGroup: editing.handleGroup,
+
         handleUngroup: editing.handleUngroup,
         handleSelectAll: selection.handleSelectAll,
         handleNudge: movement.handleNudge,
+
         isDrawing: drawing.isDrawing,
         isDragSelecting: selection.isDragSelecting,
+
         selectedShapeIds: selection.selectedShapeIds,
         hasClipboardData: editing.hasClipboardData,
         isSnappingEnabled: movement.isSnappingEnabled,

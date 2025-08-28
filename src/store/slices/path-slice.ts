@@ -1,11 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PathGroup, PathSegment } from '@/types/gcode-path';
+import { PathGroup, PathSegment } from '@/types/path';
 
 interface PathState {
     pathGroups: PathGroup[];
     selectedPathId: string | null;     // 선택된 Path ID
     selectedSegmentId: string | null;  // 선택된 Segment ID
     tool: 'select' | 'add' | 'delete' | 'split' | 'merge';
+    shapeToPathMap: Record<string, string>; // shapeId -> pathGroupId 매핑 추가
 }
 
 const initialState: PathState = {
@@ -13,6 +14,7 @@ const initialState: PathState = {
     selectedPathId: null,
     selectedSegmentId: null,
     tool: 'select',
+    shapeToPathMap: {},
 };
 
 const pathSlice = createSlice({
@@ -74,7 +76,19 @@ const pathSlice = createSlice({
         setTool(state, action: PayloadAction<'select' | 'add' | 'delete' | 'split' | 'merge'>) {
             state.tool = action.payload;
         },
-        // 히스토리 로직 제거 (saveToHistory, undo, redo)
+        setShapePathMap(state, action: PayloadAction<{ shapeId: string; groupId: string }>) {
+            state.shapeToPathMap[action.payload.shapeId] = action.payload.groupId;
+        },
+        removeShapePathMap(state, action: PayloadAction<string>) {
+            delete state.shapeToPathMap[action.payload];
+        },
+        // PathGroup을 ID로 교체(업서트용)
+        upsertPathGroup(state, action: PayloadAction<PathGroup>) {
+            const idx = state.pathGroups.findIndex(g => g.id === action.payload.id);
+            if (idx >= 0) state.pathGroups[idx] = action.payload;
+            else state.pathGroups.push(action.payload);
+        },
+
     },
 });
 
@@ -89,6 +103,9 @@ export const {
     setSelectedPath,
     setSelectedSegment,
     setTool,
+    setShapePathMap,
+    removeShapePathMap,
+    upsertPathGroup,
 } = pathSlice.actions;
 
 export default pathSlice.reducer;

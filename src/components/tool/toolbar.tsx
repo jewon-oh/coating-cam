@@ -30,7 +30,7 @@ import {useProjectActions} from "@/hooks/project/use-project-actions";
 import {useInsertImage} from "@/hooks/use-insert-image";
 import {Card, CardContent} from "@/components/ui/card";
 import {Separator} from "@/components/ui/separator";
-import {redo, undo} from "@/store/slices/history-slice";
+import {redo, undo} from "@/store/slices/shape-history-slice";
 
 interface ToolbarProps {
     onGenerateGCode: () => void;

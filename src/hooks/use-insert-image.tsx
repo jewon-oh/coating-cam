@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import {useAppDispatch, useAppSelector} from '@/hooks/redux';
-import { addShapeToBack } from '@/store/slices/shapes-slice';
+import { addShapeToBack } from '@/store/slices/shape-slice';
 import { setTool } from '@/store/slices/tool-slice';
-import {setPresent} from "@/store/slices/history-slice";
+import {setPresent} from "@/store/slices/shape-history-slice";
 
 type Size = { width: number; height: number };
 

@@ -46,7 +46,7 @@ export class PathGenerator {
 
         // 각 모듈을 초기화
         this.masker = new MaskingManager(settings, maskShapes);
-        this.calculator = new PathCalculator(settings, workArea,this.masker);
+        this.calculator = new PathCalculator(settings,this.masker);
         this.optimizer = new PathOptimizer(settings, maskShapes);
     }
 

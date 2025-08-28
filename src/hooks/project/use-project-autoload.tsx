@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 import { useCanvas } from "@/contexts/canvas-context";
 import { useAppDispatch } from "@/hooks/redux";
-import { resetHistory } from "@/store/slices/history-slice";
-import { setAllShapes } from "@/store/slices/shapes-slice";
+import { resetHistory } from "@/store/slices/shape-history-slice";
+import { setAllShapes } from "@/store/slices/shape-slice";
 import { ProjectFileType } from "@/types/project";
 import { useRouter } from "next/router";
 import {useSettings} from "@/contexts/settings-context";

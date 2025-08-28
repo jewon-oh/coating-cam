@@ -23,7 +23,7 @@ import {
     ContextMenuTrigger
 } from "@/components/ui/context-menu";
 import {useAppDispatch} from "@/hooks/redux";
-import {removeShapes} from "@/store/slices/shapes-slice";
+import {removeShapes} from "@/store/slices/shape-slice";
 
 const shapeIcons = {
     rect: <RectangleHorizontal size={16} className="flex-shrink-0"/>,

@@ -3,8 +3,8 @@ import React, { useCallback, useRef } from 'react';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { batchUpdateShapes } from '@/store/slices/shapes-slice';
-import { setPresent } from '@/store/slices/history-slice';
+import { batchUpdateShapes } from '@/store/slices/shape-slice';
+import { setPresent } from '@/store/slices/shape-history-slice';
 import type { CustomShapeConfig } from '@/types/custom-konva-config';
 import { useSettings } from '@/contexts/settings-context';
 

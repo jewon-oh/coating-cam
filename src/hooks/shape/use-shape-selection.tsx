@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import {selectMultipleShapes, selectShape, unselectAllShapes} from '@/store/slices/shapes-slice';
+import {selectMultipleShapes, selectShape, unselectAllShapes} from '@/store/slices/shape-slice';
 import { useSelectionRect } from '@/hooks/use-selection-rect';
 
 export function useShapeSelection() {
@@ -133,6 +133,16 @@ export function useShapeSelection() {
 
     }, [dispatch, selectedShapeIds]);
 
+
+    const handleSelectAll = useCallback(() => {
+        const ids = shapes
+            .filter(s => s.visible !== false && !s.isLocked)
+            .map(s => s.id!)
+            .filter(Boolean);
+        if (ids.length) dispatch(selectMultipleShapes(ids));
+    }, [dispatch, shapes]);
+
+
     return {
         isDragSelecting,
         startDragSelection,
@@ -140,6 +150,7 @@ export function useShapeSelection() {
         finishDragSelection,
         cancelDragSelection,
         handleSelect,
+        handleSelectAll,
         selectedShapeIds
     };
 }

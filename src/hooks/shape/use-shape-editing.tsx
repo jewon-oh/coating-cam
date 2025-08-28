@@ -6,8 +6,8 @@ import {
     setAllShapes,
     selectMultipleShapes,
     unselectAllShapes
-} from '@/store/slices/shapes-slice';
-import { setPresent } from '@/store/slices/history-slice';
+} from '@/store/slices/shape-slice';
+import { setPresent } from '@/store/slices/shape-history-slice';
 import type { CustomShapeConfig } from '@/types/custom-konva-config';
 
 // 클립보드 타입 정의
