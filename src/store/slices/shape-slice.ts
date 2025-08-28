@@ -1,16 +1,20 @@
 import {createSelector, createSlice, PayloadAction} from '@reduxjs/toolkit';
-import {CustomShapeConfig} from '@/types/custom-konva-config';
+import {CustomShapeConfig, PathConfig} from '@/types/custom-konva-config';
 
 interface ShapesState {
     shapes: CustomShapeConfig[];      // 모든 도형들
+    paths: PathConfig[];
     selectedShapeIds: string[];       // 선택된 도형 ID들
+    selectedPathIds: string[];        //  선택된 경로들
     isGroupSelected: boolean;         // 그룹 선택 여부
     lastUpdateTimestamp: number;      // 성능 최적화용 캐시
 }
 
 const initialState: ShapesState = {
     shapes: [],
+    paths: [],
     selectedShapeIds: [],
+    selectedPathIds: [],
     isGroupSelected: false,
     lastUpdateTimestamp: Date.now(),
 };
@@ -123,6 +127,139 @@ const shapeSlice = createSlice({
             // state.shapes.unshift(newShape);
         },
 
+        // Path 관련 액션들
+        addPath: (state, action: PayloadAction<PathConfig>) => {
+            const newPath = action.payload;
+            state.paths.push(newPath);
+
+            // 부모 shape의 pathIds에 추가
+            const parentShape = state.shapes.find(s => s.id === newPath.shapeId);
+            if (parentShape) {
+                parentShape.pathIds = parentShape.pathIds || [];
+                if (!parentShape.pathIds.includes(newPath.id)) {
+                    parentShape.pathIds.push(newPath.id);
+                }
+            }
+        },
+
+        updatePath: (state, action: PayloadAction<{ id: string; props: Partial<PathConfig> }>) => {
+            const index = state.paths.findIndex(p => p.id === action.payload.id);
+            if (index !== -1) {
+                state.paths[index] = { ...state.paths[index], ...action.payload.props };
+            }
+        },
+
+        removePath: (state, action: PayloadAction<string>) => {
+            const pathId = action.payload;
+            const pathIndex = state.paths.findIndex(p => p.id === pathId);
+
+            if (pathIndex !== -1) {
+                const path = state.paths[pathIndex];
+
+                // 부모 shape에서 pathId 제거
+                const parentShape = state.shapes.find(s => s.id === path.shapeId);
+                if (parentShape && parentShape.pathIds) {
+                    parentShape.pathIds = parentShape.pathIds.filter(id => id !== pathId);
+                }
+
+                // path 제거
+                state.paths.splice(pathIndex, 1);
+
+                // 선택에서도 제거
+                state.selectedPathIds = state.selectedPathIds.filter(id => id !== pathId);
+            }
+        },
+
+        // Shape 삭제 시 연관된 path들도 함께 삭제
+        removeShapes: (state, action: PayloadAction<string[]>) => {
+            const shapeIds = action.payload;
+
+            // 연관된 path들 찾아서 제거
+            const pathsToRemove = state.paths.filter(p => shapeIds.includes(p.shapeId));
+            const pathIdsToRemove = pathsToRemove.map(p => p.id);
+
+            // path들 제거
+            state.paths = state.paths.filter(p => !shapeIds.includes(p.shapeId));
+
+            // shape들 제거
+            state.shapes = state.shapes.filter(s => !shapeIds.includes(s.id || ''));
+
+            // 선택 상태 정리
+            state.selectedShapeIds = [];
+            state.selectedPathIds = state.selectedPathIds.filter(id => !pathIdsToRemove.includes(id));
+            state.isGroupSelected = false;
+        },
+
+        // 자동 Path 생성 (기존 shape에 대해)
+        generateDefaultPaths: (state, action: PayloadAction<string>) => {
+            const shapeId = action.payload;
+            const shape = state.shapes.find(s => s.id === shapeId);
+
+            if (!shape || shape.coatingType === 'masking') return;
+
+            const baseName = shape.name || shape.type || 'Shape';
+
+            // 기존 path가 있는지 확인
+            const existingPaths = state.paths.filter(p => p.shapeId === shapeId);
+
+            if (existingPaths.length === 0) {
+                // coatingType에 따른 기본 path 생성
+                if (shape.coatingType === 'fill' || !shape.coatingType) {
+                    const fillPath: PathConfig = {
+                        id: crypto.randomUUID(),
+                        shapeId,
+                        type: 'fill',
+                        name: `${baseName} - 채우기`,
+                        order: 0,
+                        enabled: true,
+                        fillPattern: shape.fillPattern || 'auto',
+                        coatingWidth: shape.coatingWidth,
+                        lineSpacing: shape.lineSpacing,
+                        coatingHeight: shape.coatingHeight,
+                        coatingSpeed: shape.coatingSpeed,
+                    };
+                    state.paths.push(fillPath);
+
+                    // shape에 pathId 추가
+                    shape.pathIds = shape.pathIds || [];
+                    shape.pathIds.push(fillPath.id);
+                }
+
+                if (shape.coatingType === 'outline') {
+                    const outlinePath: PathConfig = {
+                        id: crypto.randomUUID(),
+                        shapeId,
+                        type: 'outline',
+                        name: `${baseName} - 테두리`,
+                        order: 0,
+                        enabled: true,
+                        outlineType: shape.outlineType || 'outside',
+                        outlinePasses: shape.outlinePasses || 1,
+                        outlineInterval: shape.outlineInterval,
+                        coatingHeight: shape.coatingHeight,
+                        coatingSpeed: shape.coatingSpeed,
+                    };
+                    state.paths.push(outlinePath);
+
+                    // shape에 pathId 추가
+                    shape.pathIds = shape.pathIds || [];
+                    shape.pathIds.push(outlinePath.id);
+                }
+            }
+        },
+
+        // Path 선택 관련
+        selectPath: (state, action: PayloadAction<string>) => {
+            state.selectedPathIds = [action.payload];
+        },
+
+        selectMultiplePaths: (state, action: PayloadAction<string[]>) => {
+            state.selectedPathIds = action.payload;
+        },
+
+        unselectAllPaths: (state) => {
+            state.selectedPathIds = [];
+        },
 
         // updateShape는 Immer가 있으니 현재 형태 유지 가능
         updateShape: (state, action: PayloadAction<{ id: string; updatedProps: Partial<CustomShapeConfig> }>) => {
@@ -169,11 +306,7 @@ const shapeSlice = createSlice({
             });
 
         },
-        removeShapes: (state, action: PayloadAction<string[]>) => {
-            state.shapes = state.shapes.filter(s => !action.payload.includes(s.id || ''));
-            state.selectedShapeIds = [];
-            state.isGroupSelected = false;
-        },
+
         setAllShapes: (state, action: PayloadAction<CustomShapeConfig[]>) => {
             Object.assign(state, {
                 shapes: action.payload.map((s, i) => ({

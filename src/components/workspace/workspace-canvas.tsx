@@ -93,15 +93,16 @@ export default function WorkspaceCanvas() {
 
     // 전역 키보드 이벤트 등록
     useGlobalKeyboard({
-        onDelete: handleDelete,
-        onCopy: handleCopy,
-        onPaste: handlePaste,
-        onCut: handleCut,
-        onGroup: handleGroup,
-        onUngroup: handleUngroup,
-        onSelectAll: handleSelectAll,
-        onNudge: handleNudge
+        onDelete: workspaceMode === 'shape' ? handleDelete : undefined,
+        onCopy: workspaceMode === 'shape' ? handleCopy : undefined,
+        onPaste: workspaceMode === 'shape' ? handlePaste : undefined,
+        onCut: workspaceMode === 'shape' ? handleCut : undefined,
+        onGroup: workspaceMode === 'shape' ? handleGroup : undefined,
+        onUngroup: workspaceMode === 'shape' ? handleUngroup : undefined,
+        onSelectAll: workspaceMode === 'shape' ? handleSelectAll : undefined,
+        onNudge: workspaceMode === 'shape' ? handleNudge : undefined
     });
+
 
     // ===== 렌더링 =====
     return (

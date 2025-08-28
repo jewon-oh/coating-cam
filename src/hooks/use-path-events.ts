@@ -33,17 +33,17 @@ export function usePathEvents() {
             case 'path-pen':
                 console.log('Path pen tool - drawing start');
                 setIsDrawingPath(true);
-                // drawing.startDrawing(e);
+                drawing.startDrawing(e);
                 return;
 
             case 'path-line':
                 console.log('Path line tool - drawing start');
                 setIsDrawingPath(true);
-                // drawing.startLineDrawing(e);
+                drawing.startDrawing(e);
                 return;
 
             case 'path-select':
-                // selection.startDragSelection(e);
+                selection.startDragSelection(e);
                 return;
 
             case 'path-node':
@@ -51,7 +51,7 @@ export function usePathEvents() {
                 console.log('Path node editing');
                 return;
         }
-    }, [tool]);
+    }, [drawing, selection, tool]);
 
     const handleMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
         if (isDrawingPath) {
@@ -60,32 +60,32 @@ export function usePathEvents() {
             return;
         }
 
-        // if (selection.updateDragSelection(e)) return;
-    }, [isDrawingPath]);
+        if (selection.updateDragSelection(e)) return;
+    }, [isDrawingPath, selection]);
 
     const handleMouseUp = useCallback((e: KonvaEventObject<MouseEvent>) => {
         if (isDrawingPath) {
             console.log('Path drawing - finish');
             setIsDrawingPath(false);
-            // drawing.finishDrawing(e);
+            drawing.finishDrawing(e);
             return;
         }
 
-        // selection.finishDragSelection(e);
-    }, [isDrawingPath]);
+        selection.finishDragSelection(e);
+    }, [drawing, isDrawingPath, selection]);
 
     const handleMouseLeave = useCallback((e: KonvaEventObject<MouseEvent>) => {
         if (isDrawingPath) {
             console.log('Path drawing - cancel');
             setIsDrawingPath(false);
-            // drawing.cancelDrawing();
+            drawing.cancelDrawing();
         }
 
         if (isDragSelecting) {
             setIsDragSelecting(false);
-            // selection.cancelDragSelection();
+            selection.cancelDragSelection();
         }
-    }, [isDrawingPath, isDragSelecting]);
+    }, [isDrawingPath, isDragSelecting, drawing, selection]);
 
     // 개별 경로 클릭 선택
     const handleSelect = useCallback((e: KonvaEventObject<MouseEvent>) => {
@@ -110,64 +110,64 @@ export function usePathEvents() {
         }
     }, [dispatch]);
 
-    // 드래그 핸들러들 (향후 구현)
+    // 드래그 핸들러들 
     const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
         console.log('Path drag start');
-        // movement.handleDragStart(e);
-    }, []);
+        movement.handleDragStart(e);
+    }, [movement]);
 
     const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
         console.log('Path drag move');
-        // movement.handleDragMove(e);
-    }, []);
+        movement.handleDragMove(e);
+    }, [movement]);
 
     const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
         console.log('Path drag end');
-        // movement.handleDragEnd(e);
-    }, []);
+        movement.handleDragEnd(e);
+    }, [movement]);
 
-    // 편집 기능들 (향후 구현)
+    // 편집 기능들 
     const handleDelete = useCallback(() => {
         if (selectedPathId) {
             console.log('Delete path:', selectedPathId);
-            // editing.handleDelete();
+            editing.handleDelete();
         }
-    }, [selectedPathId]);
+    }, [editing, selectedPathId]);
 
     const handleCopy = useCallback(() => {
         if (selectedPathId) {
             console.log('Copy path:', selectedPathId);
             setHasClipboardData(true);
-            // editing.handleCopy();
+            editing.handleCopy();
         }
-    }, [selectedPathId]);
+    }, [editing, selectedPathId]);
 
     const handlePaste = useCallback(() => {
         if (hasClipboardData) {
             console.log('Paste path');
-            // editing.handlePaste();
+            editing.handlePaste();
         }
-    }, [hasClipboardData]);
+    }, [editing, hasClipboardData]);
 
     const handleCut = useCallback(() => {
         if (selectedPathId) {
             console.log('Cut path:', selectedPathId);
             setHasClipboardData(true);
-            // editing.handleCut();
+            editing.handleCut();
         }
-    }, [selectedPathId]);
+    }, [editing, selectedPathId]);
 
     const handleSelectAll = useCallback(() => {
         console.log('Select all paths');
-        // selection.handleSelectAll();
-    }, []);
+        selection.handleSelectAll();
+    }, [selection]);
 
     const handleNudge = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
         if (selectedPathId) {
             console.log('Nudge path:', direction);
-            // movement.handleNudge(direction);
+            movement.handleNudge(direction);
         }
-    }, [selectedPathId]);
+    }, [movement, selectedPathId]);
 
     // Path 전용 기능들
     const handleNodeEdit = useCallback(() => {

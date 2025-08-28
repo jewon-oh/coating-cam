@@ -7,14 +7,19 @@ import { Point } from '@/lib/gcode/point';
  */
 export class MaskingManager {
     private readonly settings: GcodeSettings;
-    private readonly maskShapes: CustomShapeConfig[];
+    private maskShapes: CustomShapeConfig[];
     private readonly maskClearance: number;
 
-    constructor(settings: GcodeSettings, maskShapes: CustomShapeConfig[]) {
+
+    constructor(settings: GcodeSettings, maskShapes: CustomShapeConfig[]=[]) {
         this.settings = settings;
         this.maskShapes = maskShapes;
         // 마스킹 여유 거리에 코팅 라인 폭 절반을 더합니다.
         this.maskClearance = settings.maskingClearance + settings.coatingWidth / 2;
+    }
+
+    public setMaskShapes(maskShapes: CustomShapeConfig[]) {
+        this.maskShapes = maskShapes;
     }
 
     /**

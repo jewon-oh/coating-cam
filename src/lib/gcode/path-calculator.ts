@@ -4,6 +4,30 @@ import { Point } from '@/lib/gcode/point';
 import { MaskingManager } from "@/lib/gcode/mask-manager";
 
 /**
+ * Path 계산 옵션
+ */
+export interface PathCalculationOptions {
+    /** 상대 좌표로 반환할지 여부 (UI용) */
+    relative?: boolean;
+    /** 변환 정보를 함께 반환할지 여부 */
+    includeTransform?: boolean;
+}
+
+/**
+ * Path 계산 결과
+ */
+export interface PathCalculationResult {
+    segments: { start: Point; end: Point }[];
+    transform?: {
+        x: number;
+        y: number;
+        rotation: number;
+        scaleX: number;
+        scaleY: number;
+    };
+}
+
+/**
  * 개선된 PathCalculator - 단순화되고 예측 가능한 접근법
  */
 export class PathCalculator {
@@ -14,18 +38,151 @@ export class PathCalculator {
         this.settings = settings;
         this.masker = masker;
     }
+    /**
+     * 점을 회전시키는 유틸리티 함수
+     */
+    private rotatePoint(point: Point, center: Point, angleInDegrees: number): Point {
+        if (angleInDegrees === 0) return point;
+
+        const angleInRadians = (angleInDegrees * Math.PI) / 180;
+        const cos = Math.cos(angleInRadians);
+        const sin = Math.sin(angleInRadians);
+
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+
+        return {
+            x: center.x + (dx * cos - dy * sin),
+            y: center.y + (dx * sin + dy * cos)
+        };
+    }
 
     /**
-     * 메인 계산 메서드 - 단순화된 접근
+     * 도형의 회전 중심점을 계산하는 함수 (Konva의 offsetX, offsetY 고려)
      */
-    public async calculateForShape(boundary: CustomShapeConfig): Promise<{ start: Point; end: Point }[]> {
-        if (boundary.coatingType === 'fill') {
-            return this.calculateFillSegments(boundary);
-        } else if (boundary.coatingType === 'outline') {
-            return this.calculateOutlineSegments(boundary);
+    private getRotationCenter(shape: CustomShapeConfig): Point {
+        // Konva의 offsetX, offsetY 고려 (기본값은 0)
+        const offsetX = shape.offsetX ?? 0;
+        const offsetY = shape.offsetY ?? 0;
+
+        if (shape.type === 'circle') {
+            return {
+                x: (shape.x ?? 0) - offsetX,
+                y: (shape.y ?? 0) - offsetY
+            };
+        } else if (shape.type === 'rectangle' || shape.type === 'image') {
+            return {
+                x: (shape.x ?? 0) - offsetX,
+                y: (shape.y ?? 0) - offsetY
+            };
         }
-        return [];
+
+        return {
+            x: (shape.x ?? 0) - offsetX,
+            y: (shape.y ?? 0) - offsetY
+        };
     }
+
+    /**
+     * 도형의 기하학적 중심점을 계산하는 함수 (회전 변환용)
+     */
+    private getShapeCenter(shape: CustomShapeConfig): Point {
+        if (shape.type === 'circle') {
+            return {
+                x: shape.x ?? 0,
+                y: shape.y ?? 0
+            };
+        } else if (shape.type === 'rectangle' || shape.type === 'image') {
+            return {
+                x: (shape.x ?? 0) + (shape.width ?? 0) / 2,
+                y: (shape.y ?? 0) + (shape.height ?? 0) / 2
+            };
+        }
+
+        return { x: shape.x ?? 0, y: shape.y ?? 0 };
+    }
+
+    /**
+     * 세그먼트에 회전 변환 적용
+     */
+    private applyRotationToSegments(
+        segments: { start: Point; end: Point }[],
+        shape: CustomShapeConfig
+    ): { start: Point; end: Point }[] {
+        const rotation = shape.rotation ?? 0;
+        if (rotation === 0) return segments;
+
+        // Konva의 회전 중심점 사용
+        const rotationCenter = this.getRotationCenter(shape);
+
+        return segments.map(segment => ({
+            start: this.rotatePoint(segment.start, rotationCenter, rotation),
+            end: this.rotatePoint(segment.end, rotationCenter, rotation)
+        }));
+    }
+
+
+    /**
+     * 메인 계산 메서드 - 옵션을 통해 절대/상대 좌표 선택
+     */
+    public async calculateForShape(
+        boundary: CustomShapeConfig,
+        options: PathCalculationOptions = {}
+    ): Promise<PathCalculationResult> {
+        const { relative = false, includeTransform = false } = options;
+
+        let segments: { start: Point; end: Point }[] = [];
+
+        if (boundary.coatingType === 'fill') {
+            segments = await this.calculateFillSegments(boundary);
+        } else if (boundary.coatingType === 'outline') {
+            segments = this.calculateOutlineSegments(boundary);
+        }
+
+        // 회전 변환 적용 (항상 절대 좌표로 먼저 계산)
+        const absoluteSegments = this.applyRotationToSegments(segments, boundary);
+
+        // 변환 정보 준비
+        const transform = {
+            x: boundary.x ?? 0,
+            y: boundary.y ?? 0,
+            rotation: boundary.rotation ?? 0,
+            scaleX: boundary.scaleX ?? 1,
+            scaleY: boundary.scaleY ?? 1
+        };
+
+        // 상대 좌표 변환 여부에 따라 처리
+        if (relative) {
+            // UI용: 상대 좌표로 변환
+            const relativeSegments = absoluteSegments.map(seg => ({
+                start: {
+                    x: seg.start.x - transform.x,
+                    y: seg.start.y - transform.y
+                },
+                end: {
+                    x: seg.end.x - transform.x,
+                    y: seg.end.y - transform.y
+                }
+            }));
+
+            return {
+                segments: relativeSegments,
+                ...(includeTransform && { transform })
+            };
+        } else {
+            // G-code용: 절대 좌표 그대로 반환
+            return {
+                segments: absoluteSegments,
+                ...(includeTransform && { transform })
+            };
+        }
+    }
+    // 기존 메서드 유지 (하위 호환성) - 배열 직접 반환
+    public async calculateForShapeAbsolute(boundary: CustomShapeConfig): Promise<{ start: Point; end: Point }[]> {
+        const result = await this.calculateForShape(boundary, { relative: false });
+        return result.segments;
+    }
+
 
     /**
      * Fill 세그먼트 계산 - 대폭 단순화
@@ -280,20 +437,29 @@ export class PathCalculator {
     }
 
     private isPointInBoundary(point: Point, boundary: CustomShapeConfig): boolean {
+        // 회전이 적용된 경우, 점을 역회전시켜서 원래 도형 좌표계에서 검사
+        const rotation = boundary.rotation ?? 0;
+        let testPoint = point;
+
+        if (rotation !== 0) {
+            const rotationCenter = this.getRotationCenter(boundary);
+            testPoint = this.rotatePoint(point, rotationCenter, rotation);
+        }
+
         if (boundary.type === 'rectangle' || boundary.type === 'image') {
             const x = boundary.x ?? 0;
             const y = boundary.y ?? 0;
             const width = boundary.width ?? 0;
             const height = boundary.height ?? 0;
 
-            return point.x >= x && point.x <= x + width &&
-                point.y >= y && point.y <= y + height;
+            return testPoint.x >= x && testPoint.x <= x + width &&
+                testPoint.y >= y && testPoint.y <= y + height;
         } else if (boundary.type === 'circle') {
             const centerX = boundary.x ?? 0;
             const centerY = boundary.y ?? 0;
             const radius = boundary.radius ?? 0;
 
-            const distance = Math.hypot(point.x - centerX, point.y - centerY);
+            const distance = Math.hypot(testPoint.x - centerX, testPoint.y - centerY);
             return distance <= radius;
         }
 
@@ -304,6 +470,7 @@ export class PathCalculator {
         const bounds = this.getBounds(boundary);
         if (!bounds) return [];
 
+        // 회전이 없는 경우의 기본 처리
         if (boundary.type === 'rectangle' || boundary.type === 'image') {
             if (y >= bounds.y && y <= bounds.y + bounds.height) {
                 return [{ start: { x: bounds.x, y }, end: { x: bounds.x + bounds.width, y } }];
@@ -327,6 +494,7 @@ export class PathCalculator {
         const bounds = this.getBounds(boundary);
         if (!bounds) return [];
 
+        // 회전이 없는 경우의 기본 처리
         if (boundary.type === 'rectangle' || boundary.type === 'image') {
             if (x >= bounds.x && x <= bounds.x + bounds.width) {
                 return [{ start: { x, y: bounds.y }, end: { x, y: bounds.y + bounds.height } }];
@@ -345,6 +513,7 @@ export class PathCalculator {
 
         return [];
     }
+
 
     // 기존의 outline 관련 메서드들도 유지...
     private generateRectangleOutline(shape: CustomShapeConfig, offset: number, passes: number, startPoint: 'outside' | 'center' | 'inside'): { start: Point; end: Point }[] {

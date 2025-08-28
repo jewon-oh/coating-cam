@@ -50,15 +50,43 @@ const pathSlice = createSlice({
                 group.segments.push(action.payload.segment);
             }
         },
-        // Segment 업데이트
-        updateSegment(state, action: PayloadAction<{ id: string; updates: Partial<PathSegment> }>) {
-            state.pathGroups.forEach((group) => {
-                const segment = group.segments.find((s) => s.id === action.payload.id);
-                if (segment) {
-                    Object.assign(segment, action.payload.updates);
+        updateSegment(state, action: PayloadAction<{ segmentId: string; updates: Partial<PathSegment> }>) {
+            const { segmentId, updates } = action.payload;
+
+            // 해당 세그먼트가 속한 그룹을 찾아서 업데이트
+            for (const group of state.pathGroups) {
+                const segmentIndex = group.segments.findIndex(seg => seg.id === segmentId);
+                if (segmentIndex !== -1) {
+                    group.segments[segmentIndex] = {
+                        ...group.segments[segmentIndex],
+                        ...updates
+                    };
+                    break;
                 }
-            });
+            }
         },
+
+        batchUpdateSegments(state, action: PayloadAction<Array<{ segmentId: string; updates: Partial<PathSegment> }>>) {
+            const updates = action.payload;
+
+            // 성능 최적화를 위해 그룹별로 업데이트를 그룹핑
+            for (const update of updates) {
+                const { segmentId, updates: segmentUpdates } = update;
+
+                // 해당 세그먼트가 속한 그룹을 찾아서 업데이트
+                for (const group of state.pathGroups) {
+                    const segmentIndex = group.segments.findIndex(seg => seg.id === segmentId);
+                    if (segmentIndex !== -1) {
+                        group.segments[segmentIndex] = {
+                            ...group.segments[segmentIndex],
+                            ...segmentUpdates
+                        };
+                        break;
+                    }
+                }
+            }
+        },
+
         // Segment 삭제
         removeSegment(state, action: PayloadAction<string>) {
             state.pathGroups.forEach((group) => {
@@ -99,6 +127,7 @@ export const {
     removePathGroup,
     addSegment,
     updateSegment,
+    batchUpdateSegments,
     removeSegment,
     setSelectedPath,
     setSelectedSegment,

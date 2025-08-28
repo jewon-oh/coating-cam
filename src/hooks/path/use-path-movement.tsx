@@ -1,116 +1,336 @@
-import { useCallback, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
+import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { updateSegment } from '@/store/slices/path-slice';
+import { batchUpdateSegments, updateSegment } from '@/store/slices/path-slice';
+import { useSettings } from '@/contexts/settings-context';
 
 type Endpoint = 'start' | 'end';
 
 export function usePathMovement() {
     const dispatch = useAppDispatch();
     const { selectedPathId, selectedSegmentId, pathGroups } = useAppSelector((s) => s.paths);
+    const { isSnappingEnabled, gridSize } = useSettings();
 
-    const dragState = useRef<{ segmentId: string | null; endpoint: Endpoint | 'segment' | null }>({
-        segmentId: null,
-        endpoint: null,
-    });
+    const pathGroupsRef = useRef(pathGroups);
+    React.useEffect(() => {
+        pathGroupsRef.current = pathGroups;
+    }, [pathGroups]);
 
-    // 세그먼트 전체 드래그 시작
-    const handleDragStart = useCallback((segmentId?: string) => {
-        dragState.current.segmentId = segmentId ?? selectedSegmentId ?? null;
-        dragState.current.endpoint = 'segment';
-    }, [selectedSegmentId]);
+    // 드래그 시작 위치 저장용
+    const dragStartPositionsRef = useRef<Map<string, {
+        start?: { x: number; y: number };
+        end?: { x: number; y: number };
+        x?: number;
+        y?: number;
+    }>>(new Map());
 
-    // 세그먼트 전체 드래그(평행이동)
-    const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
-        if (!dragState.current.segmentId || dragState.current.endpoint !== 'segment') return;
+    // 스냅 함수
+    const snap = useCallback(
+        (v: number) => (isSnappingEnabled ? Math.round(v / gridSize) * gridSize : v),
+        [isSnappingEnabled, gridSize]
+    );
 
-        const dx = e.evt.movementX ?? 0;
-        const dy = e.evt.movementY ?? 0;
+    // 드래그 시작 핸들러
+    const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
+        const node = e.target;
+        const segmentId = node.id();
 
-        // Stage 좌표계 보정(스크린 픽셀 -> 로컬 좌표)
-        const stage = e.target.getStage();
-        if (!stage) return;
-        const scaleX = stage.scaleX() || 1;
-        const scaleY = stage.scaleY() || 1;
-        const localDx = dx / scaleX;
-        const localDy = dy / scaleY;
+        const group = pathGroupsRef.current.find(g => g.segments?.some(s => s.id === segmentId));
+        const segment = group?.segments?.find(s => s.id === segmentId);
 
-        const segId = dragState.current.segmentId;
-        const group = pathGroups.find(g => g.segments.some(s => s.id === segId));
-        const seg = group?.segments.find(s => s.id === segId);
-        if (!seg) return;
-
-        if ('start' in seg && 'end' in seg) {
-            dispatch(updateSegment({
-                id: segId,
-                updates: {
-                    start: { x: (seg.start?.x ?? 0) + localDx, y: (seg.start?.y ?? 0) + localDy },
-                    end: { x: (seg.end?.x ?? 0) + localDx, y: (seg.end?.y ?? 0) + localDy },
-                }
-            }));
-        } else {
-            // 포인트 타입(line 포인트 등)
-            dispatch(updateSegment({
-                id: segId,
-                updates: {
-                    x: (seg.x ?? 0) + localDx,
-                    y: (seg.y ?? 0) + localDy,
-                }
-            }));
-        }
-    }, [dispatch, pathGroups]);
-
-    const handleDragEnd = useCallback(() => {
-        dragState.current.segmentId = null;
-        dragState.current.endpoint = null;
-    }, []);
-
-    // 엔드포인트 드래그(노드 이동)
-    const handleEndpointDrag = useCallback((segmentId: string, endpoint: Endpoint, pos: { x: number; y: number }) => {
-        const group = pathGroups.find(g => g.segments.some(s => s.id === segmentId));
-        const seg = group?.segments.find(s => s.id === segmentId);
-        if (!seg) return;
-
-        const updates: any = {};
-        if ('start' in seg && 'end' in seg) {
-            updates[endpoint] = { x: pos.x, y: pos.y };
-        } else {
-            // 포인트 단일 타입이면 x,y로 갱신
-            updates.x = pos.x;
-            updates.y = pos.y;
-        }
-        dispatch(updateSegment({ id: segmentId, updates }));
-    }, [dispatch, pathGroups]);
-
-    // 방향키로 Nudging (전체 그룹 이동)
-    const handleNudge = useCallback((direction: 'up' | 'down' | 'left' | 'right', step = 1) => {
-        if (!selectedPathId) return;
-        const group = pathGroups.find(g => g.id === selectedPathId);
-        if (!group) return;
-
-        const delta =
-            direction === 'up' ? { dx: 0, dy: -step } :
-                direction === 'down' ? { dx: 0, dy: step } :
-                    direction === 'left' ? { dx: -step, dy: 0 } :
-                        { dx: step, dy: 0 };
-
-        for (const seg of group.segments) {
-            if ('start' in seg && 'end' in seg) {
-                dispatch(updateSegment({
-                    id: seg.id,
-                    updates: {
-                        start: { x: (seg.start?.x ?? 0) + delta.dx, y: (seg.start?.y ?? 0) + delta.dy },
-                        end: { x: (seg.end?.x ?? 0) + delta.dx, y: (seg.end?.y ?? 0) + delta.dy },
-                    }
-                }));
+        if (segment) {
+            if ('start' in segment && 'end' in segment) {
+                dragStartPositionsRef.current.set(segmentId, {
+                    start: { x: segment.start?.x ?? 0, y: segment.start?.y ?? 0 },
+                    end: { x: segment.end?.x ?? 0, y: segment.end?.y ?? 0 }
+                });
             } else {
-                dispatch(updateSegment({
-                    id: seg.id,
-                    updates: { x: (seg.x ?? 0) + delta.dx, y: (seg.y ?? 0) + delta.dy }
-                }));
+                dragStartPositionsRef.current.set(segmentId, {
+                    x: segment.x ?? 0,
+                    y: segment.y ?? 0
+                });
             }
         }
-    }, [dispatch, pathGroups, selectedPathId]);
+    }, []);
+
+    // 드래그 이동 중 스냅 적용
+    const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
+        // Transformer가 변형을 처리하므로 여기서는 스냅핑만 적용
+        if (isSnappingEnabled) {
+            const node = e.target as Konva.Node & {
+                points: () => number[];
+                points: (points: number[]) => void;
+            };
+
+            if (node.points) {
+                const points = node.points();
+                const snappedPoints = [
+                    snap(points[0]), snap(points[1]),
+                    snap(points[2]), snap(points[3])
+                ];
+
+                if (snappedPoints.some((p, i) => p !== points[i])) {
+                    node.points(snappedPoints);
+                    node.getLayer()?.batchDraw();
+                }
+            }
+        }
+    }, [snap, isSnappingEnabled]);
+
+    // 드래그 종료 핸들러 - 실제 이동했을 때만 업데이트
+    const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
+        const node = e.target;
+        const segmentId = node.id();
+
+        const group = pathGroupsRef.current.find(g => g.segments?.some(s => s.id === segmentId));
+        const segment = group?.segments?.find(s => s.id === segmentId);
+
+        if (!segment) return;
+
+        const startPos = dragStartPositionsRef.current.get(segmentId);
+        if (!startPos) return;
+
+        // 실제로 이동했는지 확인
+        let hasMoved = false;
+        const updates: any = {};
+
+        if ('start' in segment && 'end' in segment) {
+            const currentStart = { x: segment.start?.x ?? 0, y: segment.start?.y ?? 0 };
+            const currentEnd = { x: segment.end?.x ?? 0, y: segment.end?.y ?? 0 };
+
+            hasMoved = startPos.start && (
+                Math.abs(currentStart.x - startPos.start.x) > 0.5 ||
+                Math.abs(currentStart.y - startPos.start.y) > 0.5 ||
+                Math.abs(currentEnd.x - (startPos.end?.x ?? 0)) > 0.5 ||
+                Math.abs(currentEnd.y - (startPos.end?.y ?? 0)) > 0.5
+            );
+
+            if (hasMoved) {
+                updates.start = { x: snap(currentStart.x), y: snap(currentStart.y) };
+                updates.end = { x: snap(currentEnd.x), y: snap(currentEnd.y) };
+            }
+        } else {
+            const currentPos = { x: segment.x ?? 0, y: segment.y ?? 0 };
+
+            hasMoved = Math.abs(currentPos.x - (startPos.x ?? 0)) > 0.5 ||
+                Math.abs(currentPos.y - (startPos.y ?? 0)) > 0.5;
+
+            if (hasMoved) {
+                updates.x = snap(currentPos.x);
+                updates.y = snap(currentPos.y);
+            }
+        }
+
+        if (hasMoved && Object.keys(updates).length > 0) {
+            dispatch(updateSegment({
+                segmentId: segmentId,
+                updates
+            }));
+        }
+
+        // 시작 위치 정리
+        dragStartPositionsRef.current.delete(segmentId);
+    }, [dispatch, snap]);
+
+    // 엔드포인트 직접 드래그 (Transformer의 앵커 포인트 조작)
+    const handleEndpointDrag = useCallback((segmentId: string, endpoint: Endpoint, pos: { x: number; y: number }) => {
+        const group = pathGroupsRef.current.find(g => g.segments?.some(s => s.id === segmentId));
+        const segment = group?.segments?.find(s => s.id === segmentId);
+        if (!segment) return;
+
+        const snappedPos = { x: snap(pos.x), y: snap(pos.y) };
+        const updates: any = {};
+
+        if ('start' in segment && 'end' in segment) {
+            updates[endpoint] = snappedPos;
+        } else {
+            // 포인트 단일 타입이면 x,y로 갱신
+            updates.x = snappedPos.x;
+            updates.y = snappedPos.y;
+        }
+
+        dispatch(updateSegment({
+            segmentId: segmentId,
+            updates
+        }));
+    }, [dispatch, snap]);
+
+    // 키보드를 통한 미세 이동 (선택된 segment 또는 전체 path)
+    const handleNudge = useCallback((direction: 'up' | 'down' | 'left' | 'right', distance = 1) => {
+        let deltaX = 0;
+        let deltaY = 0;
+
+        switch (direction) {
+            case 'up':
+                deltaY = -distance;
+                break;
+            case 'down':
+                deltaY = distance;
+                break;
+            case 'left':
+                deltaX = -distance;
+                break;
+            case 'right':
+                deltaX = distance;
+                break;
+        }
+
+        const updates: Array<{ segmentId: string; updates: any }> = [];
+
+        if (selectedSegmentId) {
+            // 단일 segment 이동
+            const group = pathGroupsRef.current.find(g => g.segments?.some(s => s.id === selectedSegmentId));
+            const segment = group?.segments?.find(s => s.id === selectedSegmentId);
+
+            if (segment) {
+                if ('start' in segment && 'end' in segment) {
+                    const newStart = {
+                        x: snap((segment.start?.x ?? 0) + deltaX),
+                        y: snap((segment.start?.y ?? 0) + deltaY)
+                    };
+                    const newEnd = {
+                        x: snap((segment.end?.x ?? 0) + deltaX),
+                        y: snap((segment.end?.y ?? 0) + deltaY)
+                    };
+                    updates.push({
+                        segmentId: selectedSegmentId,
+                        updates: { start: newStart, end: newEnd }
+                    });
+                } else {
+                    updates.push({
+                        segmentId: selectedSegmentId,
+                        updates: {
+                            x: snap((segment.x ?? 0) + deltaX),
+                            y: snap((segment.y ?? 0) + deltaY)
+                        }
+                    });
+                }
+            }
+        } else if (selectedPathId) {
+            // 전체 path group 이동
+            const group = pathGroupsRef.current.find(g => g.id === selectedPathId);
+
+            if (group?.segments) {
+                group.segments.forEach(segment => {
+                    if ('start' in segment && 'end' in segment) {
+                        const newStart = {
+                            x: snap((segment.start?.x ?? 0) + deltaX),
+                            y: snap((segment.start?.y ?? 0) + deltaY)
+                        };
+                        const newEnd = {
+                            x: snap((segment.end?.x ?? 0) + deltaX),
+                            y: snap((segment.end?.y ?? 0) + deltaY)
+                        };
+                        updates.push({
+                            segmentId: segment.id,
+                            updates: { start: newStart, end: newEnd }
+                        });
+                    } else {
+                        updates.push({
+                            segmentId: segment.id,
+                            updates: {
+                                x: snap((segment.x ?? 0) + deltaX),
+                                y: snap((segment.y ?? 0) + deltaY)
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        if (updates.length > 0) {
+            // 배치 업데이트 (성능 최적화)
+            if (updates.length === 1) {
+                dispatch(updateSegment(updates[0]));
+            } else {
+                dispatch(batchUpdateSegments(updates));
+            }
+        }
+    }, [selectedSegmentId, selectedPathId, snap, dispatch]);
+
+    // 세그먼트를 특정 위치로 이동
+    const moveSegmentTo = useCallback((segmentId: string, position: { x: number; y: number }) => {
+        const group = pathGroupsRef.current.find(g => g.segments?.some(s => s.id === segmentId));
+        const segment = group?.segments?.find(s => s.id === segmentId);
+        if (!segment) return;
+
+        const snappedPos = { x: snap(position.x), y: snap(position.y) };
+        const updates: any = {};
+
+        if ('start' in segment && 'end' in segment) {
+            // 라인 세그먼트의 경우 중심점을 기준으로 이동
+            const currentCenterX = ((segment.start?.x ?? 0) + (segment.end?.x ?? 0)) / 2;
+            const currentCenterY = ((segment.start?.y ?? 0) + (segment.end?.y ?? 0)) / 2;
+
+            const deltaX = snappedPos.x - currentCenterX;
+            const deltaY = snappedPos.y - currentCenterY;
+
+            updates.start = {
+                x: (segment.start?.x ?? 0) + deltaX,
+                y: (segment.start?.y ?? 0) + deltaY
+            };
+            updates.end = {
+                x: (segment.end?.x ?? 0) + deltaX,
+                y: (segment.end?.y ?? 0) + deltaY
+            };
+        } else {
+            updates.x = snappedPos.x;
+            updates.y = snappedPos.y;
+        }
+
+        dispatch(updateSegment({
+            segmentId: segmentId,
+            updates
+        }));
+    }, [snap, dispatch]);
+
+    // 여러 세그먼트를 특정 위치로 이동
+    const moveSegmentsTo = useCallback((segmentIds: string[], positions: Array<{ x: number; y: number }>) => {
+        const updates: Array<{ segmentId: string; updates: any }> = [];
+
+        segmentIds.forEach((segmentId, index) => {
+            if (positions[index]) {
+                const group = pathGroupsRef.current.find(g => g.segments?.some(s => s.id === segmentId));
+                const segment = group?.segments?.find(s => s.id === segmentId);
+
+                if (segment) {
+                    const snappedPos = { x: snap(positions[index].x), y: snap(positions[index].y) };
+
+                    if ('start' in segment && 'end' in segment) {
+                        const currentCenterX = ((segment.start?.x ?? 0) + (segment.end?.x ?? 0)) / 2;
+                        const currentCenterY = ((segment.start?.y ?? 0) + (segment.end?.y ?? 0)) / 2;
+
+                        const deltaX = snappedPos.x - currentCenterX;
+                        const deltaY = snappedPos.y - currentCenterY;
+
+                        updates.push({
+                            segmentId: segmentId,
+                            updates: {
+                                start: {
+                                    x: (segment.start?.x ?? 0) + deltaX,
+                                    y: (segment.start?.y ?? 0) + deltaY
+                                },
+                                end: {
+                                    x: (segment.end?.x ?? 0) + deltaX,
+                                    y: (segment.end?.y ?? 0) + deltaY
+                                }
+                            }
+                        });
+                    } else {
+                        updates.push({
+                            segmentId: segmentId,
+                            updates: snappedPos
+                        });
+                    }
+                }
+            }
+        });
+
+        if (updates.length > 0) {
+            dispatch(batchUpdateSegments(updates));
+        }
+    }, [snap, dispatch]);
 
     return {
         handleDragStart,
@@ -118,5 +338,8 @@ export function usePathMovement() {
         handleDragEnd,
         handleEndpointDrag,
         handleNudge,
+        moveSegmentTo,
+        moveSegmentsTo,
+        isSnappingEnabled,
     };
 }

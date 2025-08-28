@@ -1,14 +1,17 @@
+
 // types/path.ts
+import {Point} from "@/lib/gcode/point";
+
 export interface PathSegment {
     id: string;
-    start: { x: number; y: number };
-    end: { x: number; y: number };
-    type: 'G0' | 'G1'; // 이동 vs 코팅
+    // 상대 좌표로 변경 (shape 기준)
+    start: Point;
+    end: Point;
+    type: 'G0' | 'G1';
     speed?: number;
-    originalLine?: number; // 원본 G-code 라인 번호
-    z?: number; // Z 높이 값
-    feedRate?: number; // 이송 속도
-    comment?: string; // 주석
+    originalLine?: number;
+    feedRate?: number;
+    comment?: string;
 }
 
 export interface PathGroup {
@@ -17,6 +20,17 @@ export interface PathGroup {
     segments: PathSegment[];
     visible: boolean;
     locked: boolean;
-    color?: string; // 시각화를 위한 색상
-    order?: number; // 실행 순서
+    color?: string;
+    order?: number;
+
+    // Shape 연결 정보 추가
+    sourceShapeId?: string;  // 연결된 shape ID
+    isRelative: boolean;     // 상대 좌표 여부
+    baseTransform?: {        // 생성 시점의 shape 변환 정보
+        x: number;
+        y: number;
+        rotation: number;
+        scaleX: number;
+        scaleY: number;
+    };
 }

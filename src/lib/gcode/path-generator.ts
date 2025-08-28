@@ -77,8 +77,8 @@ export class PathGenerator {
                 const shapeTypeLabel = boundary.type === 'image' ? 'PCB' : boundary.type.toUpperCase();
                 if (onProgress) onProgress(boundaryProgressBase, `${shapeTypeLabel} ${bi + 1}/${orderedBoundaries.length} 경로 계산 중...`);
 
-                // 1. 경로 계산
-                const rawSegments = await this.calculator.calculateForShape(boundary);
+                // 1. 경로 계산 - G-code 생성용: 절대 좌표로 계산
+                const rawSegments = await this.calculator.calculateForShapeAbsolute(boundary);
 
                 // 2. 마스킹 적용
                 const maskedSegments = this.masker.applyMaskingToSegments(rawSegments, boundary);
