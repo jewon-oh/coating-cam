@@ -36,11 +36,11 @@ export function PathLayer({ isPanning = false }: PathLayerProps) {
 
     // 캔버스 컨텍스트
     const { stage } = useCanvas();
-    const { gcodeSettings } = useSettings();
+    const { coatingSettings } = useSettings();
 
     // path 생성 클래스
-    const masker = new MaskingManager(gcodeSettings);
-    const calc = new PathCalculator(gcodeSettings, masker);
+    const masker = new MaskingManager(coatingSettings);
+    const calc = new PathCalculator(coatingSettings, masker);
 
     // 이벤트 훅
     const pathEvents = usePathEvents();
@@ -229,7 +229,7 @@ export function PathLayer({ isPanning = false }: PathLayerProps) {
 
             const timer = window.setTimeout(async () => {
                 try {
-                    if (!gcodeSettings) return;
+                    if (!coatingSettings) return;
 
                     // UI용: 상대 좌표와 변환 정보 요청
                     const result = await calc.calculateForShape(shape, {
@@ -240,7 +240,7 @@ export function PathLayer({ isPanning = false }: PathLayerProps) {
                     const groupId = groupIdOf(id);
                     const segments = toSegments(result.segments ?? [], groupId);
 
-                    const exists = paths .some((g) => g.id === groupId);
+                    const exists = pathGroups.some((g) => g.id === groupId);
                     const base = {
                         id: groupId,
                         name: `${shape.name || shape.type || 'Shape'} Path`,
@@ -302,7 +302,7 @@ export function PathLayer({ isPanning = false }: PathLayerProps) {
             timersRef.current.forEach((t) => window.clearTimeout(t));
             timersRef.current.clear();
         };
-    }, [dispatch, shapes, paths, shapeSnapshot, groupIdOf, toSegments, gcodeSettings, calc]);
+    }, [dispatch, shapes, pathGroups, shapeSnapshot, groupIdOf, toSegments, coatingSettings, calc]);
 
     // =================== 렌더링 ===================
 
@@ -431,7 +431,7 @@ export function PathLayer({ isPanning = false }: PathLayerProps) {
                         ? 'rgba(59,130,246,0.15)'
                         : 'rgba(16,185,129,0.15)';
 
-            const coatingWidth = gcodeSettings?.coatingWidth ?? 2;
+            const coatingWidth = coatingSettings?.coatingWidth ?? 2;
             const p = makeCenteredRectForSegment(start, end, coatingWidth);
 
             return (
@@ -472,7 +472,7 @@ export function PathLayer({ isPanning = false }: PathLayerProps) {
             handleSegmentSelect,
             strokeWidthFor,
             getAbsoluteCoordinates,
-            gcodeSettings,
+            coatingSettings,
             makeCenteredRectForSegment,
             handleTransformStart,
             handleTransform,
@@ -514,7 +514,7 @@ export function PathLayer({ isPanning = false }: PathLayerProps) {
                 </Group>
             );
         },
-        [isPanning, pathEvents, renderSegment,]
+        [isPanning, pathEvents, renderSegment, selectedSegmentId]
     );
 
     return (

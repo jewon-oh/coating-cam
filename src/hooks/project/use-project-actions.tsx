@@ -45,7 +45,7 @@ export function useProjectActions() {
         const payload:ProjectFileType = {
             version: 1,
             shapes,
-            gcodeSettings
+            coatingSettings: gcodeSettings
         };
 
         const projectJson = JSON.stringify({ payload }, null, 2);

@@ -1,5 +1,5 @@
 // src/hooks/use-shape-drawing.tsx
-import React, { useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';

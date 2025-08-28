@@ -1,17 +1,17 @@
 import { CustomShapeConfig } from '@/types/custom-konva-config';
-import { GcodeSettings } from '@/types/gcode';
+import {CoatingSettings} from "@/types/coating";
 import { Point } from '@/lib/gcode/point';
 
 /**
  * 마스킹 계산 및 경로 분할만 담당하는 클래스
  */
 export class MaskingManager {
-    private readonly settings: GcodeSettings;
+    private readonly settings: CoatingSettings;
     private maskShapes: CustomShapeConfig[];
     private readonly maskClearance: number;
 
 
-    constructor(settings: GcodeSettings, maskShapes: CustomShapeConfig[]=[]) {
+    constructor(settings: CoatingSettings, maskShapes: CustomShapeConfig[]=[]) {
         this.settings = settings;
         this.maskShapes = maskShapes;
         // 마스킹 여유 거리에 코팅 라인 폭 절반을 더합니다.

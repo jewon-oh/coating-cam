@@ -1,4 +1,4 @@
-import { GcodeSettings } from "@/types/gcode";
+import { CoatingSettings } from "@/types/gcode";
 import { CustomShapeConfig } from "@/types/custom-konva-config";
 import { GCodeEmitter } from "@/lib/gcode/gcode-emitter";
 import { ProgressCallback } from "@/lib/gcode/progress-callback";
@@ -18,7 +18,7 @@ function shouldSkipCoating(shape: Partial<CustomShapeConfig>): boolean {
  * 도형들을 분석하여 실제 G-code 경로(segments)를 생성합니다.
  */
 export class PathGenerator {
-    private readonly settings: GcodeSettings;
+    private readonly settings: CoatingSettings;
     private readonly coatingShapes: CustomShapeConfig[];
 
     // 모듈 인스턴스
@@ -26,7 +26,7 @@ export class PathGenerator {
     private readonly masker: MaskingManager;
     private readonly optimizer: PathOptimizer;
 
-    constructor(settings: GcodeSettings, workArea: { width: number; height: number }, shapes: CustomShapeConfig[]) {
+    constructor(settings: CoatingSettings, workArea: { width: number; height: number }, shapes: CustomShapeConfig[]) {
         this.settings = settings;
         // 코팅에서 제외되지 않은 도형들만 필터링
         const activeShapes = shapes.filter(s => !shouldSkipCoating(s));

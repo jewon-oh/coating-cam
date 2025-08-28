@@ -1,4 +1,4 @@
-import {GcodeSettings} from "@/types/gcode";
+import {CoatingSettings} from "@/types/coating";
 import {Point} from "@/lib/gcode/point";
 
 /**
@@ -11,9 +11,9 @@ export class GCodeEmitter {
     // 마지막으로 이동한 위치를 추적하여 불필요한 이동 명령을 방지합니다.
     private lastPosition: Point = {x: 0, y: 0, z: 0};
     // G-code 생성에 필요한 설정을 담고 있습니다. (예: 속도, 높이)
-    private readonly settings: GcodeSettings;
+    private readonly settings: CoatingSettings;
 
-    constructor(settings: GcodeSettings) {
+    constructor(settings: CoatingSettings) {
         this.settings = settings;
     }
 

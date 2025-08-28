@@ -1,4 +1,4 @@
-import { GcodeSettings } from '@/types/gcode';
+import {CoatingSettings} from "@/types/coating";
 import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { Point } from '@/lib/gcode/point';
 import { ProgressCallback } from '@/lib/gcode/progress-callback';
@@ -7,7 +7,7 @@ import { GCodeEmitter } from '@/lib/gcode/gcode-emitter';
 /**
  * 개별 도형의 코팅 높이를 계산합니다.
  */
-function getCoatingHeight(shape: CustomShapeConfig, settings: GcodeSettings): number {
+function getCoatingHeight(shape: CustomShapeConfig, settings: CoatingSettings): number {
     if (typeof shape.coatingHeight === 'number') {
         return shape.coatingHeight;
     }
@@ -17,7 +17,7 @@ function getCoatingHeight(shape: CustomShapeConfig, settings: GcodeSettings): nu
 /**
  * 개별 도형의 코팅 속도를 계산합니다.
  */
-function getCoatingSpeed(shape: CustomShapeConfig, settings: GcodeSettings): number {
+function getCoatingSpeed(shape: CustomShapeConfig, settings: CoatingSettings): number {
     if (typeof shape.coatingSpeed === 'number') {
         return shape.coatingSpeed;
     }
@@ -28,10 +28,10 @@ function getCoatingSpeed(shape: CustomShapeConfig, settings: GcodeSettings): num
  * 경로 그룹화, 순서 최적화, 이동 경로 회피를 담당하는 클래스
  */
 export class PathOptimizer {
-    private readonly settings: GcodeSettings;
+    private readonly settings: CoatingSettings;
     private readonly maskShapes: CustomShapeConfig[];
 
-    constructor(settings: GcodeSettings, maskShapes: CustomShapeConfig[]) {
+    constructor(settings: CoatingSettings, maskShapes: CustomShapeConfig[]) {
         this.settings = settings;
         this.maskShapes = maskShapes;
     }

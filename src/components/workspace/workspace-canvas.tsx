@@ -16,7 +16,6 @@ import {useStageEvents} from '@/hooks/use-stage-events';
 // 컴포넌트 및 타입
 import CanvasGrid from '@/components/workspace/canvas-grid';
 import {ShapeLayer} from '@/components/workspace/shape/shape-layer';
-import {PathLayer} from "@/components/workspace/path-layer";
 import {useGlobalKeyboard} from '@/hooks/use-global-keyboard';
 
 // ===== 메인 컴포넌트 =====
@@ -201,9 +200,9 @@ export default function WorkspaceCanvas() {
                     <ShapeLayer isPanning={isPanning}/>
                 )}
 
-                {workspaceMode === "path" && (
-                    <PathLayer/>
-                )}
+                {/*{workspaceMode === "path" && (*/}
+                {/*    <PathLayer/>*/}
+                {/*)}*/}
             </Stage>
         </div>
     );

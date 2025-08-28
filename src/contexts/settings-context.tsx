@@ -12,7 +12,8 @@ import React, {
     useState,
 } from "react";
 import {nanoid} from "nanoid";
-import type {GCodeHook, GcodeSettings, GCodeSnippet} from "@/types/gcode";
+import type {GCodeHook, GCodeSnippet} from "@/types/gcode";
+import {CoatingSettings} from "@/types/coating";
 import {DEFAULT_SETTINGS, SettingsType} from "@/types/settings";
 
 function useSettingsBridge() {
@@ -120,9 +121,9 @@ type SettingsContextType = {
     setWorkArea: (wa: { width: number; height: number }) => void;
 
     // G-Code 설정 추가
-    gcodeSettings: GcodeSettings;
-    updateGcodeSettings: (patch: Partial<GcodeSettings>) => void;
-    setGcodeSettings: (settings: GcodeSettings) => void;
+    gcodeSettings: CoatingSettings;
+    updateGcodeSettings: (patch: Partial<CoatingSettings>) => void;
+    setGcodeSettings: (settings: CoatingSettings) => void;
 
     // G-Code 스니펫 API
     gcodeSnippets: GCodeSnippet[];
@@ -159,7 +160,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
     const [workArea, setWorkArea] = useState(DEFAULT_SETTINGS.workArea);
 
     // G-Code 설정 상태 추가
-    const [gcodeSettings, setGcodeSettings] = useState<GcodeSettings>(DEFAULT_SETTINGS.gcodeSettings);
+    const [gcodeSettings, setGcodeSettings] = useState<CoatingSettings>(DEFAULT_SETTINGS.coatingSettings);
 
     // G-Code 스니펫 (useReducer)
     const [gcodeSnippets, dispatchSnippets] = useReducer(
@@ -168,7 +169,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
     );
 
     // G-Code 설정 업데이트 함수
-    const updateGcodeSettings = useCallback((patch: Partial<GcodeSettings>) => {
+    const updateGcodeSettings = useCallback((patch: Partial<CoatingSettings>) => {
         setGcodeSettings(prev => ({ ...prev, ...patch }));
     }, []);
 
@@ -194,7 +195,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
                 setWorkArea(settings.workArea ?? DEFAULT_SETTINGS.workArea);
 
                 // G-Code 설정 로드
-                setGcodeSettings(settings.gcodeSettings ?? DEFAULT_SETTINGS.gcodeSettings);
+                setGcodeSettings(settings.coatingSettings ?? DEFAULT_SETTINGS.coatingSettings);
 
                 dispatchSnippets({
                     type: "setAll",
@@ -241,7 +242,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
                 snapping: isSnappingEnabled,
             },
             theme,
-            gcodeSettings,
+            coatingSettings: gcodeSettings,
             gcodeSnippets,
         };
         scheduleSave(snapshot);

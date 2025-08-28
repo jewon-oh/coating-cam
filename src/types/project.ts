@@ -1,8 +1,8 @@
 import {CustomShapeConfig} from "@/types/custom-konva-config";
-import {GcodeSettings} from "@/types/gcode";
+import {CoatingSettings} from "@/types/coating";
 
 export type ProjectFileType ={
     version:number,
     shapes: CustomShapeConfig[],
-    gcodeSettings: GcodeSettings
+    coatingSettings: CoatingSettings
 }

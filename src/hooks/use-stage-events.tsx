@@ -7,7 +7,6 @@ import { usePanZoom } from '@/hooks/use-pan-zoom';
 
 // 모드별 이벤트 훅들
 import { useShapeEvents } from "@/hooks/use-shape-events";
-import { usePathEvents } from "@/hooks/use-path-events";
 
 interface UseStageEventsProps {
     workspaceMode: 'shape' | 'path';
@@ -28,19 +27,17 @@ export function useStageEvents({ workspaceMode }: UseStageEventsProps) {
 
     // 모든 모드의 이벤트 핸들러를 항상 생성 (훅 규칙 준수)
     const shapeEvents = useShapeEvents();
-    const pathEvents = usePathEvents();
 
     // workspaceMode에 따라 현재 활성화된 모드 선택
     const modeEvents = useMemo(() => {
         switch (workspaceMode) {
             case 'shape':
                 return shapeEvents;
-            case 'path':
-                return pathEvents;
+
             default:
                 return shapeEvents; // 기본값
         }
-    }, [workspaceMode, shapeEvents, pathEvents]);
+    }, [workspaceMode, shapeEvents]);
 
     // 통합된 Stage 이벤트 핸들러들
     const handleStageMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
@@ -132,10 +129,9 @@ export function useStageEvents({ workspaceMode }: UseStageEventsProps) {
         workspaceMode,
 
         // 현재 활성화된 모드의 상태들
-        selectedShapeIds: workspaceMode === 'shape' ? shapeEvents.selectedShapeIds : [],
-        selectedPathIds: workspaceMode === 'path' ? pathEvents.selectedPathIds : [],
+        selectedShapeIds: shapeEvents.selectedShapeIds || [],
         isDrawing: modeEvents.isDrawing || false,
-        isDragSelecting: workspaceMode === 'shape' ? shapeEvents.isDragSelecting : pathEvents.isDragSelecting,
+        isDragSelecting: shapeEvents.isDragSelecting,
         hasClipboardData: modeEvents.hasClipboardData || false,
         isSnappingEnabled: modeEvents.isSnappingEnabled || false,
 
@@ -144,14 +140,10 @@ export function useStageEvents({ workspaceMode }: UseStageEventsProps) {
         handleCopy: modeEvents.handleCopy,
         handlePaste: modeEvents.handlePaste,
         handleCut: modeEvents.handleCut,
-        handleGroup: workspaceMode === 'shape' ? shapeEvents.handleGroup : undefined,
-        handleUngroup: workspaceMode === 'shape' ? shapeEvents.handleUngroup : undefined,
+        handleGroup: shapeEvents.handleGroup,
+        handleUngroup: shapeEvents.handleUngroup,
         handleSelectAll: modeEvents.handleSelectAll,
         handleNudge: modeEvents.handleNudge,
 
-        // Path 전용 기능들 (path 모드일 때만 사용 가능)
-        handleNodeEdit: workspaceMode === 'path' ? pathEvents.handleNodeEdit : undefined,
-        handlePathClose: workspaceMode === 'path' ? pathEvents.handlePathClose : undefined,
-        handlePathOpen: workspaceMode === 'path' ? pathEvents.handlePathOpen : undefined,
     };
 }

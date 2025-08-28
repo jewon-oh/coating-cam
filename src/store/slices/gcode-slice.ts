@@ -1,5 +1,11 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { GCodeState} from "@/types/gcode";
+
+interface GCodeState {
+    gcode: string;
+    gcodePath: number[][];
+    lastGenerated: number | null;
+    isGenerating: boolean;
+}
 
 const initialState: GCodeState = {
     gcode: '',

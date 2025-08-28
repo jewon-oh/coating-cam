@@ -60,7 +60,7 @@ export function useProjectAutoLoad() {
                 const {
                     version: parsedVersion,
                     shapes: parsedShapes,
-                    gcodeSettings: parsedGcodeSettings,
+                    coatingSettings: parsedGcodeSettings,
                 } = parsed;
 
                 console.log(`[Project Load] Project file version: ${parsedVersion}`);

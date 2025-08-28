@@ -1,5 +1,5 @@
 import { CustomShapeConfig } from '@/types/custom-konva-config';
-import { GcodeSettings } from '@/types/gcode';
+import {CoatingSettings} from "@/types/coating";
 import { Point } from '@/lib/gcode/point';
 import { MaskingManager } from "@/lib/gcode/mask-manager";
 
@@ -31,10 +31,10 @@ export interface PathCalculationResult {
  * 개선된 PathCalculator - 단순화되고 예측 가능한 접근법
  */
 export class PathCalculator {
-    private readonly settings: GcodeSettings;
+    private readonly settings: CoatingSettings;
     private readonly masker: MaskingManager;
 
-    constructor(settings: GcodeSettings, masker: MaskingManager) {
+    constructor(settings: CoatingSettings, masker: MaskingManager) {
         this.settings = settings;
         this.masker = masker;
     }
