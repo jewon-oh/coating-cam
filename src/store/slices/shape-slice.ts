@@ -75,6 +75,10 @@ const shapeSlice = createSlice({
     name: 'shape',
     initialState,
     reducers: {
+        clearShapes: (state) => {
+            Object.assign(state, initialState);
+            state.lastUpdateTimestamp = Date.now();
+        },
         // addShape: Object.assign으로 배열 교체 금지 → push 사용
         addShape: (state, action: PayloadAction<SerializableShapePayload>) => {
             // shapes 안에 있는 같은 타입의 shape 개수를 세어 이름에 사용
@@ -373,7 +377,7 @@ export const {
     renameGroup,
     toggleGroupVisibility,
     toggleGroupLock,
-
+    clearShapes,
 } = shapeSlice.actions;
 
 export default shapeSlice.reducer;

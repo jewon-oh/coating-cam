@@ -27,8 +27,7 @@ import { useTheme } from "next-themes";
 
 export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}   >
-            {/* 핵심: flex column + max-h, 중간 래퍼 min-h-0 + overflow-y-auto */}
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-5xl p-0 flex flex-col max-h-[90vh] translate-y-[0%] top-16">
                 {/* 헤더 */}
                 <div className="px-6 pt-6">
@@ -43,9 +42,10 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                     <Tabs defaultValue="general" className="w-full flex-1 min-h-0 flex flex-col">
                         {/* 탭 리스트(상단 고정) */}
                         <div className="px-6">
-                            <TabsList className="w-full grid grid-cols-3 sticky top-0 z-10">
+                            <TabsList className="w-full grid grid-cols-4 sticky top-0 z-10">
                                 <TabsTrigger value="general">일반</TabsTrigger>
                                 <TabsTrigger value="view">뷰/그리드</TabsTrigger>
+                                <TabsTrigger value="coating">코팅</TabsTrigger>
                                 <TabsTrigger value="gcode">G-Code 스니펫</TabsTrigger>
                             </TabsList>
                         </div>
@@ -60,6 +60,10 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                                 <ViewGridSettings />
                             </TabsContent>
 
+                            <TabsContent value="coating" className="mt-4 space-y-6">
+                                <CoatingSettings />
+                            </TabsContent>
+
                             <TabsContent value="gcode" className="mt-4 space-y-6">
                                 <GCodeSnippetsSection />
                             </TabsContent>
@@ -69,11 +73,9 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 <Separator />
                 {/* 푸터 */}
                 <DialogFooter className="gap-2 px-3 py-3">
-
                     <p className="mx-3 text-xs text-muted-foreground">*변경사항은 자동 저장됩니다.</p>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>닫기</Button>
                 </DialogFooter>
-
             </DialogContent>
         </Dialog>
     );
@@ -144,9 +146,7 @@ function GeneralSettings() {
                     <Select
                         value={(runtimeTheme as any) ?? "system"}
                         onValueChange={(v) => {
-                            // 즉시 UI 적용(shadcn/next-themes)
                             setTheme(v as any);
-                            // 설정 파일에도 저장
                             setThemePersisted(v);
                         }}
                     >
@@ -219,6 +219,173 @@ function ViewGridSettings() {
     );
 }
 
+/* 코팅 탭: 기본 코팅 설정 */
+function CoatingSettings() {
+    const { gcodeSettings, updateGcodeSettings } = useSettings();
+
+    const handleInputChange = useCallback((field: string, value: string) => {
+        const numValue = parseFloat(value) || 0;
+        updateGcodeSettings({ [field]: numValue });
+    }, [updateGcodeSettings]);
+
+    const handleSelectChange = useCallback((field: string, value: string) => {
+        updateGcodeSettings({ [field]: value });
+    }, [updateGcodeSettings]);
+
+    const handleSwitchChange = useCallback((field: string, value: boolean) => {
+        updateGcodeSettings({ [field]: value });
+    }, [updateGcodeSettings]);
+
+    return (
+        <section className="space-y-6">
+            <div>
+                <h3 className="text-base font-semibold">코팅 설정</h3>
+                <p className="text-sm text-muted-foreground">기본 코팅 매개변수를 설정합니다.</p>
+            </div>
+
+            {/* 기본 코팅 설정 */}
+            <div className="rounded-md border p-4 space-y-4">
+                <h4 className="font-medium text-sm">기본 매개변수</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label className="text-sm">코팅 폭 (mm)</Label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={gcodeSettings.coatingWidth}
+                            onChange={(e) => handleInputChange('coatingWidth', e.target.value)}
+                            className="h-9"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-sm">라인 간격 (mm)</Label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={gcodeSettings.lineSpacing}
+                            onChange={(e) => handleInputChange('lineSpacing', e.target.value)}
+                            className="h-9"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-sm">코팅 속도 (mm/min)</Label>
+                        <Input
+                            type="number"
+                            value={gcodeSettings.coatingSpeed}
+                            onChange={(e) => handleInputChange('coatingSpeed', e.target.value)}
+                            className="h-9"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-sm">이동 속도 (mm/min)</Label>
+                        <Input
+                            type="number"
+                            value={gcodeSettings.moveSpeed}
+                            onChange={(e) => handleInputChange('moveSpeed', e.target.value)}
+                            className="h-9"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Z축 설정 */}
+            <div className="rounded-md border p-4 space-y-4">
+                <h4 className="font-medium text-sm">Z축 설정</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label className="text-sm">안전 높이 (mm)</Label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={gcodeSettings.safeHeight}
+                            onChange={(e) => handleInputChange('safeHeight', e.target.value)}
+                            className="h-9"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-sm">코팅 높이 (mm)</Label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={gcodeSettings.coatingHeight}
+                            onChange={(e) => handleInputChange('coatingHeight', e.target.value)}
+                            className="h-9"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* 패턴 및 마스킹 설정 */}
+            <div className="rounded-md border p-4 space-y-4">
+                <h4 className="font-medium text-sm">패턴 및 마스킹</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label className="text-sm">기본 채우기 패턴</Label>
+                        <Select
+                            value={gcodeSettings.fillPattern}
+                            onValueChange={(value) => handleSelectChange('fillPattern', value)}
+                        >
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="horizontal">수평</SelectItem>
+                                <SelectItem value="vertical">수직</SelectItem>
+                                <SelectItem value="auto">자동</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-sm">이동 회피 전략</Label>
+                        <Select
+                            value={gcodeSettings.travelAvoidanceStrategy}
+                            onValueChange={(value) => handleSelectChange('travelAvoidanceStrategy', value)}
+                        >
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="global">전역 회피</SelectItem>
+                                <SelectItem value="lift">리프트</SelectItem>
+                                <SelectItem value="contour">윤곽 따라</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                            <div className="font-medium text-sm">마스킹 사용</div>
+                            <div className="text-xs text-muted-foreground">마스킹 영역을 설정하여 코팅을 제외합니다.</div>
+                        </div>
+                        <Switch
+                            checked={gcodeSettings.enableMasking}
+                            onCheckedChange={(checked) => handleSwitchChange('enableMasking', checked)}
+                        />
+                    </div>
+
+                    {gcodeSettings.enableMasking && (
+                        <div className="space-y-2">
+                            <Label className="text-sm">마스킹 여유 거리 (mm)</Label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                value={gcodeSettings.maskingClearance}
+                                onChange={(e) => handleInputChange('maskingClearance', e.target.value)}
+                                className="h-9"
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+        </section>
+    );
+}
+
 /* G-Code 스니펫 탭: 긴 목록도 확실히 스크롤 */
 function GCodeSnippetsSection() {
     const {
@@ -230,7 +397,7 @@ function GCodeSnippetsSection() {
         reorderGcodeSnippetsInHook,
     } = useSettings();
 
-    const hooks= GCODE_HOOKS;
+    const hooks = GCODE_HOOKS;
 
     const grouped = useMemo(() => {
         const map = new Map<GCodeHook, typeof gcodeSnippets>();

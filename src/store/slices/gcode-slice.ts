@@ -4,14 +4,12 @@ interface GCodeState {
     gcode: string;
     gcodePath: number[][];
     lastGenerated: number | null;
-    isGenerating: boolean;
 }
 
 const initialState: GCodeState = {
     gcode: '',
     gcodePath: [],
     lastGenerated: null,
-    isGenerating: false,
 };
 
 const gcodeSlice = createSlice({
@@ -23,9 +21,6 @@ const gcodeSlice = createSlice({
             state.gcodePath = action.payload.path;
             state.lastGenerated = Date.now();
         },
-        setGenerating: (state, action: PayloadAction<boolean>) => {
-            state.isGenerating = action.payload;
-        },
         clearGCode: (state) => {
             state.gcode = '';
             state.gcodePath = [];
@@ -34,5 +29,5 @@ const gcodeSlice = createSlice({
     },
 });
 
-export const { setGCode, setGenerating, clearGCode } = gcodeSlice.actions;
+export const { setGCode, clearGCode } = gcodeSlice.actions;
 export default gcodeSlice.reducer;

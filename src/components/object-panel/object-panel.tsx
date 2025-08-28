@@ -44,9 +44,33 @@ export const ObjectPanel = memo(() => {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [openItemId, setOpenItemId] = useState<string | null>(null);
 
+    // 코팅 순서에 따라 정렬된 도형 목록
+    const sortedShapes = useMemo(() => {
+        const shapesCopy = [...shapes];
+        shapesCopy.sort((a, b) => {
+            const orderA = a.coatingOrder ?? 0;
+            const orderB = b.coatingOrder ?? 0;
+
+            const aHasOrder = orderA > 0;
+            const bHasOrder = orderB > 0;
+
+            if (aHasOrder && bHasOrder) {
+                return orderA - orderB; // 코팅 순서 오름차순 정렬
+            }
+            if (aHasOrder) {
+                return -1; // a가 앞으로
+            }
+            if (bHasOrder) {
+                return 1; // b가 앞으로
+            }
+            return 0; // 순서 없는 아이템들은 기존 순서 유지
+        });
+        return shapesCopy;
+    }, [shapes]);
+
     // useVirtualTree를 사용한 트리 구조 생성
     const { flattenedTree } = useVirtualTree(
-        shapes,
+        sortedShapes, // 정렬된 배열 사용
         expandedIds
     );
 
@@ -232,9 +256,9 @@ export const ObjectPanel = memo(() => {
     }, [selectedShapeIds, shapes, handleSelect, handlePatch, handleToggleGroup, handleUngroup, handleDeleteGroup, handleToggleGroupVisibility, handleToggleGroupLock]);
 
     return (
-        <Card className="h-full w-full rounded-none flex flex-col transition-all duration-200 border-0">
+        <Card className="h-full w-full rounded-none flex flex-col transition-all duration-200 border-0 gap-0">
             {/* 헤더 */}
-            <CardHeader className="px-2 py-0.5 border-b bg-muted/10">
+            <CardHeader className="px-2 pb-0border-b bg-muted/10">
                 <CardTitle className={cn(
                     "text-lg flex items-center space-x-1.5",
                     panelCollapsed && "hidden"
@@ -249,10 +273,6 @@ export const ObjectPanel = memo(() => {
 
             {/* 트리 목록 */}
             <CardContent className="flex-1 p-0 overflow-hidden">
-                {/* 상태 표시 */}
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 h-auto">
-                    {statsText}
-                </Badge>
                 <ScrollArea className="h-full">
                     <div className="px-2 pt-1 pb-12 space-y-0.5">
                         {flattenedTree.length === 0 ? (

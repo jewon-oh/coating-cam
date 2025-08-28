@@ -225,107 +225,17 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                                 label="불러오기"
                                 onClick={handleLoadProject}
                             />
-                            <ToolButton
-                                icon={<Settings size={16}/>}
-                                label="코팅설정"
-                                active={isCoatingSettingsOpen}
-                                onClick={() => setIsCoatingSettingsOpen(!isCoatingSettingsOpen)}
-                                className={isCoatingSettingsOpen ? 'bg-primary/20 border border-primary/40' : ''}
-                            />
+
                             <ToolButton
                                 icon={<Play size={16}/>}
                                 label="G-Code생성"
-                                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md"
+                                className="w-30 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md"
                                 onClick={onGenerateGCode}
                             />
                         </div>
                         <span className="text-xs mt-1 text-muted-foreground">프로젝트</span>
                     </div>
                 </div>
-
-                {/* 두 번째 줄: 코팅 설정 패널 */}
-                <Collapsible open={isCoatingSettingsOpen}>
-                    <CollapsibleContent className="border-t pt-2">
-                        <div className="bg-muted/20 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-sm font-medium text-foreground">
-                                        {coatingType === 'fill' ? '채우기' :
-                                            coatingType === 'outline' ? '윤곽' : '마스킹'} 설정
-                                    </h3>
-                                    <div className={`w-3 h-3 rounded-full ${
-                                        coatingType === 'fill' ? 'bg-sky-400' :
-                                            coatingType === 'outline' ? 'bg-yellow-400' : 'bg-red-400'
-                                    }`}/>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-4 gap-4 items-center text-sm">
-                                {/* 코팅폭 */}
-                                <div className="flex items-center gap-2">
-                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">코팅폭</Label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        name="coatingWidth"
-                                        value={coatingWidth}
-                                        onChange={handleCoatingSettingChange}
-                                        className="h-7 text-xs w-16"
-                                    />
-                                    <span className="text-xs text-muted-foreground">mm</span>
-                                </div>
-
-                                {/* 라인간격 (outline이 아닌 경우에만 표시) */}
-                                {coatingType !== 'outline' && (
-                                    <div className="flex items-center gap-2">
-                                        <Label className="text-xs text-muted-foreground whitespace-nowrap">간격</Label>
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            name="lineSpacing"
-                                            value={lineSpacing}
-                                            onChange={handleCoatingSettingChange}
-                                            className="h-7 text-xs w-16"
-                                        />
-                                        <span className="text-xs text-muted-foreground">mm</span>
-                                    </div>
-                                )}
-
-                                {/* 코팅속도 */}
-                                <div className="flex items-center gap-2">
-                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">속도</Label>
-                                    <Input
-                                        type="number"
-                                        name="coatingSpeed"
-                                        value={coatingSpeed}
-                                        onChange={handleCoatingSettingChange}
-                                        className="h-7 text-xs w-16"
-                                    />
-                                    <span className="text-xs text-muted-foreground">mm/min</span>
-                                </div>
-
-                                {/* 패턴 (fill 타입인 경우에만 표시) */}
-                                {coatingType === 'fill' && (
-                                    <div className="flex items-center gap-2">
-                                        <Label className="text-xs text-muted-foreground whitespace-nowrap">패턴</Label>
-                                        <Select
-                                            value={fillPattern}
-                                            onValueChange={(value) => handleCoatingSettingSelectChange('fillPattern', value)}
-                                        >
-                                            <SelectTrigger className="h-7 text-xs w-20">
-                                                <SelectValue/>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="horizontal">수평</SelectItem>
-                                                <SelectItem value="vertical">수직</SelectItem>
-                                                <SelectItem value="auto">자동</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </CollapsibleContent>
-                </Collapsible>
             </CardContent>
         </Card>
     );

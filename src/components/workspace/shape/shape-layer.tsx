@@ -14,6 +14,7 @@ import { useCanvas } from '@/contexts/canvas-context';
 import { useTransformerHandlers } from '@/hooks/use-transformer-handlers';
 import { useShapeEvents } from '@/hooks/use-shape-events';
 import { TransformerConfig } from "konva/lib/shapes/Transformer";
+import {flipImageData} from "@/lib/flip-image-data";
 
 interface ShapeLayerProps {
     isPanning?: boolean;
@@ -305,6 +306,50 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
             </Group>
         );
     }, []);
+
+    // ✅ ===== 이미지 자동 뒤집기 Effect 추가 =====
+    useEffect(() => {
+        // isFlipped 속성이 없거나 false인 이미지들을 찾습니다.
+        const imagesToFlip = shapes.filter(s =>
+            s.type === 'image' && s.imageDataUrl && !s.isFlipped
+        );
+
+        // 뒤집을 이미지가 없으면 아무것도 하지 않습니다.
+        if (imagesToFlip.length === 0) return;
+
+        // 비동기 함수로 이미지들을 하나씩 처리합니다.
+        const processImages = async () => {
+            setLoading({isLoading: true, message: '이미지 최적화 중...'});
+
+            for (const shape of imagesToFlip) {
+                try {
+                    // 1. 이미지 데이터를 좌우로 뒤집습니다.
+                    const flippedDataUrl = await flipImageData(shape.imageDataUrl!, 'horizontal');
+
+                    // 2. 캐시에서 이전 데이터를 삭제합니다.
+                    imageCache.current.delete(shape.imageDataUrl!);
+
+                    // 3. Redux 상태를 업데이트합니다: 뒤집힌 데이터와 함께 isFlipped: true 플래그를 저장합니다.
+                    dispatch(updateShape({
+                        id: shape.id!,
+                        updatedProps: {
+                            imageDataUrl: flippedDataUrl,
+                            isFlipped: true, // "뒤집기 완료" 플래그 설정
+                        }
+                    }));
+                } catch (error) {
+                    console.error(`${shape.id} 이미지 뒤집기 실패:`, error);
+                    // 실패 시에도 플래그를 업데이트하여 무한 재시도를 방지
+                    dispatch(updateShape({id: shape.id!, updatedProps: {isFlipped: true}}));
+                }
+            }
+
+            setLoading({isLoading: false});
+        };
+
+        processImages();
+
+    }, [shapes, dispatch, setLoading, imageCache]); // shapes 배열이 변경될 때마다 실행
 
     // Transformer 노드 업데이트
     useEffect(() => {

@@ -8,11 +8,8 @@ import { usePanZoom } from '@/hooks/use-pan-zoom';
 // 모드별 이벤트 훅들
 import { useShapeEvents } from "@/hooks/use-shape-events";
 
-interface UseStageEventsProps {
-    workspaceMode: 'shape' | 'path';
-}
 
-export function useStageEvents({ workspaceMode }: UseStageEventsProps) {
+export function useStageEvents() {
     const dispatch = useAppDispatch();
     const { canvasContainerRef, setStage } = useCanvas();
 
@@ -30,14 +27,8 @@ export function useStageEvents({ workspaceMode }: UseStageEventsProps) {
 
     // workspaceMode에 따라 현재 활성화된 모드 선택
     const modeEvents = useMemo(() => {
-        switch (workspaceMode) {
-            case 'shape':
-                return shapeEvents;
-
-            default:
-                return shapeEvents; // 기본값
-        }
-    }, [workspaceMode, shapeEvents]);
+        return shapeEvents; // 기본값
+    }, [ shapeEvents]);
 
     // 통합된 Stage 이벤트 핸들러들
     const handleStageMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
@@ -106,12 +97,9 @@ export function useStageEvents({ workspaceMode }: UseStageEventsProps) {
 
         // 공통 로직: 빈 영역 클릭 시 선택 해제
         if (e.target === e.target.getStage()) {
-            if (workspaceMode === 'shape') {
-                dispatch(unselectAllShapes());
-            }
-            // Path 모드에서는 pathEvents.handleCanvasClick이 처리함
+            dispatch(unselectAllShapes());
         }
-    }, [canvasContainerRef, dispatch, isPanning, workspaceMode]);
+    }, [canvasContainerRef, dispatch, isPanning, ]);
 
     return {
         // 공통 Stage 이벤트 핸들러
@@ -126,7 +114,6 @@ export function useStageEvents({ workspaceMode }: UseStageEventsProps) {
 
         // 공통 상태
         isPanning,
-        workspaceMode,
 
         // 현재 활성화된 모드의 상태들
         selectedShapeIds: shapeEvents.selectedShapeIds || [],
@@ -144,6 +131,5 @@ export function useStageEvents({ workspaceMode }: UseStageEventsProps) {
         handleUngroup: shapeEvents.handleUngroup,
         handleSelectAll: modeEvents.handleSelectAll,
         handleNudge: modeEvents.handleNudge,
-
     };
 }

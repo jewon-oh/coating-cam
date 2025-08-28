@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import {useEffect, useState} from "react";
 import {useRouter} from "next/router";
+import {useAppDispatch} from "@/hooks/redux";
+import {clearShapes} from "@/store/slices/shape-slice";
 
 type RecentFile = {
     name: string;
@@ -12,6 +14,7 @@ type RecentFile = {
 export default function HomePage() {
     const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
     const router = useRouter();
+    const dispatch = useAppDispatch();
     const appName = process.env.NEXT_PUBLIC_APP_NAME?.trim() ??"";
 
     useEffect(() => {
@@ -22,6 +25,10 @@ export default function HomePage() {
             console.error('Failed to load recent files from localStorage:', error);
         }
     }, []);
+
+    const handleNewProject = () => {
+        dispatch(clearShapes());
+    };
 
     const handleOpenFile = async (file: RecentFile) => {
         // Electron: 경로만 넘기고 /canvas에서 읽기
@@ -46,7 +53,7 @@ export default function HomePage() {
             <div className="w-full max-w-xl p-6 bg-card text-card-foreground rounded-lg shadow-md">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-2xl font-semibold">Recent Files</h2>
-                    <Link href="/workspace" className="text-sm text-blue-500 hover:underline">
+                    <Link href="/workspace" onClick={handleNewProject} className="text-sm text-blue-500 hover:underline">
                         새 프로젝트 만들기
                     </Link>
                 </div>

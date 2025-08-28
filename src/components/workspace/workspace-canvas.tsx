@@ -21,7 +21,7 @@ import {useGlobalKeyboard} from '@/hooks/use-global-keyboard';
 // ===== 메인 컴포넌트 =====
 export default function WorkspaceCanvas() {
     // Redux 상태에서 tool과 workspaceMode 모두 가져오기
-    const {tool, workspaceMode} = useAppSelector((state) => state.tool);
+    const {tool} = useAppSelector((state) => state.tool);
 
     // Context에서 캔버스 상태 가져오기
     const {
@@ -63,9 +63,7 @@ export default function WorkspaceCanvas() {
         handleSelectAll,
         handleNudge,
 
-    } = useStageEvents({
-        workspaceMode
-    });
+    } = useStageEvents();
 
     // 커서 스타일 매핑 테이블
     const cursorMapping: Record<string, string> = useMemo(
@@ -86,20 +84,20 @@ export default function WorkspaceCanvas() {
         if (isPanning) return "grabbing";
         if (isTransforming) return "move";
 
-        const modeKey = `${workspaceMode}/${tool}`;
+        const modeKey = `shape/${tool}`;
         return cursorMapping[modeKey] || "default";
-    }, [workspaceMode, tool, isPanning, isTransforming, cursorMapping]);
+    }, [ tool, isPanning, isTransforming, cursorMapping]);
 
     // 전역 키보드 이벤트 등록
     useGlobalKeyboard({
-        onDelete: workspaceMode === 'shape' ? handleDelete : undefined,
-        onCopy: workspaceMode === 'shape' ? handleCopy : undefined,
-        onPaste: workspaceMode === 'shape' ? handlePaste : undefined,
-        onCut: workspaceMode === 'shape' ? handleCut : undefined,
-        onGroup: workspaceMode === 'shape' ? handleGroup : undefined,
-        onUngroup: workspaceMode === 'shape' ? handleUngroup : undefined,
-        onSelectAll: workspaceMode === 'shape' ? handleSelectAll : undefined,
-        onNudge: workspaceMode === 'shape' ? handleNudge : undefined
+        onDelete: handleDelete,
+        onCopy: handleCopy,
+        onPaste: handlePaste,
+        onCut: handleCut,
+        onGroup: handleGroup,
+        onUngroup: handleUngroup,
+        onSelectAll: handleSelectAll,
+        onNudge: handleNudge
     });
 
 
@@ -195,14 +193,7 @@ export default function WorkspaceCanvas() {
                     />
                 </Layer>
 
-                {/* workspaceMode에 따라 다른 레이어 렌더링 */}
-                {workspaceMode === "shape" && (
-                    <ShapeLayer isPanning={isPanning}/>
-                )}
-
-                {/*{workspaceMode === "path" && (*/}
-                {/*    <PathLayer/>*/}
-                {/*)}*/}
+                <ShapeLayer isPanning={isPanning}/>
             </Stage>
         </div>
     );

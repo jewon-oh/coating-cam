@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/context-menu";
 import {useAppDispatch} from "@/hooks/redux";
 import {removeShapes} from "@/store/slices/shape-slice";
+import {Badge} from "@/components/ui/badge";
 
 const shapeIcons = {
     rect: <RectangleHorizontal size={16} className="flex-shrink-0"/>,
@@ -94,6 +95,22 @@ export const ObjectItem = memo<ObjectItemProps>(({
     const isDisabled = shape.listening ?? false;
     const isHidden = shape.visible === false;
 
+    const coatingColorClass = useMemo(() => {
+        if (shape.skipCoating) {
+            return "bg-gray-500/10 border-gray-500/20";
+        }
+        switch (shape.coatingType) {
+            case 'fill':
+                return "bg-blue-500/10 border-blue-500/20";
+            case 'outline':
+                return "bg-orange-500/10 border-orange-500/20";
+            case 'masking':
+                return "bg-red-500/10 border-red-500/20";
+            default:
+                return "";
+        }
+    }, [shape.coatingType, shape.skipCoating]);
+
     // 크기 정보 메모이제이션
     const sizeInfo = useMemo(() => {
         if (shape.type === 'group') return null;
@@ -117,6 +134,7 @@ export const ObjectItem = memo<ObjectItemProps>(({
                     data-shape-id={shape.id}
                     className={cn(
                         "group/item border rounded-md transition-all duration-200 hover:shadow-sm select-none",
+                        !isSelected && coatingColorClass,
                         "hover:border-muted-foreground/20",
                         isSelected && !isDisabled && "ring-2 ring-primary bg-primary/5 border-primary/30",
                         isHidden && "opacity-60",
@@ -135,10 +153,10 @@ export const ObjectItem = memo<ObjectItemProps>(({
                         </div>
 
                         {/* 이름 및 정보 */}
-                        <div className="flex-1 min-w-0 ">
+                        <div className="flex-1 min-w-0">
                             <div
                                 className={cn(
-                                    "text-sm font-medium truncate cursor-pointer",
+                                    "text-sm font-medium cursor-pointer",
                                     isHidden && "line-through italic",
                                     isDisabled && "text-foreground/60"
                                 )}
@@ -156,9 +174,16 @@ export const ObjectItem = memo<ObjectItemProps>(({
                                         onKeyDown={handleKeyDown}
                                     />
                                 ) : (
-                                    <span>
-                                {shape.name ? ellipsizeEnd(shape.name, 20) : `${shape.type} #${shape.id?.slice(0, 6)}`}
-                            </span>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="truncate">
+                                            {shape.name ? ellipsizeEnd(shape.name, 20) : `${shape.type} #${shape.id?.slice(0, 6)}`}
+                                        </span>
+                                        {shape.coatingOrder && shape.coatingOrder > 0 && (
+                                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 h-auto">
+                                                {shape.coatingOrder}
+                                            </Badge>
+                                        )}
+                                    </div>
                                 )}
                             </div>
 

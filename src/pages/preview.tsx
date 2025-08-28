@@ -270,12 +270,12 @@ export default function PreviewPage() {
                 <Card className="w-96">
                     <CardContent className="text-center p-8">
                         <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4"/>
-                        <h3 className="text-xl font-semibold mb-2">G-code가 없습니다</h3>
+                        <h3 className="text-xl font-semibold mb-2">G-Code가 없습니다</h3>
                         <p className="text-muted-foreground mb-4">
-                            캔버스에서 도형을 생성하고 G-code를 생성하세요.
+                            캔버스에서 도형을 생성하고 G-Code를 생성하세요.
                         </p>
                         <Button onClick={() => window.history.back()}>
-                            캔버스로 돌아가기
+                            작업 공간으로 돌아가기
                         </Button>
                     </CardContent>
                 </Card>

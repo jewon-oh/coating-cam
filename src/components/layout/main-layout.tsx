@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { SettingsDialog } from "@/components/settings/settings-dialog";
-import { Settings } from 'lucide-react';
+import { DraftingCompass, Settings, LayoutGrid, Box } from 'lucide-react';
 import {ThemeProvider} from "next-themes";
 import {useSettings} from "@/contexts/settings-context";
 
@@ -16,17 +16,20 @@ function MainHeader() {
     const [isSettingsOpen, setSettingsOpen] = useState(false);
 
     const navLinks = [
-        { href: '/workspace', label: '작업 공간' },
-        { href: '/preview', label: '3D 미리보기' },
+        { href: '/workspace', label: '작업 공간', icon: <LayoutGrid className="w-4 h-4 mr-2" /> },
+        { href: '/preview', label: '3D 미리보기', icon: <Box className="w-4 h-4 mr-2" /> },
     ];
 
     const appName = process.env.NEXT_PUBLIC_APP_NAME?.trim()?? "";
 
     return (
         <>
-            <header className="flex items-center justify-between px-4 py-2 border-b">
+            <header className="flex items-center justify-between px-4 py-2 bg-card shadow-sm z-10">
                 <div className="flex items-center">
-                    <Link href="/" className="text-xl font-bold mr-6">{appName}</Link>
+                    <Link href="/" className="flex items-center gap-2 text-xl font-bold mr-6">
+                        <DraftingCompass className="w-6 h-6" />
+                        <span>{appName}</span>
+                    </Link>
                     <nav className="flex items-center space-x-2">
                         {navLinks.map(link => (
                             <Button
@@ -34,7 +37,10 @@ function MainHeader() {
                                 variant={pathname === link.href ? 'secondary' : 'ghost'}
                                 asChild
                             >
-                                <Link href={link.href}>{link.label}</Link>
+                                <Link href={link.href} className="flex items-center">
+                                    {link.icon}
+                                    {link.label}
+                                </Link>
                             </Button>
                         ))}
                     </nav>

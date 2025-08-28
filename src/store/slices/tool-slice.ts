@@ -1,6 +1,7 @@
+
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {ToolType, SHAPE_TOOLS} from '@/types/tool-type';
-import {FillPattern, CoatingType}  from "@/types/coating";
+import {FillPattern, CoatingType, TravelAvoidanceStrategy} from "@/types/coating";
 
 interface ToolState {
     tool: ToolType;
@@ -16,6 +17,11 @@ interface ToolState {
     // 채우기 설정
     fillPattern: FillPattern;
     lineSpacing: number;         // 라인 간격 (mm)
+
+    // 윤곽 설정
+    outlineType: 'outside' | 'center' | 'inside';  // 윤곽 타입
+    outlinePasses: number;       // 윤곽 횟수
+    outlineInterval: number;     // 윤곽 오프셋 (mm)
 
     // 마스킹 설정
     maskingClearance: number;    // 마스킹 여유 거리 (mm)
@@ -37,9 +43,14 @@ const initialState: ToolState = {
     fillPattern: 'vertical',
     lineSpacing: 20,
 
+    // 윤곽 설정
+    outlineType: 'center',
+    outlinePasses: 1,
+    outlineInterval: 0,
+
     // 마스킹 설정
     maskingClearance: 0,
-    travelAvoidanceStrategy: 'avoid'
+    travelAvoidanceStrategy: 'contour'
 };
 
 const toolSlice = createSlice({
@@ -47,14 +58,13 @@ const toolSlice = createSlice({
     initialState,
     reducers: {
         setTool: (state, action: PayloadAction<ToolType>) => {
-            console.log('Setting tool:', action.payload, 'Current mode:', state.workspaceMode);
-            
+            console.log('Setting tool:', action.payload,);
             // 도구 유효성 확인
             if (SHAPE_TOOLS.includes(action.payload)) {
                 state.tool = action.payload;
                 console.log('Tool set successfully:', state.tool);
             } else {
-                console.warn('Invalid tool for current mode:', action.payload, 'Valid tools:', validTools);
+                console.warn('Invalid tool for current mode:', action.payload, 'Valid tools:', SHAPE_TOOLS);
             }
         },
         setCoatingType: (state, action: PayloadAction<CoatingType>) => {
@@ -70,6 +80,10 @@ const toolSlice = createSlice({
             state.coatingType = action.payload.coatingType;
             state.fillPattern = action.payload.fillPattern;
         },
+        // 코팅 설정 업데이트 액션 추가
+        updateCoatingSettings: (state, action: PayloadAction<Partial<ToolState>>) => {
+            Object.assign(state, action.payload);
+        },
     },
 });
 
@@ -77,5 +91,6 @@ export const {
     setTool,
     setCoatingType,
     setCoatingTypeAndFillPattern,
+    updateCoatingSettings,
 } = toolSlice.actions;
 export default toolSlice.reducer;
