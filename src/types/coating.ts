@@ -1,4 +1,4 @@
-export type FillPattern = 'horizontal' | 'vertical' | 'auto';
+export type FillPattern = 'horizontal' | 'vertical' | 'concentric' |'auto';
 export type CoatingType = 'fill' | 'outline' | 'masking';
 export type TravelAvoidanceStrategy = 'lift' | 'contour';
 

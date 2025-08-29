@@ -3,6 +3,7 @@ import { Line, Group, Text } from 'react-konva';
 
 interface CanvasGridProps {
     gridSize: number;
+    pixelsPerMm: number;
     workArea: { width: number; height: number };
     visible?: boolean;
     isPanning?: boolean;
@@ -22,8 +23,8 @@ const GRID_CONSTANTS = {
     MIN_ZOOM_FOR_LABELS: 0.1,
     MIN_ZOOM_FOR_MINOR: 0.3,
     MIN_ZOOM_FOR_MAJOR_LABELS: 0.5,
-    BASE_FONT_SIZE: 10,
-    MIN_FONT_SIZE: 8,
+    BASE_FONT_SIZE: 12, // Increased from 10
+    MIN_FONT_SIZE: 10, // Increased from 8
     AXIS_OFFSET: 12,
     LABEL_OFFSET: 20,
     AXIS_LABEL_OFFSET: 24,
@@ -94,30 +95,23 @@ const calculateScaleInfo = (stageScaleX: number, stageScaleY: number): ScaleInfo
  * 그리드 설정 계산
  */
 const calculateGridSettings = (gridSize: number, zoom: number): GridSettings => {
-    const majorStep = gridSize * GRID_CONSTANTS.MAJOR_MULTIPLIER;
-    const labelStep = gridSize * GRID_CONSTANTS.LABEL_MULTIPLIER;
-
-    let effectiveStep = gridSize;
-    let showMinor = true;
-    let showLabels = true;
-
-    // 줌 임계값 조정 (낮은 배율에서도 잘 보이도록)
+    let displayMultiplier = 1;
     if (zoom < 0.05) {
-        effectiveStep = labelStep;
-        showMinor = false;
-    } else if (zoom < 0.15) {
-        effectiveStep = majorStep;
-        showMinor = false;
-    } else if (zoom < 0.25) {
-        showLabels = false;
+        displayMultiplier = 100;
+    } else if (zoom < 0.2) {
+        displayMultiplier = 10;
     }
+
+    const effectiveStep = gridSize * displayMultiplier;
+    const majorStep = effectiveStep * GRID_CONSTANTS.MAJOR_MULTIPLIER;
+    const labelStep = effectiveStep * GRID_CONSTANTS.LABEL_MULTIPLIER;
 
     return {
         effectiveStep,
-        showMinor,
-        showLabels,
         majorStep,
         labelStep,
+        showLabels: true,
+        showMinor: true, // This is now controlled by the loop's step
     };
 };
 /**
@@ -197,7 +191,8 @@ const createVerticalLinesAndLabels = (
     workArea: { width: number; height: number },
     settings: GridSettings,
     styles: GridStyles,
-    scaleInfo: ScaleInfo
+    scaleInfo: ScaleInfo,
+    pixelsPerMm: number
 ): { lines: React.ReactElement[]; labels: React.ReactElement[] } => {
     const lines: React.ReactElement[] = [];
     const labels: React.ReactElement[] = [];
@@ -229,7 +224,7 @@ const createVerticalLinesAndLabels = (
             const scaleAdjustedOffset = baseOffset / scaleInfo.absScaleY;
 
             // 텍스트 크기에 따른 위치 조정
-            const textWidth = x.toString().length * styles.label.size * 0.6; // 대략적인 텍스트 너비
+            const textWidth = (x / pixelsPerMm).toString().length * styles.label.size * 0.6; // 대략적인 텍스트 너비
             const horizontalOffset = textWidth * 0.5 / scaleInfo.absScaleX;
 
             let labelX = x;
@@ -248,7 +243,7 @@ const createVerticalLinesAndLabels = (
                     key={`xlabel-${x}`}
                     x={labelX}
                     y={-scaleAdjustedOffset}
-                    text={x.toString()}
+                    text={(x / pixelsPerMm).toString()}
                     fontSize={styles.label.size}
                     fill={styles.label.color}
                     align={align}
@@ -277,7 +272,8 @@ const createHorizontalLinesAndLabels = (
     workArea: { width: number; height: number },
     settings: GridSettings,
     styles: GridStyles,
-    scaleInfo: ScaleInfo
+    scaleInfo: ScaleInfo,
+    pixelsPerMm: number
 ): { lines: React.ReactElement[]; labels: React.ReactElement[] } => {
     const lines: React.ReactElement[] = [];
     const labels: React.ReactElement[] = [];
@@ -323,7 +319,7 @@ const createHorizontalLinesAndLabels = (
                     key={`ylabel-${y}`}
                     x={labelX}
                     y={y}
-                    text={y.toString()}
+                    text={(y / pixelsPerMm).toString()}
                     fontSize={styles.label.size}
                     fill={styles.label.color}
                     align={align}
@@ -396,6 +392,7 @@ const createAxisLabels = (
  */
 const CanvasGrid: React.FC<CanvasGridProps> = React.memo(({
                                                               gridSize,
+                                                              pixelsPerMm,
                                                               workArea,
                                                               visible = true,
                                                               isPanning = false,
@@ -443,10 +440,10 @@ const CanvasGrid: React.FC<CanvasGridProps> = React.memo(({
 
         const axisLines = createAxisLines(workArea, gridStyles);
         const { lines: verticalLines, labels: xLabels } = createVerticalLinesAndLabels(
-            viewportBounds, workArea, gridSettings, gridStyles, scaleInfo
+            viewportBounds, workArea, gridSettings, gridStyles, scaleInfo, pixelsPerMm
         );
         const { lines: horizontalLines, labels: yLabels } = createHorizontalLinesAndLabels(
-            viewportBounds, workArea, gridSettings, gridStyles, scaleInfo
+            viewportBounds, workArea, gridSettings, gridStyles, scaleInfo, pixelsPerMm
         );
 
         const allLines = [...axisLines, ...verticalLines, ...horizontalLines];
@@ -457,7 +454,7 @@ const CanvasGrid: React.FC<CanvasGridProps> = React.memo(({
         }
 
         return { lines: allLines, labels: allLabels };
-    }, [shouldRender, workArea, gridStyles, viewportBounds, gridSettings, scaleInfo]);
+    }, [shouldRender, workArea, gridStyles, viewportBounds, gridSettings, scaleInfo, pixelsPerMm]);
 
     // 렌더링하지 않는 경우
     if (!gridElements) return null;

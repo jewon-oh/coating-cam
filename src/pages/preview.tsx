@@ -58,7 +58,7 @@ function parseGCodeToPathData(gcodeText: string): PathPoint[] {
 export default function PreviewPage() {
     // const dispatch = useAppDispatch();
     const shapes = useAppSelector((state) => state.shapes.shapes);
-    const {gcode,  isGenerating, lastGenerated} = useAppSelector((state) => state.gcode);
+    const {gcode,  lastGenerated} = useAppSelector((state) => state.gcode);
     // const {workArea} = useSettings();
 
     // G-code를 파싱하여 경로 데이터 생성
@@ -358,7 +358,7 @@ export default function PreviewPage() {
                                 </Button>
                                 <Button
                                     onClick={handleDownloadGCode}
-                                    disabled={!gcode || isGenerating}
+                                    disabled={!gcode }
                                     className="w-full"
                                 >
                                     <Download className="w-4 h-4 mr-2"/>

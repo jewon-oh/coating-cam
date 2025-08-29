@@ -1,7 +1,8 @@
+
 "use client";
 
 import React, { useMemo, useCallback, useRef, useEffect } from 'react';
-import { Layer, Group, Rect, Circle, Image, Text, Transformer } from 'react-konva';
+import { Layer, Group, Rect, Circle, Image, Text, Transformer, Line } from 'react-konva';
 import type Konva from 'konva';
 
 // Redux 상태 관리
@@ -14,7 +15,7 @@ import { useCanvas } from '@/contexts/canvas-context';
 import { useTransformerHandlers } from '@/hooks/use-transformer-handlers';
 import { useShapeEvents } from '@/hooks/use-shape-events';
 import { TransformerConfig } from "konva/lib/shapes/Transformer";
-import {flipImageData} from "@/lib/flip-image-data";
+import { flipImageData } from "@/lib/flip-image-data";
 
 interface ShapeLayerProps {
     isPanning?: boolean;
@@ -24,10 +25,11 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
     // Redux 상태
     const dispatch = useAppDispatch();
     const { shapes, selectedShapeIds } = useAppSelector((state) => state.shapes);
+    const { pathGroups, shapeToPathMap } = useAppSelector((state) => state.paths);
     const { tool } = useAppSelector((state) => state.tool);
 
     // Context 및 훅
-    const { stage, setLoading } = useCanvas();
+    const { setLoading } = useCanvas();
     const shapeEvents = useShapeEvents();
 
     // 로컬 상태
@@ -46,17 +48,16 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         handleTransformEnd
     } = useTransformerHandlers(transformerRef);
 
-    // ===== 계산된 값들 =====
     const { imageShapes, otherShapes } = useMemo(() => {
         const visibleShapes = shapes.filter(s => s.visible !== false);
 
         // 코팅 타입에 따른 정렬 (fill이 masking보다 앞에 오도록)
         visibleShapes.sort((a, b) => {
-            const aIsFill = a.coatingType === 'fill';
+            const aIsFill = a.coatingType === 'fill' || a.coatingType === 'outline';
             const bIsMasking = b.coatingType === 'masking';
             if (aIsFill && bIsMasking) return -1;
             const aIsMasking = a.coatingType === 'masking';
-            const bIsFill = b.coatingType === 'fill';
+            const bIsFill = b.coatingType === 'fill' || b.coatingType === 'outline';
             if (aIsMasking && bIsFill) return 1;
             return 0;
         });
@@ -67,11 +68,17 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         };
     }, [shapes]);
 
+    // Line이 아닌 도형들만 transformer 적용
+    const transformableShapes = useMemo(() =>
+            shapes.filter(shape =>
+                selectedShapeIds.includes(shape.id!) &&
+                shape.type !== 'line' // Line 도형 제외
+            )
+        , [shapes, selectedShapeIds]);
+
     const hasImages = useMemo(() =>
-        selectedShapeIds.some(id =>
-            shapes.find(shape => shape.id === id)?.type === 'image'
-        ), [shapes, selectedShapeIds]
-    );
+            transformableShapes.some(shape => shape.type === 'image')
+        , [transformableShapes]);
 
     const transformerConfig: TransformerConfig = useMemo(() => ({
         anchorStyleFunc: (anchor) => {
@@ -87,6 +94,17 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
             }
         },
         keepRatio: false,
+        centeredScaling: false,
+        flipEnabled: false,
+        ignoreStroke: true,
+        boundBoxFunc: (oldBox, newBox) => {
+            const minWidth = 5;
+            const minHeight = 5;
+            if (Math.abs(newBox.width) < minWidth || Math.abs(newBox.height) < minHeight) {
+                return oldBox;
+            }
+            return newBox;
+        },
     }), []);
 
     // ===== 이미지 로딩 =====
@@ -196,6 +214,12 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         }
     }, []);
 
+    // PathGroup을 shape ID로 찾는 헬퍼 함수
+    const getPathGroupByShapeId = useCallback((shapeId: string) => {
+        const pathGroupId = shapeToPathMap[shapeId];
+        return pathGroupId ? pathGroups.find(pg => pg.id === pathGroupId) : undefined;
+    }, [pathGroups, shapeToPathMap]);
+
     const makeCommonProps = useCallback((shape: Partial<CustomShapeConfig>) => {
         const isLocked = shape.isLocked;
         const isInteractionBlocked = isPanning || isLocked;
@@ -271,97 +295,53 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         };
     }, [makeCommonProps, isPanning]);
 
-    const renderCoatingOrderBadge = useCallback((shape: CustomShapeConfig, stageScale: number) => {
-        if (shape.isLocked || shape.skipCoating || !shape.coatingOrder) {
-            return null;
-        }
-
-        const badgeSize = 20 / Math.abs(stageScale);
-        const fontSize = 12 / Math.abs(stageScale);
-
-        return (
-            <Group key={`${shape.id}-badge`}>
-                <Circle
-                    x={(shape.x || 0) - badgeSize/2}
-                    y={(shape.y || 0) - badgeSize/2}
-                    radius={badgeSize/2}
-                    fill="#4caf50"
-                    stroke="#2e7d32"
-                    strokeWidth={1 / Math.abs(stageScale)}
-                    listening={false}
-                />
-                <Text
-                    x={(shape.x || 0) - badgeSize/2}
-                    y={(shape.y || 0) - badgeSize/2}
-                    width={badgeSize}
-                    height={badgeSize}
-                    text={shape.coatingOrder.toString()}
-                    fontSize={fontSize}
-                    fontFamily="Arial, sans-serif"
-                    fill="white"
-                    align="center"
-                    verticalAlign="middle"
-                    listening={false}
-                />
-            </Group>
-        );
-    }, []);
-
-    // ✅ ===== 이미지 자동 뒤집기 Effect 추가 =====
+    // ===== 이미지 자동 뒤집기 Effect =====
     useEffect(() => {
-        // isFlipped 속성이 없거나 false인 이미지들을 찾습니다.
         const imagesToFlip = shapes.filter(s =>
             s.type === 'image' && s.imageDataUrl && !s.isFlipped
         );
 
-        // 뒤집을 이미지가 없으면 아무것도 하지 않습니다.
         if (imagesToFlip.length === 0) return;
 
-        // 비동기 함수로 이미지들을 하나씩 처리합니다.
         const processImages = async () => {
-            setLoading({isLoading: true, message: '이미지 최적화 중...'});
+            setLoading({ isLoading: true, message: '이미지 최적화 중...' });
 
             for (const shape of imagesToFlip) {
                 try {
-                    // 1. 이미지 데이터를 좌우로 뒤집습니다.
                     const flippedDataUrl = await flipImageData(shape.imageDataUrl!, 'horizontal');
-
-                    // 2. 캐시에서 이전 데이터를 삭제합니다.
                     imageCache.current.delete(shape.imageDataUrl!);
 
-                    // 3. Redux 상태를 업데이트합니다: 뒤집힌 데이터와 함께 isFlipped: true 플래그를 저장합니다.
                     dispatch(updateShape({
                         id: shape.id!,
                         updatedProps: {
                             imageDataUrl: flippedDataUrl,
-                            isFlipped: true, // "뒤집기 완료" 플래그 설정
+                            isFlipped: true,
                         }
                     }));
                 } catch (error) {
                     console.error(`${shape.id} 이미지 뒤집기 실패:`, error);
-                    // 실패 시에도 플래그를 업데이트하여 무한 재시도를 방지
-                    dispatch(updateShape({id: shape.id!, updatedProps: {isFlipped: true}}));
+                    dispatch(updateShape({ id: shape.id!, updatedProps: { isFlipped: true } }));
                 }
             }
 
-            setLoading({isLoading: false});
+            setLoading({ isLoading: false });
         };
 
         processImages();
+    }, [shapes, dispatch, setLoading, imageCache]);
 
-    }, [shapes, dispatch, setLoading, imageCache]); // shapes 배열이 변경될 때마다 실행
-
-    // Transformer 노드 업데이트
+    // Transformer 노드 업데이트 (Line 제외)
     useEffect(() => {
         if (transformerRef.current && layerRef.current) {
-            const nodesToSet = selectedShapeIds
-                .map(id => layerRef.current!.findOne(`#${id}`))
+            // Line이 아닌 도형들만 transformer에 연결
+            const nodesToSet = transformableShapes
+                .map(shape => layerRef.current!.findOne(`#${shape.id}`))
                 .filter(Boolean);
 
             transformerRef.current.nodes(nodesToSet as Konva.Shape[]);
             transformerRef.current.getLayer()?.batchDraw();
         }
-    }, [selectedShapeIds, shapes]);
+    }, [transformableShapes]);
 
     // 메모리 정리
     useEffect(() => {
@@ -372,7 +352,7 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
 
     return (
         <Layer ref={layerRef}>
-            {/* 이미지 그룹 */}
+            {/* 이미지 도형들 */}
             <Group listening={tool === 'select'}>
                 {imageShapes.map((shape) => {
                     const imageElement = shape.imageDataUrl ? loadImage(shape.imageDataUrl, shape.id) : null;
@@ -433,7 +413,7 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
                 })}
             </Group>
 
-            {/* 도형 그룹 */}
+            {/* 다른 도형들 */}
             <Group listening={true}>
                 {otherShapes.map((shape) => {
                     const commonProps = makeCommonProps(shape);
@@ -472,21 +452,43 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
                                     {...commonProps}
                                 />
                             );
+                        case 'line':
+                            return (
+                                <Line
+                                    key={shape.id}
+                                    id={shape.id}
+                                    name="shape"
+                                    x={shape.x}
+                                    y={shape.y}
+                                    points={shape.points}
+                                    rotation={shape.rotation}
+                                    scaleX={shape.scaleX}
+                                    scaleY={shape.scaleY}
+                                    stroke={commonProps.stroke || shape.stroke || '#000000'}
+                                    strokeWidth={commonProps.strokeWidth || shape.strokeWidth || 2}
+                                    strokeScaleEnabled={false}
+                                    dash={commonProps.dash}
+                                    opacity={commonProps.opacity}
+                                    listening={commonProps.listening}
+                                    draggable={commonProps.draggable}
+                                    onClick={commonProps.onClick}
+                                    onContextMenu={commonProps.onContextMenu}
+                                    onMouseEnter={commonProps.onMouseEnter}
+                                    onMouseLeave={commonProps.onMouseLeave}
+                                    onDragStart={commonProps.onDragStart}
+                                    onDragMove={commonProps.onDragMove}
+                                    onDragEnd={commonProps.onDragEnd}
+                                    perfectDrawEnabled={false}
+                                />
+                            );
                         default:
                             return null;
                     }
                 })}
             </Group>
 
-            {/* 코팅 순서 배지들 */}
-            <Group listening={false}>
-                {shapes
-                    .filter(shape => shape.coatingOrder && !shape.isLocked && !shape.skipCoating)
-                    .map(shape => renderCoatingOrderBadge(shape, stage.scaleX))
-                }
-            </Group>
 
-            {/* Transformer */}
+            {/* Transformer (Line 제외) */}
             <Transformer
                 ref={transformerRef}
                 rotationSnaps={hasImages ? [0, 45, 90, 135, 180, 225, 270, 315] : []}
@@ -502,7 +504,7 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
                     'top-left', 'top-right', 'bottom-left', 'bottom-right',
                     'top-center', 'middle-right', 'bottom-center', 'middle-left'
                 ]}
-                visible={selectedShapeIds.length > 0 && !isTransforming}
+                visible={transformableShapes.length > 0 && !isTransforming}
                 {...transformerConfig}
             />
         </Layer>

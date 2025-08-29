@@ -83,7 +83,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
 /* 일반 탭: workArea 편집 + 테마 즉시 적용 + 현재 테마 표시 */
 function GeneralSettings() {
-    const { theme: persistedTheme, setTheme: setThemePersisted, workArea, setWorkArea } = useSettings();
+    const { theme: persistedTheme, setTheme: setThemePersisted, workArea, setWorkArea, pixelsPerMm } = useSettings();
     const { theme: runtimeTheme, setTheme } = useTheme();
 
     const [widthText, setWidthText] = useState(String(workArea.width));
@@ -106,6 +106,14 @@ function GeneralSettings() {
         }
     }, [runtimeTheme]);
 
+    const workAreaInPx = useMemo(() => {
+        if (!pixelsPerMm) return { w: 0, h: 0 };
+        return {
+            w: workArea.width * pixelsPerMm,
+            h: workArea.height * pixelsPerMm,
+        };
+    }, [workArea, pixelsPerMm]);
+
     return (
         <section className="space-y-4">
             <div>
@@ -115,7 +123,7 @@ function GeneralSettings() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid grid-cols-4 items-center gap-2">
-                    <Label className="text-right col-span-1">작업영역 너비</Label>
+                    <Label className="text-right col-span-1">너비 (mm)</Label>
                     <Input
                         className="col-span-3"
                         type="number"
@@ -127,7 +135,7 @@ function GeneralSettings() {
                     />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-2">
-                    <Label className="text-right col-span-1">작업영역 높이</Label>
+                    <Label className="text-right col-span-1">높이 (mm)</Label>
                     <Input
                         className="col-span-3"
                         type="number"
@@ -138,6 +146,9 @@ function GeneralSettings() {
                         onKeyDown={(e) => e.key === "Enter" && commitWorkArea()}
                     />
                 </div>
+            </div>
+            <div className="text-sm text-muted-foreground pl-2">
+                현재 작업 영역의 픽셀 크기는 <b>{workAreaInPx.w} x {workAreaInPx.h} px</b> 입니다.
             </div>
 
             <div className="grid grid-cols-4 items-center gap-2 max-w-md">
@@ -170,19 +181,19 @@ function GeneralSettings() {
 
 /* 뷰/그리드 탭: 그리드/스냅/그리드 크기 */
 function ViewGridSettings() {
-    const { isGridVisible, setGridVisible, isSnappingEnabled, setSnappingEnabled, gridSize, setGridSize } = useSettings();
-    const [gridSizeText, setGridSizeText] = useState(String(gridSize));
+    const { isGridVisible, setGridVisible, isSnappingEnabled, setSnappingEnabled, pixelsPerMm, setPixelsPerMm } = useSettings();
+    const [pixelsPerMmText, setPixelsPerMmText] = useState(String(pixelsPerMm));
 
-    const commitGridSize = useCallback(() => {
-        const n = Math.max(1, Math.floor(Number(gridSizeText)));
-        if (Number.isFinite(n)) setGridSize(n);
-    }, [gridSizeText, setGridSize]);
+    const commitPixelsPerMm = useCallback(() => {
+        const n = Math.max(1, Math.floor(Number(pixelsPerMmText)));
+        if (Number.isFinite(n)) setPixelsPerMm(n);
+    }, [pixelsPerMmText, setPixelsPerMm]);
 
     return (
         <section className="space-y-4">
             <div>
                 <h3 className="text-base font-semibold">뷰/그리드</h3>
-                <p className="text-sm text-muted-foreground">그리드 표시, 스냅, 그리드 크기를 설정합니다.</p>
+                <p className="text-sm text-muted-foreground">그리드 표시, 스냅, 그리드 단위를 설정합니다.</p>
             </div>
 
             <div className="grid grid-cols-1 gap-3 max-w-xl">
@@ -203,15 +214,15 @@ function ViewGridSettings() {
                 </div>
 
                 <div className="grid grid-cols-4 items-center gap-2">
-                    <Label className="text-right col-span-1">그리드 크기</Label>
+                    <Label className="text-right col-span-1">mm당 픽셀</Label>
                     <Input
                         className="col-span-3"
                         type="number"
                         min={1}
-                        value={gridSizeText}
-                        onChange={(e) => setGridSizeText(e.target.value)}
-                        onBlur={commitGridSize}
-                        onKeyDown={(e) => e.key === "Enter" && commitGridSize()}
+                        value={pixelsPerMmText}
+                        onChange={(e) => setPixelsPerMmText(e.target.value)}
+                        onBlur={commitPixelsPerMm}
+                        onKeyDown={(e) => e.key === "Enter" && commitPixelsPerMm()}
                     />
                 </div>
             </div>

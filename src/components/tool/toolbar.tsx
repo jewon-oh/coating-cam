@@ -15,7 +15,7 @@ import {
     FolderOpen,
     MoveHorizontal,
     MoveVertical,
-    Settings,
+    Settings, SquareSquare, Slash, GitCommitHorizontal,
 } from "lucide-react";
 import React, {useState} from "react";
 import {useAppDispatch, useAppSelector} from "@/hooks/redux";
@@ -54,31 +54,14 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
         setGridVisible,
         isSnappingEnabled,
         setSnappingEnabled,
+        showCoatingOrder,
+        setShowCoatingOrder
     } = useSettings();
     const {handleSaveProject, handleLoadProject} = useProjectActions();
     const {handleImageInsert} = useInsertImage();
-    const [isCoatingSettingsOpen, setIsCoatingSettingsOpen] = useState(false);
 
     const canUndo = past.length > 0;
     const canRedo = future.length > 0;
-
-    // 코팅 설정 변경 핸들러
-    const handleCoatingSettingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const {name, value} = e.target;
-        dispatch({
-            type: 'tool/updateCoatingSettings',
-            payload: {[name]: parseFloat(value)}
-        });
-    };
-
-    // 코팅 설정 셀렉트 변경 핸들러
-    const handleCoatingSettingSelectChange = (name: string, value: string) => {
-        dispatch({
-            type: 'tool/updateCoatingSettings',
-            payload: {[name]: value}
-        });
-    };
-
 
     // 현재 모드에 따른 도구들 렌더링
     const renderShapeTools = () => (
@@ -90,6 +73,13 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                     active={tool === 'select'}
                     onClick={() => dispatch(setTool('select'))}
                     className={tool === 'select' ? 'bg-primary/20 border border-primary/40' : ''}
+                />
+                <ToolButton
+                    icon={<Slash size={16}/>}
+                    label="선"
+                    active={tool === 'line'}
+                    onClick={() => dispatch(setTool('line'))}
+                    className={tool === 'line' ? 'bg-primary/20 border border-primary/40' : ''}
                 />
                 <ToolButton
                     icon={<RectangleHorizontalIcon size={16}/>}
@@ -150,6 +140,16 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                                     className={coatingType === 'fill' && fillPattern === 'vertical' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}
                                 />
                                 <ToolButton
+                                    icon={<SquareSquare size={16}/>}
+                                    label="동심채우기"
+                                    active={coatingType === 'fill' && fillPattern === 'concentric'}
+                                    onClick={() => dispatch(setCoatingTypeAndFillPattern({
+                                        coatingType: 'fill',
+                                        fillPattern: 'concentric'
+                                    }))}
+                                    className={coatingType === 'fill' && fillPattern === 'concentric' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}
+                                />
+                                <ToolButton
                                     icon={<SquaresUnite size={16}/>}
                                     label="윤곽"
                                     active={coatingType === 'outline'}
@@ -206,6 +206,13 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                                     active={isSnappingEnabled}
                                     onClick={() => setSnappingEnabled(!isSnappingEnabled)}
                                     className={isSnappingEnabled ? 'bg-primary/20 border border-primary/40' : ''}
+                                />
+                                <ToolButton
+                                    icon={<GitCommitHorizontal size={16}/>}
+                                    label="코팅 순서"
+                                    active={showCoatingOrder}
+                                    onClick={() => setShowCoatingOrder(!showCoatingOrder)}
+                                    className={showCoatingOrder ? 'bg-primary/20 border border-primary/40' : ''}
                                 />
                             </div>
                             <span className="text-xs mt-1 text-muted-foreground">뷰 옵션</span>

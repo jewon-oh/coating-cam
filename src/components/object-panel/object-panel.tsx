@@ -25,16 +25,35 @@ import type {CustomShapeConfig} from "@/types/custom-konva-config";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {ScrollArea} from "@/components/ui/scroll-area";
 import {Badge} from "@/components/ui/badge";
+import {Button} from "@/components/ui/button";
 import {
     Layers,
+    Move,
 } from "lucide-react";
 import {cn} from "@/lib/utils";
 import {useVirtualTree} from "@/hooks/object-panel/use-virtual-tree";
 import {GroupItem} from "@/components/object-panel/group-item";
 import {ObjectItem} from "@/components/object-panel/object-item";
 import debounce from "lodash/debounce";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+    DragStartEvent,
+    DragOverEvent,
+} from "@dnd-kit/core";
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
-export const ObjectPanel = memo(() => {
+export const ObjectPanel = memo(( className?: string) => {
     const dispatch = useAppDispatch();
     const shapes = useAppSelector(selectShapes);
     const selectedShapeIds = useAppSelector(selectSelectedShapeIds);
@@ -43,8 +62,29 @@ export const ObjectPanel = memo(() => {
     const [panelCollapsed, setPanelCollapsed] = useState(false);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [openItemId, setOpenItemId] = useState<string | null>(null);
+    const [isDragModeEnabled, setIsDragModeEnabled] = useState(true);
+    const [activeId, setActiveId] = useState<string | null>(null);
 
-    // 코팅 순서에 따라 정렬된 도형 목록
+    // DnD 센서 설정
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    // 코팅 순서가 있는 도형들만 필터링하고 정렬
+    const shapesWithCoatingOrder = useMemo(() => {
+        return shapes
+            .filter(shape => shape.coatingOrder && shape.coatingOrder > 0)
+            .sort((a, b) => (a.coatingOrder || 0) - (b.coatingOrder || 0));
+    }, [shapes]);
+
+    // 코팅 순서에 따라 정렬된 전체 도형 목록
     const sortedShapes = useMemo(() => {
         const shapesCopy = [...shapes];
         shapesCopy.sort((a, b) => {
@@ -69,7 +109,7 @@ export const ObjectPanel = memo(() => {
     }, [shapes]);
 
     // useVirtualTree를 사용한 트리 구조 생성
-    const { flattenedTree } = useVirtualTree(
+    const {flattenedTree} = useVirtualTree(
         sortedShapes, // 정렬된 배열 사용
         expandedIds
     );
@@ -82,18 +122,50 @@ export const ObjectPanel = memo(() => {
         if (newGroupIds.length > 0) {
             setExpandedIds(prev => new Set([...prev, ...newGroupIds]));
         }
-    }, [ shapes]); // 의존성 배열에서 expandedIds 제거
+    }, [shapes]); // 의존성 배열에서 expandedIds 제거
 
     // 통계 텍스트
     const statsText = useMemo(() => {
         const total = shapes.length;
         const selected = selectedShapeIds.length;
+        const coatingItems = shapesWithCoatingOrder.length;
 
-        return `${total}개 객체${selected > 0 ? `, ${selected}개 선택` : ''}`;
-    }, [shapes.length, selectedShapeIds.length]);
+        return `${total}개 객체${selected > 0 ? `, ${selected}개 선택` : ''}${coatingItems > 0 ? `, ${coatingItems}개 코팅` : ''}`;
+    }, [shapes.length, selectedShapeIds.length, shapesWithCoatingOrder.length]);
+
+    // DnD 이벤트 핸들러
+    const handleDragStart = useCallback((event: DragStartEvent) => {
+        const {active} = event;
+        setActiveId(active.id as string);
+    }, []);
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const {active, over} = event;
+
+        if (over && active.id !== over.id) {
+            const oldIndex = shapesWithCoatingOrder.findIndex(shape => shape.id === active.id);
+            const newIndex = shapesWithCoatingOrder.findIndex(shape => shape.id === over.id);
+
+            if (oldIndex !== -1 && newIndex !== -1) {
+                const newOrder = arrayMove(shapesWithCoatingOrder, oldIndex, newIndex);
+
+                // 새로운 순서에 따라 coatingOrder 업데이트
+                newOrder.forEach((shape, index) => {
+                    dispatch(updateShape({
+                        id: shape.id!,
+                        updatedProps: {coatingOrder: index + 1}
+                    }));
+                });
+            }
+        }
+
+        setActiveId(null);
+    }, [shapesWithCoatingOrder, dispatch]);
 
     // 이벤트 핸들러들
     const handleSelect = useCallback((id: string, e: React.MouseEvent) => {
+        // if (isDragModeEnabled) return; // 드래그 모드에서는 선택 비활성화
+
         const shape = shapes.find(s => s.id === id);
         if (!shape) return;
 
@@ -233,7 +305,8 @@ export const ObjectPanel = memo(() => {
                         onSelect={handleSelect}
                         onPatch={handlePatch}
                         onUngroup={handleUngroup}
-                        onDuplicate={() => {}}
+                        onDuplicate={() => {
+                        }}
                         onDelete={handleDeleteGroup}
                         onToggleVisibility={handleToggleGroupVisibility}
                         onToggleLock={handleToggleGroupLock}
@@ -250,40 +323,99 @@ export const ObjectPanel = memo(() => {
                     isSelected={isSelected}
                     onSelect={handleSelect}
                     onPatch={handlePatch}
+                    isDragEnabled={isDragModeEnabled}
                 />
             </div>
         );
-    }, [selectedShapeIds, shapes, handleSelect, handlePatch, handleToggleGroup, handleUngroup, handleDeleteGroup, handleToggleGroupVisibility, handleToggleGroupLock]);
+    }, [selectedShapeIds, shapes, handleSelect, handlePatch, handleToggleGroup, handleUngroup, handleDeleteGroup, handleToggleGroupVisibility, handleToggleGroupLock, isDragModeEnabled]);
+    const renderHints = () => {
+        if (shapes.length === 0) return null;
+
+        const hints = [];
+
+        // 선택 관련 힌트
+        if (selectedShapeIds.length === 0) {
+            hints.push("💡 객체를 클릭하여 선택하세요");
+        } else if (selectedShapeIds.length === 1) {
+            hints.push("💡 Ctrl+클릭으로 다중 선택, Shift+클릭으로 범위 선택");
+        }
+
+        // 코팅 순서 힌트
+        if (shapesWithCoatingOrder.length > 1) {
+            hints.push("📋 코팅 순서가 있는 객체들을 드래그하여 순서 변경 가능");
+        }
+
+        // 그룹 힌트
+        const hasGroups = shapes.some(s => s.type === 'group');
+        if (hasGroups) {
+            hints.push("📁 그룹을 클릭하여 확장/축소");
+        }
+
+        return hints.length > 0 ? (
+            <>
+                {hints.map((hint, index) => (
+                    <p key={index} className="text-xs text-muted-foreground mt-1">
+                        {hint}
+                    </p>
+                ))}
+            </>
+
+        ) : null;
+    };
 
     return (
-        <Card className="h-full w-full rounded-none flex flex-col transition-all duration-200 border-0 gap-0">
+        <Card className={cn("h-full rounded-none border-0 gap-0", className)}>
             {/* 헤더 */}
-            <CardHeader className="px-2 pb-0border-b bg-muted/10">
+            <CardHeader className="py-0 border-b bg-muted/10">
                 <CardTitle className={cn(
-                    "text-lg flex items-center space-x-1.5",
+                    "text-lg flex items-center justify-between",
                     panelCollapsed && "hidden"
                 )}>
-                    <Layers className="w-3 h-3"/>
-                    <span>객체</span>
-                    <Badge variant="secondary" className="text-[10px] px-1 py-0.5 h-auto">
-                        {shapes.length}
-                    </Badge>
+                    <div className="flex items-center space-x-1.5">
+                        <Layers className="w-3 h-3"/>
+                        <span>객체</span>
+                        <Badge variant="secondary" className="text-[14px] px-1 py-0.5 h-auto">
+                            {shapes.length}
+                        </Badge>
+
+                    </div>
+                    {/*{shapesWithCoatingOrder.length > 0 && (*/}
+                    {/*    <Button*/}
+                    {/*        variant={isDragModeEnabled ? "default" : "outline"}*/}
+                    {/*        size="sm"*/}
+                    {/*        onClick={() => setIsDragModeEnabled(!isDragModeEnabled)}*/}
+                    {/*        className="h-7 text-xs"*/}
+                    {/*    >*/}
+                    {/*        <Move size={12} className="mr-1"/>*/}
+                    {/*        {isDragModeEnabled ? "완료" : "순서변경"}*/}
+                    {/*    </Button>*/}
+                    {/*)}*/}
                 </CardTitle>
+                {renderHints()}
+                {/*/!* 통계 정보 *!/*/}
+                {/*<div className="text-xs text-muted-foreground">*/}
+                {/*    {statsText}*/}
+                {/*</div>*/}
             </CardHeader>
 
             {/* 트리 목록 */}
             <CardContent className="flex-1 p-0 overflow-hidden">
                 <ScrollArea className="h-full">
-                    <div className="px-2 pt-1 pb-12 space-y-0.5">
-                        {flattenedTree.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">
-                                <Layers className="w-8 h-8 mx-auto mb-2 opacity-30"/>
-                                <p className="text-xs">객체가 없습니다</p>
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext
+                            items={shapesWithCoatingOrder.map(shape => shape.id!)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            <div className="p-1 space-y-1">
+                                {flattenedTree.map(renderTreeNode)}
                             </div>
-                        ) : (
-                            flattenedTree.map(renderTreeNode)
-                        )}
-                    </div>
+                        </SortableContext>
+                    </DndContext>
                 </ScrollArea>
             </CardContent>
         </Card>
@@ -291,5 +423,3 @@ export const ObjectPanel = memo(() => {
 });
 
 ObjectPanel.displayName = "ObjectPanel";
-
-export default ObjectPanel;

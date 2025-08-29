@@ -35,6 +35,55 @@ export class PathOptimizer {
         this.settings = settings;
         this.maskShapes = maskShapes;
     }
+    public async getOptimizedPathForVisualization(
+        segments: { start: Point; end: Point }[],
+        startPoint: Point
+    ): Promise<{ start: Point; end: Point }[] | null> {
+        if (segments.length === 0) return null;
+
+        const zones = this.clusterSegmentsWithKMeans(segments, 5, 5);
+        const unvisitedZones = new Set(zones.filter(z => z.length > 0));
+        let currentLocation = startPoint;
+        const finalPath: { start: Point; end: Point }[] = [];
+
+        while (unvisitedZones.size > 0) {
+            let bestNextZone: { start: Point; end: Point }[] | null = null;
+            let closestEntryPoint: Point | null = null;
+            let closestDistance = Infinity;
+
+            for (const zone of unvisitedZones) {
+                for (const segment of zone) {
+                    const distToStart = Math.hypot(currentLocation.x - segment.start.x, currentLocation.y - segment.start.y);
+                    if (distToStart < closestDistance) {
+                        closestDistance = distToStart;
+                        bestNextZone = zone;
+                        closestEntryPoint = segment.start;
+                    }
+                    const distToEnd = Math.hypot(currentLocation.x - segment.end.x, currentLocation.y - segment.end.y);
+                    if (distToEnd < closestDistance) {
+                        closestDistance = distToEnd;
+                        bestNextZone = zone;
+                        closestEntryPoint = segment.end;
+                    }
+                }
+            }
+
+            if (bestNextZone && closestEntryPoint) {
+                currentLocation = closestEntryPoint;
+
+                const orderedPath = await this.findPathWithinZoneAsync(bestNextZone, currentLocation);
+                if (orderedPath.length > 0) {
+                    finalPath.push(...orderedPath);
+                    currentLocation = orderedPath[orderedPath.length - 1].end;
+                }
+                unvisitedZones.delete(bestNextZone);
+            } else {
+                break;
+            }
+        }
+
+        return finalPath;
+    }
 
     /**
      * 최종 경로들을 받아 최적화된 G-code 명령 생성

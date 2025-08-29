@@ -9,7 +9,7 @@ import {WorkspaceOverlays} from "@/components/workspace/workspace-overlays";
 import ToolContextPanel from "@/components/workspace/tool-context-panel";
 import {useProjectAutoLoad} from "@/hooks/project/use-project-autoload";
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from "@/components/ui/resizable";
-import {PropertyPanel} from "@/components/workspace/shape/property-panel";
+import {PropertyPanel} from "@/components/workspace/property-panel";
 import {useAppDispatch, useAppSelector} from "@/hooks/redux";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
@@ -229,8 +229,8 @@ const WorkspaceContent = () => {
         }
     }, [generationState.status]);
 
-    // 우측 패널 렌더링 로직
-    const renderRightPanel = () => {
+    // 좌측 패널 렌더링 로직
+    const renderLeftPanel = () => {
         if (isDrawingTool) {
             return <ToolContextPanel />;
         }
@@ -248,8 +248,8 @@ const WorkspaceContent = () => {
 
             <div className="flex flex-1 overflow-hidden relative">
                 <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-                    <ResizablePanel defaultSize={20} minSize={5} maxSize={30}>
-                        <ObjectPanel/>
+                    <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+                        {renderLeftPanel()}
                     </ResizablePanel>
 
                     <ResizableHandle withHandle/>
@@ -263,8 +263,8 @@ const WorkspaceContent = () => {
 
                     <ResizableHandle withHandle/>
 
-                    <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-                        {renderRightPanel()}
+                    <ResizablePanel defaultSize={20} minSize={10} maxSize={30}>
+                        <ObjectPanel/>
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>

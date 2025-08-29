@@ -1,10 +1,11 @@
-import { CoatingSettings } from "@/types/gcode";
 import { CustomShapeConfig } from "@/types/custom-konva-config";
 import { GCodeEmitter } from "@/lib/gcode/gcode-emitter";
 import { ProgressCallback } from "@/lib/gcode/progress-callback";
 import { PathCalculator } from "@/lib/gcode/path-calculator";
 import { MaskingManager } from "@/lib/gcode/mask-manager";
 import { PathOptimizer } from "@/lib/gcode/path-optimizer";
+import {CoatingSettings} from "@/types/coating";
+import {Point} from "@/lib/gcode/point";
 
 /**
  * 도형이 코팅에서 제외되어야 하는지 확인합니다.
@@ -17,7 +18,7 @@ function shouldSkipCoating(shape: Partial<CustomShapeConfig>): boolean {
  * 코팅 경로 계산을 전담하는 클래스
  * 도형들을 분석하여 실제 G-code 경로(segments)를 생성합니다.
  */
-export class PathGenerator {
+export class GCodeGenerator {
     private readonly settings: CoatingSettings;
     private readonly coatingShapes: CustomShapeConfig[];
 
@@ -48,6 +49,31 @@ export class PathGenerator {
         this.masker = new MaskingManager(settings, maskShapes);
         this.calculator = new PathCalculator(settings,this.masker);
         this.optimizer = new PathOptimizer(settings, maskShapes);
+    }
+    
+    public async getOptimizedPathForShape(
+        shape: CustomShapeConfig,
+        startPoint: Point
+    ): Promise<{ start: Point; end: Point }[] | null> {
+        if (shouldSkipCoating(shape) || (shape.coatingType !== 'fill' && shape.coatingType !== 'outline')) {
+            return null;
+        }
+
+        // 1. Calculate raw segments
+        const rawSegments = await this.calculator.calculateForShapeAbsolute(shape);
+
+        // 2. Apply masking
+        const maskedSegments = this.masker.applyMaskingToSegments(rawSegments, shape);
+
+        if (maskedSegments.length === 0) {
+            return null;
+        }
+
+        // 3. Get optimized path using the new method in PathOptimizer
+        return await this.optimizer.getOptimizedPathForVisualization(
+            maskedSegments,
+            startPoint
+        );
     }
 
     public async generatePaths(emitter: GCodeEmitter, onProgress?: ProgressCallback): Promise<void> {

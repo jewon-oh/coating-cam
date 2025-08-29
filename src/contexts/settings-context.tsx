@@ -111,14 +111,16 @@ type SettingsContextType = {
     // 기존 설정
     isGridVisible: boolean;
     setGridVisible: (v: boolean) => void;
-    gridSize: number;
-    setGridSize: (n: number) => void;
+    pixelsPerMm: number;
+    setPixelsPerMm: (n: number) => void;
     isSnappingEnabled: boolean;
     setSnappingEnabled: (v: boolean) => void;
     theme: 'light' | 'dark' | 'system';
     setTheme: (t: 'light' | 'dark' | 'system') => void;
     workArea: { width: number; height: number };
     setWorkArea: (wa: { width: number; height: number }) => void;
+    showCoatingOrder: boolean;
+    setShowCoatingOrder: (v: boolean) => void;
 
     // G-Code 설정 추가
     gcodeSettings: CoatingSettings;
@@ -152,12 +154,13 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
     const [isGridVisible, setGridVisible] = useState(
         DEFAULT_SETTINGS.grid.visible
     );
-    const [gridSize, setGridSize] = useState(DEFAULT_SETTINGS.grid.size);
+    const [pixelsPerMm, setPixelsPerMm] = useState(DEFAULT_SETTINGS.grid.pixelsPerMm);
     const [isSnappingEnabled, setSnappingEnabled] = useState(
         DEFAULT_SETTINGS.grid.snapping
     );
     const [theme, setTheme] = useState<"light" | "dark" | "system">(DEFAULT_SETTINGS.theme);
     const [workArea, setWorkArea] = useState(DEFAULT_SETTINGS.workArea);
+    const [showCoatingOrder, setShowCoatingOrder] = useState(DEFAULT_SETTINGS.showCoatingOrder);
 
     // G-Code 설정 상태 추가
     const [gcodeSettings, setGcodeSettings] = useState<CoatingSettings>(DEFAULT_SETTINGS.coatingSettings);
@@ -189,10 +192,11 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
                 if (!mounted) return;
 
                 setGridVisible(!!settings.grid?.visible);
-                setGridSize(Number.isFinite(settings.grid?.size) ? settings.grid!.size : DEFAULT_SETTINGS.grid.size);
+                setPixelsPerMm(Number.isFinite(settings.grid?.pixelsPerMm) ? settings.grid!.pixelsPerMm : DEFAULT_SETTINGS.grid.pixelsPerMm);
                 setSnappingEnabled(!!settings.grid?.snapping);
                 setTheme((settings.theme) ?? DEFAULT_SETTINGS.theme);
                 setWorkArea(settings.workArea ?? DEFAULT_SETTINGS.workArea);
+                setShowCoatingOrder(settings.showCoatingOrder ?? DEFAULT_SETTINGS.showCoatingOrder);
 
                 // G-Code 설정 로드
                 setGcodeSettings(settings.coatingSettings ?? DEFAULT_SETTINGS.coatingSettings);
@@ -238,20 +242,22 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
             workArea,
             grid: {
                 visible: isGridVisible,
-                size: gridSize,
+                pixelsPerMm: pixelsPerMm,
                 snapping: isSnappingEnabled,
             },
             theme,
+            showCoatingOrder,
             coatingSettings: gcodeSettings,
             gcodeSnippets,
         };
         scheduleSave(snapshot);
     }, [
         isGridVisible,
-        gridSize,
+        pixelsPerMm,
         isSnappingEnabled,
         theme,
         workArea,
+        showCoatingOrder,
         gcodeSettings,
         gcodeSnippets,
         scheduleSave,
@@ -304,14 +310,16 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
             // 기존 설정
             isGridVisible,
             setGridVisible,
-            gridSize,
-            setGridSize,
+            pixelsPerMm,
+            setPixelsPerMm,
             isSnappingEnabled,
             setSnappingEnabled,
             theme,
             setTheme,
             workArea,
             setWorkArea,
+            showCoatingOrder,
+            setShowCoatingOrder,
 
             // G-Code 설정
             gcodeSettings,
@@ -329,10 +337,11 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         }),
         [
             isGridVisible,
-            gridSize,
+            pixelsPerMm,
             isSnappingEnabled,
             theme,
             workArea,
+            showCoatingOrder,
             gcodeSettings,
             updateGcodeSettings,
             gcodeSnippets,

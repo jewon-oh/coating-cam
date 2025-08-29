@@ -3,7 +3,6 @@ import {configureStore} from '@reduxjs/toolkit';
 import shapesReducer from './slices/shape-slice';
 import historyReducer from './slices/shape-history-slice';
 import pathReducer from './slices/path-slice';
-import pathHistoryReducer from './slices/path-history-slice';
 import toolReducer from './slices/tool-slice';
 import gcodeReducer from './slices/gcode-slice';
 import {historySyncListener} from '@/store/middleware/history-sync-listener';
@@ -14,7 +13,6 @@ export const store = configureStore({
         shapes: shapesReducer,          // state.shapes
         history: historyReducer,        // state.history (shape 히스토리)
         paths: pathReducer,             // state.paths
-        pathHistory: pathHistoryReducer,// state.pathHistory (path 히스토리)
         tool: toolReducer,
         gcode: gcodeReducer,
     },

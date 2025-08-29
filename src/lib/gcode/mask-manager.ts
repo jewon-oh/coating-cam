@@ -40,12 +40,133 @@ export class MaskingManager {
             return segments;
         }
 
+        // ✅ 코팅 도형이 마스킹 영역 안에 완전히 포함되어 있는지 확인
+        if (this.isShapeCompletelyInsideMasks(coatingShape)) {
+            console.log(`도형 ${coatingShape.name || coatingShape.id}이 마스킹 영역 안에 완전히 포함되어 있습니다. 코팅을 건너뜁니다.`);
+            return []; // 빈 배열 반환으로 코팅하지 않음
+        }
+
         const maskedSegments: { start: Point; end: Point }[] = [];
         for (const segment of segments) {
             maskedSegments.push(...this.splitSegmentByMasks(segment, coatingShape));
         }
         return maskedSegments;
     }
+
+    /**
+     * 코팅 도형이 마스킹 영역들 중 하나에 완전히 포함되어 있는지 확인
+     */
+    private isShapeCompletelyInsideMasks(coatingShape: CustomShapeConfig): boolean {
+        if (!this.hasMasks()) {
+            return false;
+        }
+
+        for (const mask of this.maskShapes) {
+            if (this.isShapeCompletelyInsideMask(coatingShape, mask)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 코팅 도형이 특정 마스킹 도형 안에 완전히 포함되어 있는지 확인
+     */
+    private isShapeCompletelyInsideMask(coatingShape: CustomShapeConfig, mask: CustomShapeConfig): boolean {
+        const clearance = this.getMaskClearance(mask);
+
+        if (mask.type === 'rectangle') {
+            const maskBounds = {
+                left: (mask.x ?? 0) - clearance,
+                top: (mask.y ?? 0) - clearance,
+                right: (mask.x ?? 0) + (mask.width ?? 0) + clearance,
+                bottom: (mask.y ?? 0) + (mask.height ?? 0) + clearance
+            };
+
+            if (coatingShape.type === 'rectangle') {
+                const shapeBounds = {
+                    left: coatingShape.x ?? 0,
+                    top: coatingShape.y ?? 0,
+                    right: (coatingShape.x ?? 0) + (coatingShape.width ?? 0),
+                    bottom: (coatingShape.y ?? 0) + (coatingShape.height ?? 0)
+                };
+
+                return shapeBounds.left >= maskBounds.left &&
+                    shapeBounds.top >= maskBounds.top &&
+                    shapeBounds.right <= maskBounds.right &&
+                    shapeBounds.bottom <= maskBounds.bottom;
+
+            } else if (coatingShape.type === 'circle' && coatingShape.radius) {
+                const shapeLeft = (coatingShape.x ?? 0) - coatingShape.radius;
+                const shapeTop = (coatingShape.y ?? 0) - coatingShape.radius;
+                const shapeRight = (coatingShape.x ?? 0) + coatingShape.radius;
+                const shapeBottom = (coatingShape.y ?? 0) + coatingShape.radius;
+
+                return shapeLeft >= maskBounds.left &&
+                    shapeTop >= maskBounds.top &&
+                    shapeRight <= maskBounds.right &&
+                    shapeBottom <= maskBounds.bottom;
+
+            } else if (coatingShape.type === 'image') {
+                // 이미지도 사각형으로 처리
+                const shapeBounds = {
+                    left: coatingShape.x ?? 0,
+                    top: coatingShape.y ?? 0,
+                    right: (coatingShape.x ?? 0) + (coatingShape.width ?? 0),
+                    bottom: (coatingShape.y ?? 0) + (coatingShape.height ?? 0)
+                };
+
+                return shapeBounds.left >= maskBounds.left &&
+                    shapeBounds.top >= maskBounds.top &&
+                    shapeBounds.right <= maskBounds.right &&
+                    shapeBounds.bottom <= maskBounds.bottom;
+            }
+
+        } else if (mask.type === 'circle' && mask.radius) {
+            const maskCenter = { x: mask.x ?? 0, y: mask.y ?? 0 };
+            const maskRadius = mask.radius + clearance;
+
+            if (coatingShape.type === 'circle' && coatingShape.radius) {
+                const shapeCenter = { x: coatingShape.x ?? 0, y: coatingShape.y ?? 0 };
+                const distance = Math.hypot(
+                    shapeCenter.x - maskCenter.x,
+                    shapeCenter.y - maskCenter.y
+                );
+                return distance + coatingShape.radius <= maskRadius;
+
+            } else if (coatingShape.type === 'rectangle') {
+                // 사각형이 원 안에 완전히 포함되는지 확인 (모든 꼭짓점이 원 안에 있어야 함)
+                const corners = [
+                    { x: coatingShape.x ?? 0, y: coatingShape.y ?? 0 },
+                    { x: (coatingShape.x ?? 0) + (coatingShape.width ?? 0), y: coatingShape.y ?? 0 },
+                    { x: (coatingShape.x ?? 0) + (coatingShape.width ?? 0), y: (coatingShape.y ?? 0) + (coatingShape.height ?? 0) },
+                    { x: coatingShape.x ?? 0, y: (coatingShape.y ?? 0) + (coatingShape.height ?? 0) }
+                ];
+
+                return corners.every(corner => {
+                    const distance = Math.hypot(corner.x - maskCenter.x, corner.y - maskCenter.y);
+                    return distance <= maskRadius;
+                });
+
+            } else if (coatingShape.type === 'image') {
+                // 이미지도 사각형과 동일하게 처리
+                const corners = [
+                    { x: coatingShape.x ?? 0, y: coatingShape.y ?? 0 },
+                    { x: (coatingShape.x ?? 0) + (coatingShape.width ?? 0), y: coatingShape.y ?? 0 },
+                    { x: (coatingShape.x ?? 0) + (coatingShape.width ?? 0), y: (coatingShape.y ?? 0) + (coatingShape.height ?? 0) },
+                    { x: coatingShape.x ?? 0, y: (coatingShape.y ?? 0) + (coatingShape.height ?? 0) }
+                ];
+
+                return corners.every(corner => {
+                    const distance = Math.hypot(corner.x - maskCenter.x, corner.y - maskCenter.y);
+                    return distance <= maskRadius;
+                });
+            }
+        }
+
+        return false;
+    }
+
 
     /**
      * 충돌하는 모든 마스킹 도형의 배열을 반환합니다.

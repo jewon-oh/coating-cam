@@ -23,8 +23,13 @@ const DynamicMinimap = dynamic(() => import('@/components/workspace/minimap'), {
 export const WorkspaceOverlays = () => {
     const shapes = useAppSelector((state) => state.shapes.shapes);
     const selectedShapeIds = useAppSelector((state) => state.shapes.selectedShapeIds);
-    const {workArea} = useSettings();
+    const {workArea, pixelsPerMm} = useSettings();
     const {stage, loading, setStage} = useCanvas(); // ✅ setStage 추가
+
+    const workAreaPx = React.useMemo(() => ({
+        width: workArea.width * pixelsPerMm,
+        height: workArea.height * pixelsPerMm,
+    }), [workArea, pixelsPerMm]);
 
     const [showShortcuts, setShowShortcuts] = useState(false);
 
@@ -49,7 +54,7 @@ export const WorkspaceOverlays = () => {
             {/* 미니맵 */}
             <DynamicMinimap
                 shapes={shapes}
-                workArea={workArea}
+                workArea={workAreaPx}
                 viewport={stage}
                 onViewportChange={handleViewportChange}
             />

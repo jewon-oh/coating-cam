@@ -8,6 +8,7 @@ import { useShapeDrawing } from './shape/use-shape-drawing';
 import { useShapeSelection } from './shape/use-shape-selection';
 import { useShapeEditing } from './shape/use-shape-editing';
 import { useShapeMovement } from './shape/use-shape-movement';
+import {DRAWING_TOOLS} from "@/types/tool-type";
 
 export function useShapeEvents() {
     const dispatch = useAppDispatch();
@@ -23,7 +24,7 @@ export function useShapeEvents() {
     const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
         console.log('useShapeEvents: handleMouseDown', tool);
 
-        if (tool === 'circle' || tool === 'rectangle') {
+        if (DRAWING_TOOLS.includes(tool)) {
             if (drawing.startDrawing(e)) {
                 return;
             }

@@ -1,12 +1,12 @@
-// src/hooks/use-global-keyboard.tsx
+// src/hooks/use-keyboard-shortcuts.tsx
 import { useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { useAppDispatch } from '@/hooks/redux';
 import { setTool } from '@/store/slices/tool-slice';
 import { unselectAllShapes } from '@/store/slices/shape-slice';
 import { useCanvas } from '@/contexts/canvas-context';
 import {undo,redo} from "@/store/slices/shape-history-slice";
 
-interface GlobalKeyboardHandlers {
+interface UseKeyboardShortcutsProps {
     onDelete?: () => void;
     onCopy?: () => void;
     onPaste?: () => void;
@@ -17,9 +17,8 @@ interface GlobalKeyboardHandlers {
     onNudge?: (direction: 'up' | 'down' | 'left' | 'right', distance: number) => void;
 }
 
-export function useGlobalKeyboard(handlers: GlobalKeyboardHandlers = {}) {
+export function useKeyboardShortcuts(handlers: UseKeyboardShortcutsProps = {}) {
     const dispatch = useAppDispatch();
-    const { workspaceMode } = useAppSelector((state) => state.tool);
     const { isCanvasFocused } = useCanvas();
 
     useEffect(() => {
@@ -50,15 +49,28 @@ export function useGlobalKeyboard(handlers: GlobalKeyboardHandlers = {}) {
                 return;
             }
 
-            // 모드별 도구 단축키
-            if (workspaceMode === 'shape') {
-                handleShapeToolShortcuts(e, dispatch);
-            } else if (workspaceMode === 'path') {
-                handlePathToolShortcuts(e, dispatch);
-            }
-
             // 캔버스가 포커스된 상태에서만 작동하는 편집 단축키
             if (!isCanvasFocused) return;
+
+            // 도구 단축키
+            switch (e.key.toLowerCase()) {
+                case '1':
+                    e.preventDefault();
+                    dispatch(setTool('select'));
+                    break;
+                case '2':
+                    e.preventDefault();
+                    dispatch(setTool('line'));
+                    break;
+                case '3':
+                    e.preventDefault();
+                    dispatch(setTool('rectangle'));
+                    break;
+                case '4':
+                    e.preventDefault();
+                    dispatch(setTool('circle'));
+                    break;
+            }
 
             // 편집 단축키
             if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -83,6 +95,8 @@ export function useGlobalKeyboard(handlers: GlobalKeyboardHandlers = {}) {
                 e.preventDefault();
                 handlers.onUngroup?.();
             }
+
+
             // 화살표 키로 도형 이동
             else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
                 e.preventDefault();
@@ -94,45 +108,5 @@ export function useGlobalKeyboard(handlers: GlobalKeyboardHandlers = {}) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [dispatch, workspaceMode, isCanvasFocused, handlers]);
-}
-
-// Shape 모드 도구 단축키
-function handleShapeToolShortcuts(e: KeyboardEvent, dispatch: any) {
-    switch (e.key.toLowerCase()) {
-        case 'v':
-            e.preventDefault();
-            dispatch(setTool('select'));
-            break;
-        case 'r':
-            e.preventDefault();
-            dispatch(setTool('rectangle'));
-            break;
-        case 'c':
-            e.preventDefault();
-            dispatch(setTool('circle'));
-            break;
-    }
-}
-
-// Path 모드 도구 단축키
-function handlePathToolShortcuts(e: KeyboardEvent, dispatch: any) {
-    switch (e.key.toLowerCase()) {
-        case 'v':
-            e.preventDefault();
-            dispatch(setTool('path-select'));
-            break;
-        case 'p':
-            e.preventDefault();
-            dispatch(setTool('path-pen'));
-            break;
-        case 'l':
-            e.preventDefault();
-            dispatch(setTool('path-line'));
-            break;
-        case 'n':
-            e.preventDefault();
-            dispatch(setTool('path-node'));
-            break;
-    }
+    }, [dispatch, isCanvasFocused, handlers]);
 }

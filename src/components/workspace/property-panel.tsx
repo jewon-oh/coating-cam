@@ -172,7 +172,6 @@ export function PropertyPanel({className}: PropertyPanelProps) {
         };
     }, [selectedShapes, singleSelectedShape]);
 
-    // 코팅 설정 렌더링
     const renderCoatingSettings = () => {
         const coatingType = commonProperties?.coatingType || 'fill';
 
@@ -242,24 +241,6 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 </div>
                             </div>
                         </div>
-
-                        {/* 패턴 선택 */}
-                        <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">채우기 패턴</Label>
-                            <Select
-                                value={commonProperties?.fillPattern || 'vertical'}
-                                onValueChange={(value) => handlePropertyUpdate('fillPattern', value)}
-                            >
-                                <SelectTrigger className="h-7 text-xs">
-                                    <SelectValue/>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="horizontal">수평</SelectItem>
-                                    <SelectItem value="vertical">수직</SelectItem>
-                                    <SelectItem value="auto">자동</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
                     </div>
                 );
 
@@ -297,7 +278,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                             </div>
                         </div>
 
-                        {/* 두 번째 줄: 높이, 횟수 */}
+                        {/* 두 번째 줄: 높이, 패스 */}
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
                                 <Label className="text-xs text-muted-foreground">코팅 높이</Label>
@@ -314,62 +295,40 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">윤곽 횟수</Label>
-                                <div className="flex items-center gap-1">
-                                    <Input
-                                        type="number"
-                                        min="1"
-                                        name="outlinePasses"
-                                        value={commonProperties?.outlinePasses || 1}
-                                        onChange={handleInputChange}
-                                        className="h-7 text-xs"
-                                    />
-                                    <span className="text-xs text-muted-foreground">회</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 세 번째 줄: 윤곽 타입, 오프셋 */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">윤곽 타입</Label>
-                                <Select
-                                    value={commonProperties?.outlineType || 'center'}
-                                    onValueChange={(value) => handlePropertyUpdate('outlineType', value)}
-                                >
-                                    <SelectTrigger className="h-7 text-xs">
-                                        <SelectValue/>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="outside">외곽</SelectItem>
-                                        <SelectItem value="center">중앙</SelectItem>
-                                        <SelectItem value="inside">내부</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">윤곽 오프셋</Label>
-                                <div className="flex items-center gap-1">
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        name="outlineInterval"
-                                        value={commonProperties?.outlineInterval || 0}
-                                        onChange={handleInputChange}
-                                        className="h-7 text-xs"
-                                    />
-                                    <span className="text-xs text-muted-foreground">mm</span>
-                                </div>
+                                <Label className="text-xs text-muted-foreground">패스 수</Label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    max="10"
+                                    name="outlinePasses"
+                                    value={commonProperties?.outlinePasses || 1}
+                                    onChange={handleInputChange}
+                                    className="h-7 text-xs"
+                                />
                             </div>
                         </div>
                     </div>
                 );
 
             case 'masking':
+            default:
                 return (
                     <div className="space-y-3">
-                        {/* 첫 번째 줄: 높이, 여유거리 */}
+                        {/* 첫 번째 줄: 속도, 높이 */}
                         <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">코팅 속도</Label>
+                                <div className="flex items-center gap-1">
+                                    <Input
+                                        type="number"
+                                        name="coatingSpeed"
+                                        value={commonProperties?.coatingSpeed || gcodeSettings.coatingSpeed}
+                                        onChange={handleInputChange}
+                                        className="h-7 text-xs"
+                                    />
+                                    <span className="text-xs text-muted-foreground">mm/min</span>
+                                </div>
+                            </div>
                             <div className="space-y-1">
                                 <Label className="text-xs text-muted-foreground">코팅 높이</Label>
                                 <div className="flex items-center gap-1">
@@ -384,45 +343,125 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                     <span className="text-xs text-muted-foreground">mm</span>
                                 </div>
                             </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">여유 거리</Label>
-                                <div className="flex items-center gap-1">
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        name="maskingClearance"
-                                        value={commonProperties?.maskingClearance || 0}
-                                        onChange={handleInputChange}
-                                        className="h-7 text-xs"
-                                    />
-                                    <span className="text-xs text-muted-foreground">mm</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 회피 전략 선택 */}
-                        <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">이동 회피 전략</Label>
-                            <Select
-                                value={commonProperties?.travelAvoidanceStrategy || 'lift'}
-                                onValueChange={(value) => handlePropertyUpdate('travelAvoidanceStrategy', value)}
-                            >
-                                <SelectTrigger className="h-7 text-xs">
-                                    <SelectValue/>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="global">전역 회피</SelectItem>
-                                    <SelectItem value="lift">리프트</SelectItem>
-                                    <SelectItem value="contour">윤곽 따라</SelectItem>
-                                </SelectContent>
-                            </Select>
                         </div>
                     </div>
                 );
-
-            default:
-                return null;
         }
+    };
+
+    // Line 전용 속성 렌더링 함수 추가
+    const renderLineSettings = () => {
+        if (!singleSelectedShape || singleSelectedShape.type !== 'line') return null;
+
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-sm">라인 속성</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {/* 시작점 좌표 */}
+                    <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">시작점</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="flex items-center gap-1">
+                                <Label className="text-xs w-4">X</Label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={singleSelectedShape.startPoint?.x || 0}
+                                    onChange={(e) => {
+                                        const newValue = parseFloat(e.target.value) || 0;
+                                        handlePropertyUpdate('startPoint', {
+                                            ...singleSelectedShape.startPoint,
+                                            x: newValue
+                                        });
+                                    }}
+                                    className="h-7 text-xs"
+                                />
+                                <span className="text-xs text-muted-foreground">mm</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Label className="text-xs w-4">Y</Label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={singleSelectedShape.startPoint?.y || 0}
+                                    onChange={(e) => {
+                                        const newValue = parseFloat(e.target.value) || 0;
+                                        handlePropertyUpdate('startPoint', {
+                                            ...singleSelectedShape.startPoint,
+                                            y: newValue
+                                        });
+                                    }}
+                                    className="h-7 text-xs"
+                                />
+                                <span className="text-xs text-muted-foreground">mm</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 끝점 좌표 */}
+                    <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">끝점</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="flex items-center gap-1">
+                                <Label className="text-xs w-4">X</Label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={singleSelectedShape.endPoint?.x || 0}
+                                    onChange={(e) => {
+                                        const newValue = parseFloat(e.target.value) || 0;
+                                        handlePropertyUpdate('endPoint', {
+                                            ...singleSelectedShape.endPoint,
+                                            x: newValue
+                                        });
+                                    }}
+                                    className="h-7 text-xs"
+                                />
+                                <span className="text-xs text-muted-foreground">mm</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Label className="text-xs w-4">Y</Label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={singleSelectedShape.endPoint?.y || 0}
+                                    onChange={(e) => {
+                                        const newValue = parseFloat(e.target.value) || 0;
+                                        handlePropertyUpdate('endPoint', {
+                                            ...singleSelectedShape.endPoint,
+                                            y: newValue
+                                        });
+                                    }}
+                                    className="h-7 text-xs"
+                                />
+                                <span className="text-xs text-muted-foreground">mm</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 라인 길이 (읽기 전용) */}
+                    <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">길이</Label>
+                        <div className="flex items-center gap-1">
+                            <Input
+                                type="text"
+                                value={singleSelectedShape.startPoint && singleSelectedShape.endPoint ?
+                                    Math.sqrt(
+                                        Math.pow((singleSelectedShape.endPoint.x || 0) - (singleSelectedShape.startPoint.x || 0), 2) +
+                                        Math.pow((singleSelectedShape.endPoint.y || 0) - (singleSelectedShape.startPoint.y || 0), 2)
+                                    ).toFixed(2) : '0.00'
+                                }
+                                disabled
+                                className="h-7 text-xs bg-muted"
+                            />
+                            <span className="text-xs text-muted-foreground">mm</span>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        );
     };
 
     if (selectedShapes.length === 0) {
@@ -469,7 +508,8 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                     {singleSelectedShape && !isEditingName && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <button onClick={() => setIsEditingName(true)} className="p-1 hover:bg-accent rounded-sm">
+                                <button onClick={() => setIsEditingName(true)}
+                                        className="p-1 hover:bg-accent rounded-sm">
                                     <Pencil className="w-3.5 h-3.5 text-muted-foreground"/>
                                 </button>
                             </TooltipTrigger>
@@ -599,6 +639,9 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                     </div>
                                 )}
 
+                                {/* Line 전용 설정 */}
+                                {renderLineSettings()}
+
                                 {/* 위치 */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
@@ -675,9 +718,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                 <div>
                     <div className="text-[11px] font-medium mb-2 text-muted-foreground">코팅 설정</div>
                     <div className="space-y-3">
-                        {/* 코팅 제외 및 코팅 순서 */}
                         <div className="grid grid-cols-2 gap-3">
+                            {/* 코팅 제외 및 코팅 순서 */}
                             {singleSelectedShape && singleSelectedShape.type === 'image' && (
+
                                 <div className="flex items-center gap-2">
                                     <Switch
                                         checked={commonProperties?.skipCoating !== true}
@@ -686,23 +730,25 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                     <Label className="text-xs text-muted-foreground">코팅 적용</Label>
                                 </div>
                             )}
-                            <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">코팅 순서</Label>
-                                <div className="flex items-center gap-1">
-                                    <Input
-                                        type="number"
-                                        min="0"
-                                        name="coatingOrder"
-                                        value={commonProperties?.coatingOrder || 0}
-                                        onChange={handleInputChange}
-                                        className="h-7 text-xs"
-                                        disabled={commonProperties?.skipCoating === true}
-                                    />
-                                    <span className="text-xs text-muted-foreground ">번</span>
-                                </div>
-                            </div>
-                        </div>
 
+                            {singleSelectedShape && singleSelectedShape.type !== 'image' && singleSelectedShape.coatingType !== 'masking' && (
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">코팅 순서</Label>
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            name="coatingOrder"
+                                            value={commonProperties?.coatingOrder || 0}
+                                            onChange={handleInputChange}
+                                            className="h-7 text-xs"
+                                            disabled={commonProperties?.skipCoating === true}
+                                        />
+                                        <span className="text-xs text-muted-foreground ">번</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         {/* 코팅이 적용될 때만 나머지 설정 표시 */}
                         {commonProperties?.skipCoating !== true && renderCoatingSettings()}
                     </div>

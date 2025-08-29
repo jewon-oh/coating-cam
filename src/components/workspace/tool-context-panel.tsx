@@ -174,24 +174,6 @@ export function ToolContextPanel() {
                                 </div>
                             </div>
                         </div>
-
-                        {/*/!* 패턴 선택 *!/*/}
-                        {/*<div className="space-y-1">*/}
-                        {/*    <Label className="text-xs text-muted-foreground">채우기 패턴</Label>*/}
-                        {/*    <Select*/}
-                        {/*        value={fillPattern}*/}
-                        {/*        onValueChange={(value) => handleCoatingSettingSelectChange('fillPattern', value)}*/}
-                        {/*    >*/}
-                        {/*        <SelectTrigger className="h-7 text-xs">*/}
-                        {/*            <SelectValue />*/}
-                        {/*        </SelectTrigger>*/}
-                        {/*        <SelectContent>*/}
-                        {/*            <SelectItem value="horizontal">수평</SelectItem>*/}
-                        {/*            <SelectItem value="vertical">수직</SelectItem>*/}
-                        {/*            <SelectItem value="auto">자동</SelectItem>*/}
-                        {/*        </SelectContent>*/}
-                        {/*    </Select>*/}
-                        {/*</div>*/}
                     </div>
                 );
 

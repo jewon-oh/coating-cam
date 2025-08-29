@@ -15,8 +15,9 @@ import {useStageEvents} from '@/hooks/use-stage-events';
 
 // 컴포넌트 및 타입
 import CanvasGrid from '@/components/workspace/canvas-grid';
-import {ShapeLayer} from '@/components/workspace/shape/shape-layer';
-import {useGlobalKeyboard} from '@/hooks/use-global-keyboard';
+import {ShapeLayer} from '@/components/workspace/shape-layer';
+import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts';
+import {PathVisualization} from "@/components/workspace/path-visualization";
 
 // ===== 메인 컴포넌트 =====
 export default function WorkspaceCanvas() {
@@ -34,7 +35,12 @@ export default function WorkspaceCanvas() {
     } = useCanvas();
 
     // 설정 가져오기
-    const {isGridVisible, gridSize, workArea} = useSettings();
+    const {isGridVisible, pixelsPerMm, workArea} = useSettings();
+
+    const workAreaPx = useMemo(() => ({
+        width: workArea.width * pixelsPerMm,
+        height: workArea.height * pixelsPerMm,
+    }), [workArea, pixelsPerMm]);
 
     // 참조들
     const transformerRef = useRef<Konva.Transformer>(null);
@@ -68,13 +74,10 @@ export default function WorkspaceCanvas() {
     // 커서 스타일 매핑 테이블
     const cursorMapping: Record<string, string> = useMemo(
         () => ({
-            "shape/select": "move",
+            "shape/select": "default",
+            "shape/line": "crosshair",
             "shape/rectangle": "crosshair",
             "shape/circle": "crosshair",
-            "path/path-select": "default",
-            "path/path-node": "pointer",
-            "path/path-pen": "crosshair",
-            "path/path-line": "crosshair",
         }),
         []
     );
@@ -83,13 +86,12 @@ export default function WorkspaceCanvas() {
     const cursorStyle = useMemo(() => {
         if (isPanning) return "grabbing";
         if (isTransforming) return "move";
-
         const modeKey = `shape/${tool}`;
         return cursorMapping[modeKey] || "default";
     }, [ tool, isPanning, isTransforming, cursorMapping]);
 
     // 전역 키보드 이벤트 등록
-    useGlobalKeyboard({
+    useKeyboardShortcuts({
         onDelete: handleDelete,
         onCopy: handleCopy,
         onPaste: handlePaste,
@@ -171,8 +173,8 @@ export default function WorkspaceCanvas() {
                     <Rect
                         x={0}
                         y={0}
-                        width={workArea.width}
-                        height={workArea.height}
+                        width={workAreaPx.width}
+                        height={workAreaPx.height}
                         stroke="black"
                         strokeWidth={1 / Math.abs(stage.scaleX)}
                         dash={[4 / Math.abs(stage.scaleX), 2 / Math.abs(stage.scaleX)]}
@@ -181,8 +183,9 @@ export default function WorkspaceCanvas() {
 
                     {/* 그리드 */}
                     <CanvasGrid
-                        gridSize={gridSize}
-                        workArea={workArea}
+                        gridSize={pixelsPerMm}
+                        pixelsPerMm={pixelsPerMm}
+                        workArea={workAreaPx}
                         visible={isGridVisible}
                         stageScaleX={stage.scaleX}
                         stageScaleY={stage.scaleY}
@@ -194,6 +197,10 @@ export default function WorkspaceCanvas() {
                 </Layer>
 
                 <ShapeLayer isPanning={isPanning}/>
+
+                <Layer>
+                    <PathVisualization />
+                </Layer>
             </Stage>
         </div>
     );

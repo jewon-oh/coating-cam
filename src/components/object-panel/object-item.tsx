@@ -1,4 +1,4 @@
-import React, {useMemo, useCallback, useEffect, useRef, useState, memo} from "react";
+import React, {useMemo, useCallback, memo} from "react";
 import type {CustomShapeConfig} from "@/types/custom-konva-config";
 import {cn} from "@/lib/utils";
 import {
@@ -7,9 +7,11 @@ import {
     EyeOff,
     Image as ImageIcon,
     Layers,
-    Lock, Move,
+    Lock,
+    Slash,
     RectangleHorizontal, Trash2,
-    Unlock
+    Unlock,
+    GripVertical
 } from "lucide-react";
 import {Input} from "@/components/ui/input";
 import {ellipsizeEnd} from "@/lib/ellipsize";
@@ -25,9 +27,11 @@ import {
 import {useAppDispatch} from "@/hooks/redux";
 import {removeShapes} from "@/store/slices/shape-slice";
 import {Badge} from "@/components/ui/badge";
+import {useSortable} from "@dnd-kit/sortable";
+import {CSS} from "@dnd-kit/utilities";
 
 const shapeIcons = {
-    rect: <RectangleHorizontal size={16} className="flex-shrink-0"/>,
+    line: <Slash size={16} className="flex-shrink-0"/>,
     rectangle: <RectangleHorizontal size={16} className="flex-shrink-0"/>,
     circle: <CircleIcon size={16} className="flex-shrink-0"/>,
     image: <ImageIcon size={16} className="flex-shrink-0"/>,
@@ -35,7 +39,7 @@ const shapeIcons = {
 } as const;
 
 const shapeTypeNames = {
-    rect: "사각형",
+    line: "선",
     rectangle: "사각형",
     circle: "원",
     image: "이미지",
@@ -47,6 +51,7 @@ interface ObjectItemProps {
     isSelected: boolean;
     onSelect: (id: string, e: React.MouseEvent) => void;
     onPatch: (id: string, patch: Partial<CustomShapeConfig>) => void;
+    isDragEnabled?: boolean;
 }
 
 export const ObjectItem = memo<ObjectItemProps>(({
@@ -54,7 +59,21 @@ export const ObjectItem = memo<ObjectItemProps>(({
                                                      isSelected,
                                                      onSelect,
                                                      onPatch,
+                                                     isDragEnabled = false,
                                                  }) => {
+    // DnD Kit sortable 설정
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({
+        id: shape.id!,
+        disabled: !isDragEnabled || shape.coatingOrder === undefined || shape.coatingOrder <= 0,
+    });
+
     // 공통 로직을 커스텀 훅으로 대체
     const {
         isEditing,
@@ -83,13 +102,13 @@ export const ObjectItem = memo<ObjectItemProps>(({
         handleNameSubmit();
     }, [handleNameSubmit]);
 
-    const handleDuplicate=useCallback((e:React.MouseEvent)=>{
-        dispatch(dispatch(removeShapes(shape.id)));
-    });
+    const handleDuplicate = useCallback((e: React.MouseEvent) => {
+        // TODO: 복사 기능 구현
+    }, [dispatch, shape.id]);
 
-    const handleDelete=useCallback((e:React.MouseEvent)=>{
-        dispatch(dispatch(removeShapes(shape.id)));
-    })
+    const handleDelete = useCallback((e: React.MouseEvent) => {
+        dispatch(removeShapes([shape.id!]));
+    }, [dispatch, shape.id]);
 
     // 상태 계산
     const isDisabled = shape.listening ?? false;
@@ -127,10 +146,19 @@ export const ObjectItem = memo<ObjectItemProps>(({
             : null;
     }, [shape.rotation]);
 
+    // DnD 스타일 설정
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>
                 <div
+                    ref={setNodeRef}
+                    style={style}
                     data-shape-id={shape.id}
                     className={cn(
                         "group/item border rounded-md transition-all duration-200 hover:shadow-sm select-none",
@@ -139,11 +167,31 @@ export const ObjectItem = memo<ObjectItemProps>(({
                         isSelected && !isDisabled && "ring-2 ring-primary bg-primary/5 border-primary/30",
                         isHidden && "opacity-60",
                         isDisabled && "cursor-not-allowed bg-muted/20",
+                        isDragging && "shadow-lg ring-2 ring-blue-400/50",
                     )}
                     onClick={handleItemClick}
                 >
                     {/* 메인 행 */}
                     <div className="flex items-center p-3 space-x-2">
+                        {/* 코팅 순서 뱃지 (맨 앞) */}
+                        {shape.coatingOrder && shape.coatingOrder > 0 && (
+                            <Badge variant="secondary" className="text-[11px] px-2 py-1 h-auto font-medium min-w-[24px] text-center">
+                                {shape.coatingOrder}
+                            </Badge>
+                        )}
+
+                        {/* DnD 핸들 (코팅 순서가 있을 때만) */}
+                        {isDragEnabled && shape.coatingOrder && shape.coatingOrder > 0 && (
+                            <div
+                                {...attributes}
+                                {...listeners}
+                                className="flex-shrink-0 p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <GripVertical size={14} />
+                            </div>
+                        )}
+
                         {/* 타입 아이콘 */}
                         <div className={cn(
                             "flex-shrink-0 p-1 rounded transition-colors",
@@ -174,16 +222,9 @@ export const ObjectItem = memo<ObjectItemProps>(({
                                         onKeyDown={handleKeyDown}
                                     />
                                 ) : (
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="truncate">
-                                            {shape.name ? ellipsizeEnd(shape.name, 20) : `${shape.type} #${shape.id?.slice(0, 6)}`}
-                                        </span>
-                                        {shape.coatingOrder && shape.coatingOrder > 0 && (
-                                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 h-auto">
-                                                {shape.coatingOrder}
-                                            </Badge>
-                                        )}
-                                    </div>
+                                    <span className="truncate">
+                                        {shape.name ? ellipsizeEnd(shape.name, 20) : `${shape.type} #${shape.id?.slice(0, 6)}`}
+                                    </span>
                                 )}
                             </div>
 

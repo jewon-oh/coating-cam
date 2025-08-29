@@ -3,7 +3,7 @@ import {CustomShapeConfig} from '@/types/custom-konva-config';
 import { GCodeSnippet, GCodeHook} from '@/types/gcode';
 import {CoatingSettings} from "@/types/coating";
 import {GCodeEmitter} from "@/lib/gcode/gcode-emitter";
-import {PathGenerator} from "@/lib/gcode/path-generator";
+import {GCodeGenerator} from "@/lib/gcode/g-code-generator";
 import {ProgressCallback} from "@/lib/gcode/progress-callback";
 
 
@@ -23,10 +23,10 @@ export async function generateCoatingGCode(
     onProgress?: ProgressCallback
 ): Promise<string> {
     const emitter = new GCodeEmitter(settings);
-    const pathGenerator = new PathGenerator(settings, workArea,shapes);
+    const gCodeGenerator = new GCodeGenerator(settings, workArea,shapes);
 
     // await 키워드 추가
-    await pathGenerator.generatePaths(emitter, onProgress);
+    await gCodeGenerator.generatePaths(emitter, onProgress);
 
     return emitter.getGCode();
 }

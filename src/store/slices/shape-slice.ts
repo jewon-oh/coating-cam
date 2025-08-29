@@ -5,6 +5,8 @@ interface ShapesState {
     shapes: CustomShapeConfig[];      // 모든 도형들
     selectedShapeIds: string[];       // 선택된 도형 ID들
     isGroupSelected: boolean;         // 그룹 선택 여부
+    isDragging: boolean;              // 드래그 상태 여부
+    draggingShapeIds: string[];       // 드래그 중인 도형 ID들
     lastUpdateTimestamp: number;      // 성능 최적화용 캐시
 }
 
@@ -12,12 +14,17 @@ const initialState: ShapesState = {
     shapes: [],
     selectedShapeIds: [],
     isGroupSelected: false,
+    isDragging: false,
+    draggingShapeIds: [],
     lastUpdateTimestamp: Date.now(),
 };
 
 // Selectors for better performance
 export const selectShapes = (state: { shapes: ShapesState }) => state.shapes.shapes;
 export const selectSelectedShapeIds = (state: { shapes: ShapesState }) => state.shapes.selectedShapeIds;
+export const selectIsDragging = (state: { shapes: ShapesState }) => state.shapes.isDragging;
+export const selectDraggingShapeIds = (state: { shapes: ShapesState }) => state.shapes.draggingShapeIds;
+
 
 // 그룹 관련 최적화된 셀렉터 추가
 export const selectGroupsWithMembers = createSelector(
@@ -75,6 +82,12 @@ const shapeSlice = createSlice({
     name: 'shape',
     initialState,
     reducers: {
+        setDragging: (state, action: PayloadAction<boolean>) => {
+            state.isDragging = action.payload;
+        },
+        setDraggingShapeIds: (state, action: PayloadAction<string[]>) => {
+            state.draggingShapeIds = action.payload;
+        },
         clearShapes: (state) => {
             Object.assign(state, initialState);
             state.lastUpdateTimestamp = Date.now();
@@ -378,6 +391,8 @@ export const {
     toggleGroupVisibility,
     toggleGroupLock,
     clearShapes,
+    setDragging,
+    setDraggingShapeIds,
 } = shapeSlice.actions;
 
 export default shapeSlice.reducer;
