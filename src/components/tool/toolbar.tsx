@@ -15,9 +15,9 @@ import {
     FolderOpen,
     MoveHorizontal,
     MoveVertical,
-    Settings, SquareSquare, Slash, GitCommitHorizontal,
+     SquareSquare, Slash, GitCommitHorizontal,
 } from "lucide-react";
-import React, {useState} from "react";
+import React from "react";
 import {useAppDispatch, useAppSelector} from "@/hooks/redux";
 import {setCoatingType, setCoatingTypeAndFillPattern, setTool} from "@/store/slices/tool-slice";
 import {useSettings} from '@/contexts/settings-context';
@@ -26,10 +26,6 @@ import {useInsertImage} from "@/hooks/use-insert-image";
 import {Card, CardContent} from "@/components/ui/card";
 import {Separator} from "@/components/ui/separator";
 import {redo, undo} from "@/store/slices/shape-history-slice";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Collapsible, CollapsibleContent} from "@/components/ui/collapsible";
 
 interface ToolbarProps {
     onGenerateGCode: () => void;
@@ -41,12 +37,6 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
         tool,
         coatingType,
         fillPattern,
-        coatingSpeed,
-        coatingWidth,
-        coatingHeight,
-        lineSpacing,
-        maskingClearance,
-        travelAvoidanceStrategy
     } = useAppSelector((state) => state.tool);
     const {past, future} = useAppSelector((state) => state.history);
     const {
@@ -54,8 +44,8 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
         setGridVisible,
         isSnappingEnabled,
         setSnappingEnabled,
-        showCoatingOrder,
-        setShowCoatingOrder
+        showCoatingPaths,
+        setShowCoatingPaths
     } = useSettings();
     const {handleSaveProject, handleLoadProject} = useProjectActions();
     const {handleImageInsert} = useInsertImage();
@@ -210,9 +200,9 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                                 <ToolButton
                                     icon={<GitCommitHorizontal size={16}/>}
                                     label="코팅 순서"
-                                    active={showCoatingOrder}
-                                    onClick={() => setShowCoatingOrder(!showCoatingOrder)}
-                                    className={showCoatingOrder ? 'bg-primary/20 border border-primary/40' : ''}
+                                    active={showCoatingPaths}
+                                    onClick={() => setShowCoatingPaths(!showCoatingPaths)}
+                                    className={showCoatingPaths ? 'bg-primary/20 border border-primary/40' : ''}
                                 />
                             </div>
                             <span className="text-xs mt-1 text-muted-foreground">뷰 옵션</span>

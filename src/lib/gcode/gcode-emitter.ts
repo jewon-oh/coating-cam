@@ -8,13 +8,25 @@ import {Point} from "@/lib/gcode/point";
 export class GCodeEmitter {
     // 생성된 G-code 문자열을 저장합니다.
     private gcode: string = '';
-    // 마지막으로 이동한 위치를 추적하여 불필요한 이동 명령을 방지합니다.
-    private lastPosition: Point = {x: 0, y: 0, z: 0};
-    // G-code 생성에 필요한 설정을 담고 있습니다. (예: 속도, 높이)
+    // 마지막 위치를 픽셀과 mm 단위로 모두 저장하여 변환 오류를 방지합니다.
+    private lastPixelPosition: Point = { x: 0, y: 0, z: 0 }; // z는 mm 단위
+    private lastMmPosition: Point = { x: 0, y: 0, z: 0 };
     private readonly settings: CoatingSettings;
+    private readonly pixelsPerMm: number;
 
     constructor(settings: CoatingSettings) {
         this.settings = settings;
+        this.pixelsPerMm = settings.pixelsPerMm > 0 ? settings.pixelsPerMm : 10; // 기본값 폴백
+        // 초기 Z 위치는 mm 단위의 안전 높이입니다.
+        this.lastMmPosition.z = settings.safeHeight;
+        this.lastPixelPosition.z = settings.safeHeight;
+    }
+
+    /**
+     * 픽셀 단위를 mm 단위로 변환합니다.
+     */
+    private toMM(pixel: number): number {
+        return pixel / this.pixelsPerMm;
     }
 
     /**
@@ -34,24 +46,28 @@ export class GCodeEmitter {
      * @param isRapid 고속 이동(G0)인지, 직선 이동(G1)인지
      */
     private moveTo(x: number, y: number, z: number | undefined, speed: number, isRapid: boolean) {
-        // 마지막 위치와 동일할 경우, 불필요한 명령을 생성하지 않습니다.
+        const mmX = this.toMM(x);
+        const mmY = this.toMM(y);
+
+        // 마지막 mm 위치와 비교하여 불필요한 이동 명령을 방지합니다.
         if (
-            Math.abs(this.lastPosition.x - x) < 0.01 &&
-            Math.abs(this.lastPosition.y - y) < 0.01 &&
-            (z === undefined || z === null || Math.abs(this.lastPosition.z! - z) < 0.01)
+            Math.abs(this.lastMmPosition.x - mmX) < 0.001 &&
+            Math.abs(this.lastMmPosition.y - mmY) < 0.001 &&
+            (z === undefined || z === null || Math.abs(this.lastMmPosition.z! - z) < 0.001)
         ) {
             return;
         }
 
-        const command = isRapid ? 'G0' : 'G1'; // G0 또는 G1 명령어 선택
+        const command = isRapid ? 'G0' : 'G1';
         this.addLine(
-            // G-code 문자열을 형식에 맞게 생성합니다.
-            `${command} F${speed} X${x.toFixed(3)} Y${y.toFixed(3)}${
+            `${command} F${speed} X${mmX.toFixed(3)} Y${mmY.toFixed(3)}${
                 z !== undefined && z !== null ? ` Z${z.toFixed(3)}` : ''
             }`,
         );
-        // 마지막 위치를 현재 위치로 업데이트합니다.
-        this.lastPosition = {x, y, z: z ?? this.lastPosition.z};
+
+        // 마지막 위치를 픽셀과 mm 단위로 모두 업데이트합니다.
+        this.lastPixelPosition = { x, y, z: z ?? this.lastMmPosition.z };
+        this.lastMmPosition = { x: mmX, y: mmY, z: z ?? this.lastMmPosition.z };
     }
 
     /**
@@ -64,7 +80,6 @@ export class GCodeEmitter {
         this.moveTo(x, y, z, this.settings.moveSpeed, true);
     }
 
-    // --- ⬇️ 새로운 메서드 추가 ⬇️ ---
     /**
      * [신규] 지정된 속도를 사용하여 코팅(G1) 이동을 합니다.
      * @param x X좌표
@@ -72,7 +87,7 @@ export class GCodeEmitter {
      * @param speed 이동 속도 (F값)
      */
     public coatToWithSpeed(x: number, y: number, speed: number) {
-        this.moveTo(x, y, this.lastPosition.z, speed, false);
+        this.moveTo(x, y, this.lastMmPosition.z, speed, false);
     }
 
     /**
@@ -81,7 +96,7 @@ export class GCodeEmitter {
      * @param y Y좌표
      */
     public coatTo(x: number, y: number) {
-        this.moveTo(x, y, this.lastPosition.z, this.settings.coatingSpeed, false);
+        this.moveTo(x, y, this.lastMmPosition.z, this.settings.coatingSpeed, false);
     }
 
     /**
@@ -98,7 +113,8 @@ export class GCodeEmitter {
      * @param z Z좌표
      */
     public setZ(z: number) {
-        this.moveTo(this.lastPosition.x, this.lastPosition.y, z, this.settings.moveSpeed, true);
+        // 마지막 픽셀 위치를 기준으로 Z축만 변경합니다.
+        this.moveTo(this.lastPixelPosition.x, this.lastPixelPosition.y, z, this.settings.moveSpeed, true);
     }
 
     /**
@@ -128,7 +144,7 @@ export class GCodeEmitter {
      * @returns 현재 위치
      */
     public getCurrentPosition(): Point {
-        return {...this.lastPosition};
+        return { ...this.lastPixelPosition, z: this.lastMmPosition.z };
     }
 
     /**

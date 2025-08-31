@@ -29,6 +29,7 @@ import {removeShapes} from "@/store/slices/shape-slice";
 import {Badge} from "@/components/ui/badge";
 import {useSortable} from "@dnd-kit/sortable";
 import {CSS} from "@dnd-kit/utilities";
+import {useSettings} from "@/contexts/settings-context";
 
 const shapeIcons = {
     line: <Slash size={16} className="flex-shrink-0"/>,
@@ -86,6 +87,7 @@ export const ObjectItem = memo<ObjectItemProps>(({
         toggleLock,
         startEditing,
     } = useItemActions({shape, onPatch});
+    const {pixelsPerMm} = useSettings();
 
     const dispatch = useAppDispatch();
 
@@ -131,14 +133,21 @@ export const ObjectItem = memo<ObjectItemProps>(({
     }, [shape.coatingType, shape.skipCoating]);
 
     // 크기 정보 메모이제이션
+    // 크기 정보 메모이제이션
     const sizeInfo = useMemo(() => {
-        if (shape.type === 'group') return null;
+        if (shape.type === 'group' || !pixelsPerMm) return null;
 
         if (shape.type === 'circle') {
-            return `반지름 ${Math.round(shape.radius || 0)}`;
+            const radiusMm = ((shape.radius || 0) / pixelsPerMm);
+            return `Ø ${(radiusMm * 2).toFixed(2)}mm`;
         }
-        return `${Math.round(shape.width || 0)}×${Math.round(shape.height || 0)}`;
-    }, [shape.type, shape.radius, shape.width, shape.height]);
+        if (shape.type === 'rectangle' || shape.type === 'image') {
+            const widthMm = ((shape.width || 0) / pixelsPerMm).toFixed(2);
+            const heightMm = ((shape.height || 0) / pixelsPerMm).toFixed(2);
+            return `${widthMm}×${heightMm} mm`;
+        }
+        return null;
+    }, [shape.type, shape.radius, shape.width, shape.height, pixelsPerMm]);
 
     const rotationInfo = useMemo(() => {
         return shape.rotation && Math.abs(shape.rotation) > 0.1

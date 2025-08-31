@@ -1,7 +1,8 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Circle, Group, Line } from 'react-konva';
+import { Circle, Group, Line, Rect } from 'react-konva';
 import { useAppSelector } from '@/hooks/redux';
 import { useSettings } from '@/contexts/settings-context';
 import { selectShapes, selectIsDragging, selectDraggingShapeIds } from '@/store/slices/shape-slice';
@@ -9,158 +10,148 @@ import { GCodeGenerator } from '@/lib/gcode/g-code-generator';
 import { Point } from '@/lib/gcode/point';
 import { CoatingOrderBadge } from './coating-order-badge';
 import { useCanvas } from '@/contexts/canvas-context';
+import { generateFillRects, CoatingRect } from '@/lib/coating-line-utils';
 
-/**
- * 각 도형의 코팅 경로 시각화에 필요한 데이터 구조입니다.
- */
 interface PathEndpoint {
-    shapeId: string;    // 도형의 고유 ID
-    startPoint: Point;  // 코팅 시작점
-    endPoint: Point;    // 코팅 끝점
-    order: number;      // 코팅 순서 번호
+    shapeId: string;
+    startPoint: Point;
+    endPoint: Point;
+    order: number;
 }
 
-/**
- * 코팅 순서가 지정된 도형들의 경로(시작점, 끝점, 이동선)를 캔버스 위에 시각화하는 컴포넌트입니다.
- */
 export const PathVisualization = () => {
-    // --- 전역 상태 및 컨텍스트 --- //
-    const { showCoatingOrder, gcodeSettings, workArea } = useSettings();
+    const settings = useSettings();
+    const { gcodeSettings, workArea, showCoatingPaths = false } = settings;
     const { stage } = useCanvas();
     const allShapes = useAppSelector(selectShapes);
     const isDragging = useAppSelector(selectIsDragging);
     const draggingShapeIds = useAppSelector(selectDraggingShapeIds);
 
-    // --- 로컬 상태 --- //
     const [endpoints, setEndpoints] = useState<PathEndpoint[]>([]);
-    const [isCalculating, setIsCalculating] = useState(false); // 경로 계산 중 상태
+    const [coatingRects, setCoatingRects] = useState<Map<string, CoatingRect[]>>(new Map());
+    const [isCalculating, setIsCalculating] = useState(false);
 
-    // --- 메모이제이션된 계산 --- //
     const orderedShapes = useMemo(() => {
         return allShapes
             .filter(s => s.coatingOrder && s.coatingOrder > 0)
             .sort((a, b) => (a.coatingOrder || 0) - (b.coatingOrder || 0));
     }, [allShapes]);
 
-    // --- 경로 계산 효과 --- //
+    const coatingShapes = useMemo(() => {
+        return allShapes.filter(s =>
+            s.coatingType === 'fill' &&
+            s.fillPattern &&
+            !s.isLocked &&
+            !s.skipCoating
+        );
+    }, [allShapes]);
+
     useEffect(() => {
-        if (isDragging) {
-            return;
-        }
-
-        if (!showCoatingOrder || orderedShapes.length === 0) {
+        if (!showCoatingPaths) {
             setEndpoints([]);
+            setCoatingRects(new Map());
             return;
         }
 
-        const calculateAllEndpoints = async () => {
-            setIsCalculating(true); // 계산 시작
+        const calculateVisualizations = async () => {
+            setIsCalculating(true);
             try {
-                const generator = new GCodeGenerator(gcodeSettings, workArea, allShapes);
-                const newEndpoints: PathEndpoint[] = [];
-                let previousEndPoint: Point = { x: 0, y: 0 };
-
-                for (const shape of orderedShapes) {
-                    const path = await generator.getOptimizedPathForShape(shape, previousEndPoint);
-
-                    if (path && path.length > 0) {
-                        const startPoint = path[0].start;
-                        const endPoint = path[path.length - 1].end;
-                        
-                        newEndpoints.push({
-                            shapeId: shape.id!,
-                            startPoint,
-                            endPoint,
-                            order: shape.coatingOrder!,
-                        });
-                        previousEndPoint = endPoint;
+                // Endpoint 계산 (기존 로직)
+                if (orderedShapes.length > 0) {
+                    const generator = new GCodeGenerator(gcodeSettings, workArea, allShapes);
+                    const newEndpoints: PathEndpoint[] = [];
+                    let previousEndPoint: Point = { x: 0, y: 0 };
+                    for (const shape of orderedShapes) {
+                        const path = await generator.getOptimizedPathForShape(shape, previousEndPoint);
+                        if (path && path.length > 0) {
+                            newEndpoints.push({
+                                shapeId: shape.id!,
+                                startPoint: path[0].start,
+                                endPoint: path[path.length - 1].end,
+                                order: shape.coatingOrder!,
+                            });
+                            previousEndPoint = path[path.length - 1].end;
+                        }
                     }
+                    setEndpoints(newEndpoints);
                 }
-                setEndpoints(newEndpoints);
+
+                // Coating Rects 계산 (리팩터링된 로직)
+                const newRectsMap = new Map<string, CoatingRect[]>();
+                for (const shape of coatingShapes) {
+                    if (draggingShapeIds.includes(shape.id!)) continue;
+                    const rects = await generateFillRects(shape, allShapes, gcodeSettings);
+                    newRectsMap.set(shape.id!, rects);
+                }
+                setCoatingRects(newRectsMap);
+
             } catch (error) {
                 console.error("경로 시각화 계산 중 오류 발생:", error);
-                setEndpoints([]); // 오류 발생 시 엔드포인트 초기화
+                setEndpoints([]);
+                setCoatingRects(new Map());
             } finally {
-                setIsCalculating(false); // 계산 종료 (성공/실패 무관)
+                setIsCalculating(false);
             }
         };
 
-        calculateAllEndpoints();
-    }, [showCoatingOrder, orderedShapes, gcodeSettings, workArea, allShapes, isDragging]);
+        calculateVisualizations();
+    }, [showCoatingPaths, orderedShapes, coatingShapes, gcodeSettings, workArea, allShapes, draggingShapeIds]);
 
-    // --- 렌더링 로직 --- //
-    // 계산 중이거나, 옵션이 꺼져 있거나, 렌더링할 포인트가 없으면 아무것도 그리지 않습니다.
-    if (isCalculating || !showCoatingOrder || endpoints.length === 0) {
+    const getPatternColor = (pattern: string) => {
+        switch (pattern) {
+            case 'horizontal': return '#ff9800';
+            case 'vertical': return '#ff9800';
+            case 'concentric': return '#ff9800';
+            case 'auto': return '#9c27b0';
+            default: return '#00bcd4';
+        }
+    };
+
+    if (isCalculating || !showCoatingPaths) {
         return null;
     }
+
     const scaleX = stage.scaleX;
     const scaleY = stage.scaleY;
-
-    // 스케일 계산 개선 - 음수 scaleX 처리 및 최소/최대 제한
-    const absScaleX = Math.abs(scaleX);
-    const absScaleY = Math.abs(scaleY);
-    const minScale = Math.min(absScaleX, absScaleY);
-
-    // invScale 계산에 제한을 두어 너무 크거나 작아지지 않도록 함
-    const invScale = Math.max(0.1, Math.min(10, 1 / minScale));
-    const absInvScale = Math.abs(invScale);
+    const invScale = Math.max(0.1, Math.min(10, 1 / Math.min(Math.abs(scaleX), Math.abs(scaleY))));
 
     return (
         <Group>
-            {endpoints.map((ep, index) => {
-                const isCurrentShapeDragging = draggingShapeIds.includes(ep.shapeId);
-                if (isCurrentShapeDragging) {
-                    return null;
-                }
+            {/* 코팅 경로 시각화 */}
+            {Array.from(coatingRects.entries()).map(([shapeId, rects]) => {
+                if (draggingShapeIds.includes(shapeId)) return null;
+                const shape = allShapes.find(s => s.id === shapeId);
+                if (!shape) return null;
 
+                const patternColor = getPatternColor(shape.fillPattern || 'auto');
+                return (
+                    <Group key={`coating-${shapeId}`}>
+                        {rects.map((rect, index) => (
+                            <Rect
+                                key={`coating-rect-${shapeId}-${index}`}
+                                {...rect}
+                                fill={patternColor}
+                                opacity={0.3}
+                                listening={false}
+                                perfectDrawEnabled={false}
+                            />
+                        ))}
+                    </Group>
+                );
+            })}
+
+            {/* 경로 순서 시각화 */}
+            {endpoints.map((ep, index) => {
+                if (draggingShapeIds.includes(ep.shapeId)) return null;
                 const nextEp = endpoints[index + 1];
                 const isNextShapeDragging = nextEp ? draggingShapeIds.includes(nextEp.shapeId) : false;
 
                 return (
                     <React.Fragment key={ep.shapeId}>
-                        {/* 시작점 (녹색) */}
-                        {/*<Circle*/}
-                        {/*    x={ep.startPoint.x}*/}
-                        {/*    y={ep.startPoint.y}*/}
-                        {/*    radius={4 * absInvScale}*/}
-                        {/*    fill="hsl(142.1 76.2% 36.3%)"*/}
-                        {/*    stroke="white"*/}
-                        {/*    strokeWidth={1.5 * absInvScale}*/}
-                        {/*    opacity={0.9}*/}
-                        {/*    shadowBlur={5}*/}
-                        {/*    shadowColor="black"*/}
-                        {/*/>*/}
-                        {/* 끝점 (빨간색) */}
-                        <Circle
-                            x={ep.endPoint.x}
-                            y={ep.endPoint.y}
-                            radius={4 * absInvScale}
-                            fill="hsl(0 100% 50%)"
-                            stroke="white"
-                            strokeWidth={1.5 * absInvScale}
-                            opacity={0.9}
-                            shadowBlur={5}
-                            shadowColor="black"
-                        />
-                        {/* 코팅 순서 배지 - 스케일 문제 해결 */}
-                        {/* 시작점 */}
-                        <CoatingOrderBadge
-                            order={ep.order}
-                            x={ep.startPoint.x}
-                            y={ep.startPoint.y}
-                            parentScaleX={scaleX}
-                            parentScaleY={scaleY}
-                        />
-
-                        {/* 다음 도형으로의 이동 경로 (파란색 점선) */}
+                        <Circle x={ep.endPoint.x} y={ep.endPoint.y} radius={4 * invScale} fill="hsl(0 100% 50%)" stroke="white" strokeWidth={1.5 * invScale} opacity={0.9} shadowBlur={5} shadowColor="black" />
+                        <CoatingOrderBadge order={ep.order} x={ep.startPoint.x} y={ep.startPoint.y} parentScaleX={scaleX} parentScaleY={scaleY} />
                         {nextEp && !isNextShapeDragging && (
-                             <Line
-                                points={[ep.endPoint.x, ep.endPoint.y, nextEp.startPoint.x, nextEp.startPoint.y]}
-                                stroke="hsl(221.2 83.2% 53.3%)"
-                                strokeWidth={1.5 * absInvScale}
-                                dash={[4 * absInvScale, 3 * absInvScale]}
-                                opacity={0.8}
-                            />
+                            <Line points={[ep.endPoint.x, ep.endPoint.y, nextEp.startPoint.x, nextEp.startPoint.y]} stroke="hsl(221.2 83.2% 53.3%)" strokeWidth={1.5 * invScale} dash={[4 * invScale, 3 * invScale]} opacity={0.8} />
                         )}
                     </React.Fragment>
                 );

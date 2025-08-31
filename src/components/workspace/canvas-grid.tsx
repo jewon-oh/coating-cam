@@ -98,7 +98,7 @@ const calculateGridSettings = (gridSize: number, zoom: number): GridSettings => 
     let displayMultiplier = 1;
     if (zoom < 0.05) {
         displayMultiplier = 100;
-    } else if (zoom < 0.2) {
+    } else if (zoom < 0.5) {
         displayMultiplier = 10;
     }
 
@@ -227,7 +227,7 @@ const createVerticalLinesAndLabels = (
             const textWidth = (x / pixelsPerMm).toString().length * styles.label.size * 0.6; // 대략적인 텍스트 너비
             const horizontalOffset = textWidth * 0.5 / scaleInfo.absScaleX;
 
-            let labelX = x;
+            const labelX = x;
             let align: 'left' | 'right' | 'center' = 'center';
 
             // flipX 상태에 관계없이 중앙 정렬 사용

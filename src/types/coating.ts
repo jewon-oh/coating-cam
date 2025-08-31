@@ -22,6 +22,7 @@ export interface CoatingSettings {
 
     travelAvoidanceStrategy: TravelAvoidanceStrategy; // 이동 회피 전략 추가
     unit?: 'mm';
+    pixelsPerMm: number; // 픽셀-밀리미터 변환 비율
 }
 
 export const DEFAULT_COATING_SETTINGS: CoatingSettings = {
@@ -44,4 +45,5 @@ export const DEFAULT_COATING_SETTINGS: CoatingSettings = {
     travelAvoidanceStrategy: 'contour', // 마스킹 테두리 따라 우회
 
     unit: 'mm',
+    pixelsPerMm: 10, // 1mm 당 10픽셀
 }

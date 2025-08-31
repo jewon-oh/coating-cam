@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useMemo, useCallback, useRef, useEffect } from 'react';
-import { Layer, Group, Rect, Circle, Image, Text, Transformer, Line } from 'react-konva';
+import { Layer, Group, Rect, Circle, Image,  Transformer, Line } from 'react-konva';
 import type Konva from 'konva';
 
 // Redux 상태 관리
@@ -12,7 +12,7 @@ import { updateShape } from '@/store/slices/shape-slice';
 // 타입 및 유틸리티
 import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { useCanvas } from '@/contexts/canvas-context';
-import { useTransformerHandlers } from '@/hooks/use-transformer-handlers';
+import { useTransformerHandlers } from '@/hooks/shape/use-transformer-handlers';
 import { useShapeEvents } from '@/hooks/use-shape-events';
 import { TransformerConfig } from "konva/lib/shapes/Transformer";
 import { flipImageData } from "@/lib/flip-image-data";
@@ -25,7 +25,6 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
     // Redux 상태
     const dispatch = useAppDispatch();
     const { shapes, selectedShapeIds } = useAppSelector((state) => state.shapes);
-    const { pathGroups, shapeToPathMap } = useAppSelector((state) => state.paths);
     const { tool } = useAppSelector((state) => state.tool);
 
     // Context 및 훅
@@ -88,7 +87,7 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
             } else if (anchor.hasName("middle-left") || anchor.hasName("middle-right")) {
                 anchor.height(26).offsetY(13).width(6).offsetX(3);
             } else if (anchor.hasName("rotater")) {
-                anchor.cornerRadius(15).width(26).height(26).offsetX(13).offsetY(13);
+                anchor.cornerRadius(15).width(20).height(20).offsetX(13).offsetY(13);
             } else {
                 anchor.width(14).offsetX(8).height(14).offsetY(8);
             }
@@ -214,11 +213,6 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         }
     }, []);
 
-    // PathGroup을 shape ID로 찾는 헬퍼 함수
-    const getPathGroupByShapeId = useCallback((shapeId: string) => {
-        const pathGroupId = shapeToPathMap[shapeId];
-        return pathGroupId ? pathGroups.find(pg => pg.id === pathGroupId) : undefined;
-    }, [pathGroups, shapeToPathMap]);
 
     const makeCommonProps = useCallback((shape: Partial<CustomShapeConfig>) => {
         const isLocked = shape.isLocked;

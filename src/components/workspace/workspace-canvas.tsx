@@ -8,7 +8,7 @@ import type Konva from 'konva';
 import {useAppSelector} from '@/hooks/redux';
 
 // 커스텀 훅들
-import {useTransformerHandlers} from '@/hooks/use-transformer-handlers';
+import {useTransformerHandlers} from '@/hooks/shape/use-transformer-handlers';
 import {useSettings} from '@/contexts/settings-context';
 import {useCanvas} from '@/contexts/canvas-context';
 import {useStageEvents} from '@/hooks/use-stage-events';

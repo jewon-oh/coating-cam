@@ -25,18 +25,22 @@ export default function Minimap({
                                     workArea,
                                     onViewportChange
                                 }: MinimapProps){
-    const minimapWidth = 200; // 크기 증가
-    const minimapHeight = 200;
+    const minimapWidth = 150; // 크기 증가
+    const minimapHeight = 150;
 
     // 1. 동적 스케일 계산
-    const contentScale = useMemo(() => {
-        // 작업 영역 전체가 미니맵에พอดี 들어가는 기본 스케일
+    const { minimapScaleX, minimapScaleY, positiveScale } = useMemo(() => {
         const baseScaleX = minimapWidth / workArea.width;
         const baseScaleY = minimapHeight / workArea.height;
-        const baseScale = Math.min(baseScaleX, baseScaleY);
-        // 기본 스케일에 메인 캔버스의 줌 레벨을 곱하여 동적 스케일 생성
-        return baseScale * Math.abs(viewport.scaleX);
-    }, [workArea, viewport.scaleX, minimapWidth, minimapHeight]);
+        // 여백을 줄이고 콘텐츠를 더 크게 표시하기 위해 1.1배 확대
+        const baseScale = Math.min(baseScaleX, baseScaleY) * 5.0;
+        return {
+            minimapScaleX: baseScale * viewport.scaleX,
+            minimapScaleY: baseScale * viewport.scaleY,
+            positiveScale: baseScale * Math.abs(viewport.scaleX)
+        };
+    }, [workArea, viewport.scaleX, viewport.scaleY, minimapWidth, minimapHeight]);
+
 
     // 2. 뷰포트 중심 계산 (월드 좌표)
     const viewCenter = useMemo(() => ({
@@ -46,17 +50,30 @@ export default function Minimap({
 
     // 3. 미니맵 그룹의 오프셋 및 위치 계산
     const groupPosition = useMemo(() => ({
-        x: (minimapWidth / 2) - (viewCenter.x * contentScale),
-        y: (minimapHeight / 2) - (viewCenter.y * contentScale),
-    }), [viewCenter, contentScale, minimapWidth, minimapHeight]);
+        x: (minimapWidth / 2) - (viewCenter.x * minimapScaleX),
+        y: (minimapHeight / 2) - (viewCenter.y * minimapScaleY),
+    }), [viewCenter, minimapScaleX, minimapScaleY, minimapWidth, minimapHeight]);
 
     // 4. 뷰포트 사각형 정보 계산 (월드 좌표 기준)
-    const viewportRect = useMemo(() => ({
-        x: -viewport.x / viewport.scaleX,
-        y: -viewport.y / viewport.scaleY,
-        width: viewport.width / Math.abs(viewport.scaleX),
-        height: viewport.height / Math.abs(viewport.scaleY),
-    }), [viewport]);
+    const viewportRect = useMemo(() => {
+        const { x, y, scaleX, scaleY, width, height } = viewport;
+        const rectWidth = width / Math.abs(scaleX);
+        const rectHeight = height / Math.abs(scaleY);
+
+        // scaleX가 음수일 때 (좌우 반전) x 좌표를 보정합니다.
+        const rectX = scaleX > 0
+            ? -x / scaleX
+            : (width - x) / scaleX;
+
+        const rectY = -y / scaleY;
+
+        return {
+            x: rectX,
+            y: rectY,
+            width: rectWidth,
+            height: rectHeight,
+        };
+    }, [viewport]);
 
     // 5. 미니맵 클릭 핸들러
     const handleMinimapClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -68,7 +85,7 @@ export default function Minimap({
 
         const transform = new Konva.Transform();
         transform.translate(groupPosition.x, groupPosition.y);
-        transform.scale(contentScale, contentScale);
+        transform.scale(minimapScaleX, minimapScaleY);
         transform.invert();
         const worldPos = transform.point(pos);
 
@@ -76,7 +93,7 @@ export default function Minimap({
         const newStageY = -worldPos.y * viewport.scaleY + viewport.height / 2;
 
         onViewportChange(newStageX, newStageY);
-    }, [onViewportChange, groupPosition, contentScale, viewport]);
+    }, [onViewportChange, groupPosition, minimapScaleX, minimapScaleY, viewport]);
 
     return (
         <motion.div
@@ -93,7 +110,7 @@ export default function Minimap({
             >
                 <Layer clipFunc={(ctx) => ctx.rect(0, 0, minimapWidth, minimapHeight)}>
                     <Rect x={0} y={0} width={minimapWidth} height={minimapHeight} fill="#f8fafc" listening={false} />
-                    <Group {...groupPosition} scaleX={contentScale} scaleY={contentScale} listening={false}>
+                    <Group {...groupPosition} scaleX={minimapScaleX} scaleY={minimapScaleY} listening={false}>
                         <Rect
                             x={0}
                             y={0}
@@ -101,7 +118,7 @@ export default function Minimap({
                             height={workArea.height}
                             fill="#ffffff"
                             stroke="#e2e8f0"
-                            strokeWidth={2 / contentScale}
+                            strokeWidth={2 / positiveScale}
                         />
                         {shapes
                             .filter(s => s.visible !== false && s.type !== 'group')
@@ -141,8 +158,8 @@ export default function Minimap({
                             height={viewportRect.height}
                             fill="rgba(239, 68, 68, 0.2)"
                             stroke="#ef4444"
-                            strokeWidth={2 / contentScale}
-                            dash={[4 / contentScale, 2 / contentScale]}
+                            strokeWidth={2 / positiveScale}
+                            dash={[4 / positiveScale, 2 / positiveScale]}
                         />
                     </Group>
                 </Layer>

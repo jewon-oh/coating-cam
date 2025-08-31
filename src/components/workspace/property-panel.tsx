@@ -39,7 +39,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
     const dispatch = useAppDispatch();
     const shapes = useAppSelector((state) => state.shapes.shapes);
     const selectedShapeIds = useAppSelector((state) => state.shapes.selectedShapeIds);
-    const {gcodeSettings} = useSettings();
+    const {gcodeSettings, pixelsPerMm} = useSettings();
 
     // 선택된 도형들 가져오기
     const selectedShapes = useMemo(() => {
@@ -92,7 +92,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
     }, [selectedShapes]);
 
     // 속성 업데이트 핸들러
-    const handlePropertyUpdate = (property: string, value: string | number | boolean | undefined) => {
+    const handlePropertyUpdate = (property: string, value: any) => {
         if (selectedShapeIds.length === 0) return;
 
         if (selectedShapeIds.length === 1) {
@@ -106,6 +106,13 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                 props: {[property]: value}
             }));
             dispatch(batchUpdateShapes(updates));
+        }
+    };
+
+    const handleDimensionUpdate = (property: string, value: string) => {
+        const pxValue = parseFloat(value) * pixelsPerMm;
+        if (!isNaN(pxValue)) {
+            handlePropertyUpdate(property, pxValue);
         }
     };
 
@@ -123,7 +130,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
         setIsEditingName(false);
     };
 
-    // 입력 변경 핸들러
+    // 입력 변경 핸들러 (G-Code 설정용)
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const {name, value} = e.target;
         handlePropertyUpdate(name, parseFloat(value) || 0);
@@ -353,6 +360,25 @@ export function PropertyPanel({className}: PropertyPanelProps) {
     const renderLineSettings = () => {
         if (!singleSelectedShape || singleSelectedShape.type !== 'line') return null;
 
+        const handlePointUpdate = (pointType: 'startPoint' | 'endPoint', axis: 'x' | 'y', value: string) => {
+            const currentPoint = singleSelectedShape[pointType] || {x: 0, y: 0};
+            const mmValue = parseFloat(value) || 0;
+            const pxValue = mmValue * pixelsPerMm;
+            handlePropertyUpdate(pointType, {...currentPoint, [axis]: pxValue});
+        };
+
+        const startX_mm = ((singleSelectedShape.startPoint?.x || 0) / pixelsPerMm).toFixed(2);
+        const startY_mm = ((singleSelectedShape.startPoint?.y || 0) / pixelsPerMm).toFixed(2);
+        const endX_mm = ((singleSelectedShape.endPoint?.x || 0) / pixelsPerMm).toFixed(2);
+        const endY_mm = ((singleSelectedShape.endPoint?.y || 0) / pixelsPerMm).toFixed(2);
+
+        const length_px = Math.sqrt(
+            Math.pow((singleSelectedShape.endPoint?.x || 0) - (singleSelectedShape.startPoint?.x || 0), 2) +
+            Math.pow((singleSelectedShape.endPoint?.y || 0) - (singleSelectedShape.startPoint?.y || 0), 2)
+        );
+        const length_mm = (length_px / pixelsPerMm).toFixed(2);
+
+
         return (
             <Card>
                 <CardHeader>
@@ -368,14 +394,8 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 <Input
                                     type="number"
                                     step="0.01"
-                                    value={singleSelectedShape.startPoint?.x || 0}
-                                    onChange={(e) => {
-                                        const newValue = parseFloat(e.target.value) || 0;
-                                        handlePropertyUpdate('startPoint', {
-                                            ...singleSelectedShape.startPoint,
-                                            x: newValue
-                                        });
-                                    }}
+                                    value={startX_mm}
+                                    onChange={(e) => handlePointUpdate('startPoint', 'x', e.target.value)}
                                     className="h-7 text-xs"
                                 />
                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -385,14 +405,8 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 <Input
                                     type="number"
                                     step="0.01"
-                                    value={singleSelectedShape.startPoint?.y || 0}
-                                    onChange={(e) => {
-                                        const newValue = parseFloat(e.target.value) || 0;
-                                        handlePropertyUpdate('startPoint', {
-                                            ...singleSelectedShape.startPoint,
-                                            y: newValue
-                                        });
-                                    }}
+                                    value={startY_mm}
+                                    onChange={(e) => handlePointUpdate('startPoint', 'y', e.target.value)}
                                     className="h-7 text-xs"
                                 />
                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -409,14 +423,8 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 <Input
                                     type="number"
                                     step="0.01"
-                                    value={singleSelectedShape.endPoint?.x || 0}
-                                    onChange={(e) => {
-                                        const newValue = parseFloat(e.target.value) || 0;
-                                        handlePropertyUpdate('endPoint', {
-                                            ...singleSelectedShape.endPoint,
-                                            x: newValue
-                                        });
-                                    }}
+                                    value={endX_mm}
+                                    onChange={(e) => handlePointUpdate('endPoint', 'x', e.target.value)}
                                     className="h-7 text-xs"
                                 />
                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -426,14 +434,8 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 <Input
                                     type="number"
                                     step="0.01"
-                                    value={singleSelectedShape.endPoint?.y || 0}
-                                    onChange={(e) => {
-                                        const newValue = parseFloat(e.target.value) || 0;
-                                        handlePropertyUpdate('endPoint', {
-                                            ...singleSelectedShape.endPoint,
-                                            y: newValue
-                                        });
-                                    }}
+                                    value={endY_mm}
+                                    onChange={(e) => handlePointUpdate('endPoint', 'y', e.target.value)}
                                     className="h-7 text-xs"
                                 />
                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -447,12 +449,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                         <div className="flex items-center gap-1">
                             <Input
                                 type="text"
-                                value={singleSelectedShape.startPoint && singleSelectedShape.endPoint ?
-                                    Math.sqrt(
-                                        Math.pow((singleSelectedShape.endPoint.x || 0) - (singleSelectedShape.startPoint.x || 0), 2) +
-                                        Math.pow((singleSelectedShape.endPoint.y || 0) - (singleSelectedShape.startPoint.y || 0), 2)
-                                    ).toFixed(2) : '0.00'
-                                }
+                                value={length_mm}
                                 disabled
                                 className="h-7 text-xs bg-muted"
                             />
@@ -578,9 +575,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                             <div className="flex items-center gap-1">
                                                 <Input
                                                     type="number"
+                                                    step="0.01"
                                                     name="width"
-                                                    value={Math.round(singleSelectedShape.width || 0)}
-                                                    onChange={handleInputChange}
+                                                    value={((singleSelectedShape.width || 0) / pixelsPerMm).toFixed(2)}
+                                                    onChange={(e) => handleDimensionUpdate('width', e.target.value)}
                                                     className="h-7 text-xs"
                                                 />
                                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -591,9 +589,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                             <div className="flex items-center gap-1">
                                                 <Input
                                                     type="number"
+                                                    step="0.01"
                                                     name="height"
-                                                    value={Math.round(singleSelectedShape.height || 0)}
-                                                    onChange={handleInputChange}
+                                                    value={((singleSelectedShape.height || 0) / pixelsPerMm).toFixed(2)}
+                                                    onChange={(e) => handleDimensionUpdate('height', e.target.value)}
                                                     className="h-7 text-xs"
                                                 />
                                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -610,9 +609,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                             <div className="flex items-center gap-1">
                                                 <Input
                                                     type="number"
-                                                    value={Math.round((singleSelectedShape.radius || 0))}
+                                                    step="0.01"
+                                                    value={((singleSelectedShape.radius || 0) / pixelsPerMm).toFixed(2)}
                                                     onChange={(e) => {
-                                                        const radius = parseFloat(e.target.value) || 0;
+                                                        const radius = (parseFloat(e.target.value) || 0) * pixelsPerMm;
                                                         handlePropertyUpdate('radius', radius);
                                                     }}
                                                     className="h-7 text-xs"
@@ -625,11 +625,11 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                             <div className="flex items-center gap-1">
                                                 <Input
                                                     type="number"
-                                                    name="width"
-                                                    value={Math.round((singleSelectedShape.radius || 0) * 2)}
+                                                    step="0.01"
+                                                    value={(((singleSelectedShape.radius || 0) * 2) / pixelsPerMm).toFixed(2)}
                                                     onChange={(e) => {
                                                         const diameter = parseFloat(e.target.value) || 0;
-                                                        handlePropertyUpdate('radius', diameter / 2);
+                                                        handlePropertyUpdate('radius', (diameter / 2) * pixelsPerMm);
                                                     }}
                                                     className="h-7 text-xs"
                                                 />
@@ -649,9 +649,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         <div className="flex items-center gap-1">
                                             <Input
                                                 type="number"
+                                                step="0.01"
                                                 name="x"
-                                                value={Math.round(singleSelectedShape.x || 0)}
-                                                onChange={handleInputChange}
+                                                value={((singleSelectedShape.x || 0) / pixelsPerMm).toFixed(2)}
+                                                onChange={(e) => handleDimensionUpdate('x', e.target.value)}
                                                 className="h-7 text-xs"
                                             />
                                             <span className="text-xs text-muted-foreground">mm</span>
@@ -662,9 +663,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         <div className="flex items-center gap-1">
                                             <Input
                                                 type="number"
+                                                step="0.01"
                                                 name="y"
-                                                value={Math.round(singleSelectedShape.y || 0)}
-                                                onChange={handleInputChange}
+                                                value={((singleSelectedShape.y || 0) / pixelsPerMm).toFixed(2)}
+                                                onChange={(e) => handleDimensionUpdate('y', e.target.value)}
                                                 className="h-7 text-xs"
                                             />
                                             <span className="text-xs text-muted-foreground">mm</span>

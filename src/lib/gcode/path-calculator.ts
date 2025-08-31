@@ -290,32 +290,25 @@ export class PathCalculator {
         segments: { start: Point; end: Point }[]
     ): Promise<void> {
         const halfWidth = coatingWidth / 2;
-        const startY = bounds.y + halfWidth;
-        const endY = bounds.y + bounds.height - halfWidth;
+        const startY = bounds.y + halfWidth; // 첫 코팅 라인의 중심 Y좌표
+        const endY = bounds.y + bounds.height - halfWidth; // 마지막 코팅 라인의 중심 Y좌표
 
-        if (startY > endY) return;
+        if (startY > endY || lineSpacing <= 0) return;
 
-        const numLines = Math.floor((endY - startY) / lineSpacing) + 1;
-        let direction = 1; // 1: 왼쪽에서 오른쪽, -1: 오른쪽에서 왼쪽
+        let direction = 1; // 1: LTR, -1: RTL
 
-        for (let i = 0; i < numLines; i++) {
-            const y = startY + i * lineSpacing;
-            if (y > endY + 0.01) break;
+        for (let i = 0; ; i++) {
+            // 다음 코팅 라인 중심 위치 = 이전 코팅 라인 중심 위치 + 코팅 라인 간격
+            const currentY = startY + i * lineSpacing;
+            if (currentY > endY + 0.01) break; // 영역을 벗어나면 중단
 
-            const lineSegments = this.getHorizontalLineSegmentsInBounds(y, boundary);
+            const lineSegments = this.getHorizontalLineSegmentsInBounds(currentY, boundary);
 
-            // Snake 패턴: 방향에 따라 세그먼트 뒤집기
             for (const segment of lineSegments) {
-                if (direction > 0) {
-                    segments.push(segment);
-                } else {
-                    segments.push({ start: segment.end, end: segment.start });
-                }
+                segments.push(direction > 0 ? segment : { start: segment.end, end: segment.start });
             }
+            direction *= -1; // 방향 전환
 
-            direction *= -1; // 다음 라인을 위해 방향 전환
-
-            // 주기적 UI 양보
             if (i % 50 === 0) {
                 await new Promise(resolve => setTimeout(resolve, 0));
             }
@@ -333,32 +326,25 @@ export class PathCalculator {
         segments: { start: Point; end: Point }[]
     ): Promise<void> {
         const halfWidth = coatingWidth / 2;
-        const startX = bounds.x + halfWidth;
-        const endX = bounds.x + bounds.width - halfWidth;
+        const startX = bounds.x + halfWidth; // 첫 코팅 라인의 중심 X좌표
+        const endX = bounds.x + bounds.width - halfWidth; // 마지막 코팅 라인의 중심 X좌표
 
-        if (startX > endX) return;
+        if (startX > endX || lineSpacing <= 0) return;
 
-        const numLines = Math.floor((endX - startX) / lineSpacing) + 1;
-        let direction = 1; // 1: 위에서 아래, -1: 아래에서 위
+        let direction = 1; // 1: TTB, -1: BTT
 
-        for (let i = 0; i < numLines; i++) {
-            const x = startX + i * lineSpacing;
-            if (x > endX + 0.01) break;
+        for (let i = 0; ; i++) {
+            // 다음 코팅 라인 중심 위치 = 이전 코팅 라인 중심 위치 + 코팅 라인 간격
+            const currentX = startX + i * lineSpacing;
+            if (currentX > endX + 0.01) break; // 영역을 벗어나면 중단
 
-            const lineSegments = this.getVerticalLineSegmentsInBounds(x, boundary);
+            const lineSegments = this.getVerticalLineSegmentsInBounds(currentX, boundary);
 
-            // Snake 패턴: 방향에 따라 세그먼트 뒤집기
             for (const segment of lineSegments) {
-                if (direction > 0) {
-                    segments.push(segment);
-                } else {
-                    segments.push({ start: segment.end, end: segment.start });
-                }
+                segments.push(direction > 0 ? segment : { start: segment.end, end: segment.start });
             }
+            direction *= -1; // 방향 전환
 
-            direction *= -1; // 다음 라인을 위해 방향 전환
-
-            // 주기적 UI 양보
             if (i % 50 === 0) {
                 await new Promise(resolve => setTimeout(resolve, 0));
             }

@@ -8,7 +8,6 @@ import { usePanZoom } from '@/hooks/use-pan-zoom';
 // 모드별 이벤트 훅들
 import { useShapeEvents } from "@/hooks/use-shape-events";
 
-
 export function useStageEvents() {
     const dispatch = useAppDispatch();
     const { canvasContainerRef, setStage } = useCanvas();

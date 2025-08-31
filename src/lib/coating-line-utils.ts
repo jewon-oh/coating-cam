@@ -1,164 +1,75 @@
 
 import type { CustomShapeConfig } from '@/types/custom-konva-config';
+import { PathCalculator } from '@/lib/gcode/path-calculator';
+import { MaskingManager } from '@/lib/gcode/mask-manager';
+import { CoatingSettings } from '@/types/coating';
 
 export interface CoatingRect {
     x: number;
     y: number;
     width: number;
     height: number;
+    rotation?: number;
 }
 
 /**
- * 도형에 따른 채우기 Rect들을 생성합니다 (시작 라인 중간부터 계산)
+ * PathCalculator를 사용하여 채우기 영역(Rect)을 생성합니다.
+ * 이를 통해 시각화와 실제 G-code 생성이 동일한 로직을 공유하게 됩니다.
  */
-export function generateFillRects(
+export async function generateFillRects(
     shape: CustomShapeConfig,
-    lineSpacing: number,
-    coatingWidth: number
-): CoatingRect[] {
+    allShapes: CustomShapeConfig[], // 마스킹 계산을 위해 모든 도형 정보가 필요합니다.
+    settings: CoatingSettings
+): Promise<CoatingRect[]> {
     if (shape.coatingType !== 'fill' || !shape.fillPattern) {
         return [];
     }
 
+    // 1. PathCalculator의 의존성 설정 (마스킹 포함)
+    const activeShapes = allShapes.filter(s => s.skipCoating !== true);
+    const maskShapes = settings.enableMasking
+        ? activeShapes.filter(s => s.coatingType === 'masking')
+        : [];
+
+    const masker = new MaskingManager(settings, maskShapes);
+    const calculator = new PathCalculator(settings, masker);
+
+    // 2. PathCalculator를 통해 채우기 경로(세그먼트) 계산
+    // calculateForShapeAbsolute는 회전과 마스킹이 모두 적용된 절대 좌표 세그먼트를 반환합니다.
+    const segments = await calculator.calculateForShapeAbsolute(shape);
+
+    // 3. 계산된 세그먼트를 시각화용 Rect로 변환
+    const coatingWidth = shape.coatingWidth ?? settings.coatingWidth;
+    const halfWidth = coatingWidth / 2;
     const rects: CoatingRect[] = [];
 
-    if (shape.type === 'rectangle') {
-        const { x = 0, y = 0, width = 0, height = 0 } = shape;
+    for (const segment of segments) {
+        const { start, end } = segment;
 
-        if (shape.fillPattern === 'horizontal') {
-            // 수평 Rect들 생성 - 첫 번째 라인의 중간부터 시작
-            const firstLineY = y + coatingWidth / 2;
-            let currentY = firstLineY;
+        // 세그먼트의 방향 (수평/수직)을 확인합니다.
+        // PathCalculator는 현재 수평/수직 라인만 생성하므로 간단한 비교로 충분합니다.
+        const isHorizontal = Math.abs(start.y - end.y) < 0.001;
 
-            while (currentY + coatingWidth / 2 <= y + height) {
-                rects.push({
-                    x: x,
-                    y: currentY - coatingWidth / 2,
-                    width: width,
-                    height: coatingWidth
-                });
-                currentY += lineSpacing;
-            }
-        } else if (shape.fillPattern === 'vertical') {
-            // 수직 Rect들 생성 - 첫 번째 라인의 중간부터 시작
-            const firstLineX = x + coatingWidth / 2;
-            let currentX = firstLineX;
-
-            while (currentX + coatingWidth / 2 <= x + width) {
-                rects.push({
-                    x: currentX - coatingWidth / 2,
-                    y: y,
-                    width: coatingWidth,
-                    height: height
-                });
-                currentX += lineSpacing;
-            }
-        } else if (shape.fillPattern === 'auto') {
-            // 더 짧은 방향으로 채우기 (효율적)
-            if (width <= height) {
-                // 수직으로 채우기
-                const firstLineX = x + coatingWidth / 2;
-                let currentX = firstLineX;
-
-                while (currentX + coatingWidth / 2 <= x + width) {
-                    rects.push({
-                        x: currentX - coatingWidth / 2,
-                        y: y,
-                        width: coatingWidth,
-                        height: height
-                    });
-                    currentX += lineSpacing;
-                }
-            } else {
-                // 수평으로 채우기
-                const firstLineY = y + coatingWidth / 2;
-                let currentY = firstLineY;
-
-                while (currentY + coatingWidth / 2 <= y + height) {
-                    rects.push({
-                        x: x,
-                        y: currentY - coatingWidth / 2,
-                        width: width,
-                        height: coatingWidth
-                    });
-                    currentY += lineSpacing;
-                }
-            }
-        }
-    } else if (shape.type === 'circle') {
-        const { x = 0, y = 0, radius = 0 } = shape;
-
-        if (shape.fillPattern === 'horizontal') {
-            // 원 내부를 수평 Rect으로 채우기 - 첫 번째 라인의 중간부터 시작
-            const firstLineY = y - radius + coatingWidth / 2;
-            let currentY = firstLineY;
-
-            while (currentY + coatingWidth / 2 <= y + radius) {
-                const distFromCenter = Math.abs(currentY - y);
-
-                if (distFromCenter + coatingWidth / 2 <= radius) {
-                    const halfChord = Math.sqrt(radius * radius - distFromCenter * distFromCenter);
-                    const rectWidth = halfChord * 2;
-                    if (rectWidth > 0) {
-                        rects.push({
-                            x: x - halfChord,
-                            y: currentY - coatingWidth / 2,
-                            width: rectWidth,
-                            height: coatingWidth
-                        });
-                    }
-                }
-                currentY += lineSpacing;
-            }
-        } else if (shape.fillPattern === 'vertical') {
-            // 원 내부를 수직 Rect으로 채우기 - 첫 번째 라인의 중간부터 시작
-            const firstLineX = x - radius + coatingWidth / 2;
-            let currentX = firstLineX;
-
-            while (currentX + coatingWidth / 2 <= x + radius) {
-                const distFromCenter = Math.abs(currentX - x);
-
-                if (distFromCenter + coatingWidth / 2 <= radius) {
-                    const halfChord = Math.sqrt(radius * radius - distFromCenter * distFromCenter);
-                    const rectHeight = halfChord * 2;
-                    if (rectHeight > 0) {
-                        rects.push({
-                            x: currentX - coatingWidth / 2,
-                            y: y - halfChord,
-                            width: coatingWidth,
-                            height: rectHeight
-                        });
-                    }
-                }
-                currentX += lineSpacing;
-            }
-        } else if (shape.fillPattern === 'auto') {
-            // 기본은 수평으로 채우기
-            const firstLineY = y - radius + coatingWidth / 2;
-            let currentY = firstLineY;
-
-            while (currentY + coatingWidth / 2 <= y + radius) {
-                const distFromCenter = Math.abs(currentY - y);
-
-                if (distFromCenter + coatingWidth / 2 <= radius) {
-                    const halfChord = Math.sqrt(radius * radius - distFromCenter * distFromCenter);
-                    const rectWidth = halfChord * 2;
-                    if (rectWidth > 0) {
-                        rects.push({
-                            x: x - halfChord,
-                            y: currentY - coatingWidth / 2,
-                            width: rectWidth,
-                            height: coatingWidth
-                        });
-                    }
-                }
-                currentY += lineSpacing;
-            }
+        if (isHorizontal) {
+            rects.push({
+                x: Math.min(start.x, end.x),
+                y: start.y - halfWidth,
+                width: Math.abs(end.x - start.x),
+                height: coatingWidth,
+            });
+        } else {
+            rects.push({
+                x: start.x - halfWidth,
+                y: Math.min(start.y, end.y),
+                width: coatingWidth,
+                height: Math.abs(end.y - start.y),
+            });
         }
     }
 
     return rects;
 }
+
 
 /**
  * 코팅 설정 기반 스냅 유틸리티 (채우기 방향에 따라 선택적 적용)

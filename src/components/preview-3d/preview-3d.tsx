@@ -1,9 +1,9 @@
 'use client';
 
-import {useCallback, useEffect, useMemo, useRef} from 'react';
+import { useMemo, } from 'react';
 import {useSettings} from "@/contexts/settings-context";
 import {Canvas} from "@react-three/fiber";
-import {OrbitControls, Grid, Text, OrthographicCamera, OrbitControlsProps} from "@react-three/drei";
+import {OrbitControls, Grid, Text, OrthographicCamera} from "@react-three/drei";
 import * as THREE from 'three';
 import {CustomShapeConfig} from "@/types/custom-konva-config";
 import {useAppSelector} from "@/hooks/redux";

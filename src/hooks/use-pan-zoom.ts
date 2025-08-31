@@ -38,7 +38,7 @@ export function usePanZoom(setStage: (updater: React.SetStateAction<StageState>)
         const direction = e.evt.deltaY > 0 ? -1 : 1;
 
         const newScale = direction > 0 ? Math.abs(oldScaleX) * scaleBy : Math.abs(oldScaleX) / scaleBy;
-        const clampedScale = Math.max(0.1, Math.min(10, newScale));
+        const clampedScale = Math.max(0.01, Math.min(10, newScale));
 
         const isXInverted = oldScaleX < 0;
         const newScaleX = isXInverted ? -clampedScale : clampedScale;

@@ -5,17 +5,18 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { addShape } from '@/store/slices/shape-slice';
 import { setTool } from '@/store/slices/tool-slice';
 import type { CustomShapeConfig } from '@/types/custom-konva-config';
-import { useSettings } from '@/contexts/settings-context';
-import { DRAWING_TOOLS, DrawingTool, SHAPE_TOOLS, ToolType } from "@/types/tool-type";
+import { DRAWING_TOOLS, DrawingTool, ToolType } from "@/types/tool-type";
+import { useShapeSnapping } from './use-shape-snapping';
 
 export function useShapeDrawing() {
     const dispatch = useAppDispatch();
     const toolState = useAppSelector((state) => state.tool);
-    const { isSnappingEnabled, pixelsPerMm, gcodeSettings } = useSettings();
+    const { snapPointToGrid, snapShapeSize, snapCircleRadius } = useShapeSnapping();
 
     // 그리기 상태
     const isDrawingRef = useRef(false);
     const drawStartClientRef = useRef<{ x: number; y: number } | null>(null);
+    const drawStartStageRef = useRef<{ x: number; y: number } | null>(null); // Stage 좌표 저장
     const tempShapeRef = useRef<Konva.Shape | null>(null);
     const tempTypeRef = useRef<DrawingTool | null>(null);
 
@@ -25,15 +26,6 @@ export function useShapeDrawing() {
         const t = stage.getAbsoluteTransform().copy().invert();
         return t.point(client);
     }, []);
-
-    const snap = useCallback(
-        (v: number) => (isSnappingEnabled ? Math.round(v / pixelsPerMm) * pixelsPerMm : v),
-        [isSnappingEnabled, pixelsPerMm]
-    );
-    const snapPoint = useCallback(
-        (p: { x: number; y: number }) => ({ x: snap(p.x), y: snap(p.y) }),
-        [snap]
-    );
 
     // 임시 도형 관리
     const createTempShape = useCallback((type: ToolType, layer: Konva.Layer, x: number, y: number) => {
@@ -97,36 +89,25 @@ export function useShapeDrawing() {
 
             const dx = endPoint.x - startPoint.x;
             const dy = endPoint.y - startPoint.y;
-            const lineSpacing = gcodeSettings.lineSpacing;
 
             if (toolState.coatingType === "fill") {
-                let snappedWidth = dx;
-                let snappedHeight = dy;
-
-                if (toolState.fillPattern === 'horizontal') {
-                    snappedHeight = Math.round(dy / lineSpacing) * lineSpacing;
-                } else if (toolState.fillPattern === 'vertical') {
-                    snappedWidth = Math.round(dx / lineSpacing) * lineSpacing;
-                } else {
-                    snappedWidth = Math.round(dx / lineSpacing) * lineSpacing;
-                    snappedHeight = Math.round(dy / lineSpacing) * lineSpacing;
-                }
-
-                const x = Math.min(startPoint.x, startPoint.x + snappedWidth);
-                const y = Math.min(startPoint.y, startPoint.y + snappedHeight);
-                const width = Math.abs(snappedWidth);
-                const height = Math.abs(snappedHeight);
-
                 if (temp instanceof Konva.Rect) {
+                    const { width: snappedWidth, height: snappedHeight } = snapShapeSize(
+                        { width: dx, height: dy },
+                        toolState
+                    );
+                    const x = Math.min(startPoint.x, startPoint.x + snappedWidth);
+                    const y = Math.min(startPoint.y, startPoint.y + snappedHeight);
+                    const width = Math.abs(snappedWidth);
+                    const height = Math.abs(snappedHeight);
                     temp.position({ x, y });
                     temp.size({ width, height });
                 } else if (temp instanceof Konva.Circle) {
-                    const rawRadius = Math.sqrt(snappedWidth * snappedWidth + snappedHeight * snappedHeight);
-                    const snappedRadius = Math.round(rawRadius / lineSpacing) * lineSpacing;
+                    const rawRadius = Math.sqrt(dx * dx + dy * dy);
+                    const snappedRadius = snapCircleRadius(rawRadius, toolState);
                     temp.position({ x: startPoint.x, y: startPoint.y });
                     temp.radius(snappedRadius);
                 } else if (temp instanceof Konva.Line) {
-                    // 라인은 채우기 패턴이 적용되지 않으므로 일반 처리
                     temp.points([startPoint.x, startPoint.y, endPoint.x, endPoint.y]);
                 }
             } else {
@@ -142,13 +123,12 @@ export function useShapeDrawing() {
                     temp.position({ x: startPoint.x, y: startPoint.y });
                     temp.radius(radius);
                 } else if (temp instanceof Konva.Line) {
-                    // 라인: 절대 좌표로 점들 설정
                     temp.points([startPoint.x, startPoint.y, endPoint.x, endPoint.y]);
                 }
             }
             temp.getLayer()?.batchDraw();
         },
-        [toolState, gcodeSettings.lineSpacing]
+        [toolState, snapShapeSize, snapCircleRadius]
     );
 
     const destroyTempShape = useCallback(() => {
@@ -159,69 +139,36 @@ export function useShapeDrawing() {
         tempTypeRef.current = null;
     }, []);
 
-    // 그리기 이벤트 핸들러들
     const startDrawing = useCallback((e: KonvaEventObject<MouseEvent>) => {
-        console.log('🎨 startDrawing called', {
-            toolState: toolState.tool,
-            targetName: e.target.name(),
-            targetConstructor: e.target.constructor.name,
-            isStage: e.target === e.target.getStage()
-        });
-
-        // 그리기 도구가 아닌 경우 early return
-        if (!(DRAWING_TOOLS.includes(toolState.tool))) {
-            console.log('❌ Not a drawing tool:', toolState.tool);
-            return false;
-        }
+        if (!(DRAWING_TOOLS.includes(toolState.tool))) return false;
 
         const stage = e.target.getStage();
-        if (!stage) {
-            console.log('❌ No stage found');
-            return false;
-        }
+        if (!stage) return false;
 
-        // Stage나 배경 요소를 클릭했을 때만 그리기 시작
-        const isValidTarget = e.target === stage ||
-            e.target.name() === '' ||
-            !e.target.listening() ||
-            e.target.id() === '';
+        const isValidTarget = e.target === stage || !e.target.listening() || e.target.id() === '';
+        if (!isValidTarget) return false;
 
-        if (!isValidTarget) {
-            console.log('❌ Invalid target for drawing:', {
-                isStage: e.target === stage,
-                name: e.target.name(),
-                listening: e.target.listening(),
-                id: e.target.id()
-            });
-            return false;
-        }
-
-        // 가장 상위 레이어 찾기 (Shape 레이어가 아닌 배경 레이어)
         const layers = stage.getLayers();
         const drawingLayer = layers.find(layer => !layer.name() || layer.name() === '') || layers[0];
-
-        if (!drawingLayer) {
-            console.log('❌ No drawing layer found');
-            return false;
-        }
+        if (!drawingLayer) return false;
 
         const client = getPointerClient(stage);
-        if (!client) {
-            console.log('❌ No client position');
-            return false;
-        }
+        if (!client) return false;
 
-        console.log('✅ Starting drawing', { tool: toolState.tool, client });
         isDrawingRef.current = true;
         drawStartClientRef.current = client;
-        const sp = snapPoint(toStagePoint(stage, client));
-        createTempShape(toolState.tool, drawingLayer, sp.x, sp.y);
+
+        const startStagePoint = toStagePoint(stage, client);
+        const snappedStartPoint = snapPointToGrid(startStagePoint);
+        drawStartStageRef.current = snappedStartPoint;
+
+        createTempShape(toolState.tool, drawingLayer, snappedStartPoint.x, snappedStartPoint.y);
         return true;
-    }, [toolState.tool, getPointerClient, snapPoint, toStagePoint, createTempShape]);
+    }, [toolState.tool, getPointerClient, toStagePoint, snapPointToGrid, createTempShape]);
 
     const updateDrawing = useCallback((e: KonvaEventObject<MouseEvent>) => {
-        if (!isDrawingRef.current || !drawStartClientRef.current) return false;
-        if (!DRAWING_TOOLS.includes(toolState.tool)) return false; // line 포함으로 수정
+        if (!isDrawingRef.current || !drawStartStageRef.current) return false;
+        if (!DRAWING_TOOLS.includes(toolState.tool)) return false;
 
         const stage = e.target.getStage();
         if (!stage) return false;
@@ -229,24 +176,27 @@ export function useShapeDrawing() {
         const cur = getPointerClient(stage);
         if (!cur) return false;
 
-        const s = snapPoint(toStagePoint(stage, drawStartClientRef.current));
-        const c = snapPoint(toStagePoint(stage, cur));
-        updateTempShape(s, c);
+        const startPoint = drawStartStageRef.current;
+        const currentPoint = snapPointToGrid(toStagePoint(stage, cur));
+
+        updateTempShape(startPoint, currentPoint);
         return true;
-    }, [toolState.tool, getPointerClient, toStagePoint, snapPoint, updateTempShape]);
+    }, [toolState.tool, getPointerClient, toStagePoint, snapPointToGrid, updateTempShape]);
 
     const finishDrawing = useCallback((e: KonvaEventObject<MouseEvent>) => {
-        if (!isDrawingRef.current || !drawStartClientRef.current) return false;
-        if (!DRAWING_TOOLS.includes(toolState.tool)) return false; // line 포함으로 수정
+        if (!isDrawingRef.current || !drawStartClientRef.current || !drawStartStageRef.current) return false;
+        if (!DRAWING_TOOLS.includes(toolState.tool)) return false;
 
         const stage = e.target.getStage();
         if (!stage) return false;
 
-        const endClient = getPointerClient(stage);
         const startClient = drawStartClientRef.current;
+        const startStagePoint = drawStartStageRef.current;
+        const endClient = getPointerClient(stage);
 
         isDrawingRef.current = false;
         drawStartClientRef.current = null;
+        drawStartStageRef.current = null;
         destroyTempShape();
 
         if (!endClient) {
@@ -256,12 +206,11 @@ export function useShapeDrawing() {
 
         const dist = Math.hypot(endClient.x - startClient.x, endClient.y - startClient.y);
         if (dist > 3) {
-            const s = snapPoint(toStagePoint(stage, startClient));
-            const ept = snapPoint(toStagePoint(stage, endClient));
+            const s = startStagePoint;
+            const ept = snapPointToGrid(toStagePoint(stage, endClient));
 
             let newShape: CustomShapeConfig;
 
-            // 공통 코팅 속성 구성
             const commonShapeProps = {
                 id: crypto.randomUUID(),
                 parentId: null,
@@ -271,76 +220,43 @@ export function useShapeDrawing() {
                 listening: false,
                 visible: true,
                 isLocked: false,
-
-                // toolState 기반 코팅 설정 적용
                 coatingType: toolState.coatingType,
                 coatingSpeed: toolState.coatingSpeed,
                 coatingHeight: toolState.coatingHeight,
                 coatingWidth: toolState.coatingWidth,
-
-                // 코팅 타입별 세부 설정
-                ...(toolState.coatingType === 'fill' && {
-                    fillPattern: toolState.fillPattern,
-                    lineSpacing: toolState.lineSpacing,
-                }),
-
-                ...(toolState.coatingType === 'outline' && {
-                    outlineType: toolState.outlineType,
-                    outlinePasses: toolState.outlinePasses,
-                    outlineInterval: toolState.outlineInterval,
-                }),
-
-                ...(toolState.coatingType === 'masking' && {
-                    maskingClearance: toolState.maskingClearance,
-                    travelAvoidanceStrategy: toolState.travelAvoidanceStrategy,
-                }),
+                ...(toolState.coatingType === 'fill' && { fillPattern: toolState.fillPattern, lineSpacing: toolState.lineSpacing }),
+                ...(toolState.coatingType === 'outline' && { outlineType: toolState.outlineType, outlinePasses: toolState.outlinePasses, outlineInterval: toolState.outlineInterval }),
+                ...(toolState.coatingType === 'masking' && { maskingClearance: toolState.maskingClearance, travelAvoidanceStrategy: toolState.travelAvoidanceStrategy }),
             };
 
             if (toolState.tool === 'rectangle') {
-                const x = Math.min(s.x, ept.x);
-                const y = Math.min(s.y, ept.y);
-                const width = Math.abs(ept.x - s.x);
-                const height = Math.abs(ept.y - s.y);
-
-                newShape = {
-                    ...commonShapeProps,
-                    type: 'rectangle',
-                    name: '사각형',
-                    x,
-                    y,
-                    width,
-                    height,
-                    fill: 'rgba(59,130,246,0.5)',
-                };
+                const rawWidth = ept.x - s.x;
+                const rawHeight = ept.y - s.y;
+                const { width: snappedWidth, height: snappedHeight } = snapShapeSize({ width: rawWidth, height: rawHeight }, toolState);
+                const x = Math.min(s.x, s.x + snappedWidth);
+                const y = Math.min(s.y, s.y + snappedHeight);
+                const width = Math.abs(snappedWidth);
+                const height = Math.abs(snappedHeight);
+                newShape = { ...commonShapeProps, type: 'rectangle', x, y, width, height, fill: 'rgba(59,130,246,0.5)' };
             } else if (toolState.tool === 'circle') {
                 const dx = ept.x - s.x;
                 const dy = ept.y - s.y;
-                const radius = Math.sqrt(dx * dx + dy * dy);
-
-                newShape = {
-                    ...commonShapeProps,
-                    type: 'circle',
-                    name: '원형',
-                    x: s.x,
-                    y: s.y,
-                    radius: radius,
-                    fill: 'rgba(59,130,246,0.5)',
-                };
+                const rawRadius = Math.sqrt(dx * dx + dy * dy);
+                const radius = snapCircleRadius(rawRadius, toolState);
+                newShape = { ...commonShapeProps, type: 'circle', x: s.x, y: s.y, radius, fill: 'rgba(59,130,246,0.5)' };
             } else if (toolState.tool === 'line') {
                 newShape = {
                     ...commonShapeProps,
                     type: 'line',
                     name: '직선',
-                    x: s.x, // 시작점을 기준으로 위치
+                    x: s.x,
                     y: s.y,
-                    fill: undefined, // 라인은 fill 없음
+                    fill: undefined,
                     stroke: '#000000',
                     strokeWidth: 2,
-                    // 상대 좌표로 점들 저장
                     points: [0, 0, ept.x - s.x, ept.y - s.y],
                     startPoint: { x: 0, y: 0 },
                     endPoint: { x: ept.x - s.x, y: ept.y - s.y },
-                    // 라인은 기본적으로 outline 타입
                     coatingType: 'outline'
                 };
             } else {
@@ -348,18 +264,19 @@ export function useShapeDrawing() {
                 return true;
             }
 
-            if (newShape!) {
+            if (newShape) {
                 dispatch(addShape(newShape));
             }
         }
 
         dispatch(setTool('select'));
         return true;
-    }, [toolState, getPointerClient, toStagePoint, snapPoint, destroyTempShape, dispatch]);
+    }, [toolState, getPointerClient, toStagePoint, snapPointToGrid, destroyTempShape, dispatch, snapShapeSize, snapCircleRadius]);
 
     const cancelDrawing = useCallback(() => {
         isDrawingRef.current = false;
         drawStartClientRef.current = null;
+        drawStartStageRef.current = null;
         destroyTempShape();
     }, [destroyTempShape]);
 

@@ -119,8 +119,8 @@ type SettingsContextType = {
     setTheme: (t: 'light' | 'dark' | 'system') => void;
     workArea: { width: number; height: number };
     setWorkArea: (wa: { width: number; height: number }) => void;
-    showCoatingOrder: boolean;
-    setShowCoatingOrder: (v: boolean) => void;
+    showCoatingPaths: boolean;
+    setShowCoatingPaths: (v: boolean) => void;
 
     // G-Code 설정 추가
     gcodeSettings: CoatingSettings;
@@ -160,7 +160,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
     );
     const [theme, setTheme] = useState<"light" | "dark" | "system">(DEFAULT_SETTINGS.theme);
     const [workArea, setWorkArea] = useState(DEFAULT_SETTINGS.workArea);
-    const [showCoatingOrder, setShowCoatingOrder] = useState(DEFAULT_SETTINGS.showCoatingOrder);
+    const [showCoatingPaths, setShowCoatingPaths] = useState(DEFAULT_SETTINGS.showCoatingOrder);
 
     // G-Code 설정 상태 추가
     const [gcodeSettings, setGcodeSettings] = useState<CoatingSettings>(DEFAULT_SETTINGS.coatingSettings);
@@ -196,7 +196,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
                 setSnappingEnabled(!!settings.grid?.snapping);
                 setTheme((settings.theme) ?? DEFAULT_SETTINGS.theme);
                 setWorkArea(settings.workArea ?? DEFAULT_SETTINGS.workArea);
-                setShowCoatingOrder(settings.showCoatingOrder ?? DEFAULT_SETTINGS.showCoatingOrder);
+                setShowCoatingPaths(settings.showCoatingOrder ?? DEFAULT_SETTINGS.showCoatingOrder);
 
                 // G-Code 설정 로드
                 setGcodeSettings(settings.coatingSettings ?? DEFAULT_SETTINGS.coatingSettings);
@@ -246,7 +246,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
                 snapping: isSnappingEnabled,
             },
             theme,
-            showCoatingOrder,
+            showCoatingOrder: showCoatingPaths,
             coatingSettings: gcodeSettings,
             gcodeSnippets,
         };
@@ -257,7 +257,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         isSnappingEnabled,
         theme,
         workArea,
-        showCoatingOrder,
+        showCoatingPaths,
         gcodeSettings,
         gcodeSnippets,
         scheduleSave,
@@ -318,8 +318,8 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
             setTheme,
             workArea,
             setWorkArea,
-            showCoatingOrder,
-            setShowCoatingOrder,
+            showCoatingPaths,
+            setShowCoatingPaths,
 
             // G-Code 설정
             gcodeSettings,
@@ -341,7 +341,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
             isSnappingEnabled,
             theme,
             workArea,
-            showCoatingOrder,
+            showCoatingPaths,
             gcodeSettings,
             updateGcodeSettings,
             gcodeSnippets,

@@ -2,7 +2,6 @@
 import {configureStore} from '@reduxjs/toolkit';
 import shapesReducer from './slices/shape-slice';
 import historyReducer from './slices/shape-history-slice';
-import pathReducer from './slices/path-slice';
 import toolReducer from './slices/tool-slice';
 import gcodeReducer from './slices/gcode-slice';
 import {historySyncListener} from '@/store/middleware/history-sync-listener';
@@ -12,7 +11,6 @@ export const store = configureStore({
     reducer: {
         shapes: shapesReducer,          // state.shapes
         history: historyReducer,        // state.history (shape 히스토리)
-        paths: pathReducer,             // state.paths
         tool: toolReducer,
         gcode: gcodeReducer,
     },

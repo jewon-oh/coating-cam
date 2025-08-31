@@ -180,26 +180,17 @@ function useCanvasResize(
             const width = Math.max(0, Math.floor(rect.width));
             const height = Math.max(0, Math.floor(rect.height));
 
-            // 스테이지 상태 업데이트
-            updateStageSize(width, height);
+            // 크기가 0보다 클 때만 상태 업데이트를 진행하여 사라지는 현상 방지
+            if (width > 0 && height > 0) {
+                // 스테이지 상태 업데이트
+                updateStageSize(width, height);
 
-            // Konva 스테이지 크기 업데이트
-            if (stage) {
-                if (stage.width() !== width) stage.width(width);
-                if (stage.height() !== height) stage.height(height);
-
-                // scaleX가 -1일 때 올바른 초기 위치 설정
-                // 우상단을 원점으로 하기 위해 x 좌표를 조정
-                if (stage.scaleX() === -1 && stage.x() === 0) {
-                    stage.x(width);
+                // Konva 스테이지 크기 업데이트
+                if (stage) {
+                    if (stage.width() !== width) stage.width(width);
+                    if (stage.height() !== height) stage.height(height);
                 }
-
-                // 레이어 다시 그리기
-                animationFrameId = requestAnimationFrame(() => {
-                    stage.getLayers().forEach(layer => layer.batchDraw());
-                });
             }
-
         };
 
         const initializeObserver = () => {
