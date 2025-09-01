@@ -13,12 +13,12 @@ import React, {
 } from "react";
 import {nanoid} from "nanoid";
 import type {GCodeHook, GCodeSnippet} from "@/types/gcode";
-import {DEFAULT_SETTINGS, SettingsType, ThemeMode} from "@/types/settings";
-
+import {CoatingSettings} from "@/types/coating";
+import {DEFAULT_SETTINGS, SettingsType} from "@/types/settings";
 
 function useSettingsBridge() {
     const bridge =
-        (typeof window !== "undefined" && (window as any).settingsApi) || null;
+        (typeof window !== "undefined" && window.settingsApi) || null;
     return bridge as null | {
         load: () => Promise<SettingsType>;
         save: (data: SettingsType) => Promise<{ ok: boolean }>;
@@ -111,14 +111,21 @@ type SettingsContextType = {
     // 기존 설정
     isGridVisible: boolean;
     setGridVisible: (v: boolean) => void;
-    gridSize: number;
-    setGridSize: (n: number) => void;
+    pixelsPerMm: number;
+    setPixelsPerMm: (n: number) => void;
     isSnappingEnabled: boolean;
     setSnappingEnabled: (v: boolean) => void;
-    theme: ThemeMode;
-    setTheme: (t: ThemeMode) => void;
+    theme: 'light' | 'dark' | 'system';
+    setTheme: (t: 'light' | 'dark' | 'system') => void;
     workArea: { width: number; height: number };
     setWorkArea: (wa: { width: number; height: number }) => void;
+    showCoatingPaths: boolean;
+    setShowCoatingPaths: (v: boolean) => void;
+
+    // G-Code 설정 추가
+    gcodeSettings: CoatingSettings;
+    updateGcodeSettings: (patch: Partial<CoatingSettings>) => void;
+    setGcodeSettings: (settings: CoatingSettings) => void;
 
     // G-Code 스니펫 API
     gcodeSnippets: GCodeSnippet[];
@@ -139,6 +146,7 @@ type SettingsContextType = {
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
+
 export function SettingsProvider({children}: { children: React.ReactNode }) {
     const bridge = useSettingsBridge();
 
@@ -146,12 +154,16 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
     const [isGridVisible, setGridVisible] = useState(
         DEFAULT_SETTINGS.grid.visible
     );
-    const [gridSize, setGridSize] = useState(DEFAULT_SETTINGS.grid.size);
+    const [pixelsPerMm, setPixelsPerMm] = useState(DEFAULT_SETTINGS.grid.pixelsPerMm);
     const [isSnappingEnabled, setSnappingEnabled] = useState(
         DEFAULT_SETTINGS.grid.snapping
     );
-    const [theme, setTheme] = useState<ThemeMode>(DEFAULT_SETTINGS.theme);
+    const [theme, setTheme] = useState<"light" | "dark" | "system">(DEFAULT_SETTINGS.theme);
     const [workArea, setWorkArea] = useState(DEFAULT_SETTINGS.workArea);
+    const [showCoatingPaths, setShowCoatingPaths] = useState(DEFAULT_SETTINGS.showCoatingOrder);
+
+    // G-Code 설정 상태 추가
+    const [gcodeSettings, setGcodeSettings] = useState<CoatingSettings>(DEFAULT_SETTINGS.coatingSettings);
 
     // G-Code 스니펫 (useReducer)
     const [gcodeSnippets, dispatchSnippets] = useReducer(
@@ -159,13 +171,18 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         DEFAULT_SETTINGS.gcodeSnippets
     );
 
+    // G-Code 설정 업데이트 함수
+    const updateGcodeSettings = useCallback((patch: Partial<CoatingSettings>) => {
+        setGcodeSettings(prev => ({ ...prev, ...patch }));
+    }, []);
+
     // 최초 로드
     const loadedRef = useRef(false);
     useEffect(() => {
         let mounted = true;
         (async () => {
             try {
-                let s: SettingsType | null = null;
+                let s: SettingsType | null;
                 if (bridge) s = await bridge.load();
                 else {
                     const raw = localStorage.getItem("app.settings.v1");
@@ -175,10 +192,14 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
                 if (!mounted) return;
 
                 setGridVisible(!!settings.grid?.visible);
-                setGridSize(Number.isFinite(settings.grid?.size) ? settings.grid!.size : DEFAULT_SETTINGS.grid.size);
+                setPixelsPerMm(Number.isFinite(settings.grid?.pixelsPerMm) ? settings.grid!.pixelsPerMm : DEFAULT_SETTINGS.grid.pixelsPerMm);
                 setSnappingEnabled(!!settings.grid?.snapping);
-                setTheme((settings.theme as ThemeMode) ?? DEFAULT_SETTINGS.theme);
+                setTheme((settings.theme) ?? DEFAULT_SETTINGS.theme);
                 setWorkArea(settings.workArea ?? DEFAULT_SETTINGS.workArea);
+                setShowCoatingPaths(settings.showCoatingOrder ?? DEFAULT_SETTINGS.showCoatingOrder);
+
+                // G-Code 설정 로드
+                setGcodeSettings(settings.coatingSettings ?? DEFAULT_SETTINGS.coatingSettings);
 
                 dispatchSnippets({
                     type: "setAll",
@@ -221,19 +242,23 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
             workArea,
             grid: {
                 visible: isGridVisible,
-                size: gridSize,
+                pixelsPerMm: pixelsPerMm,
                 snapping: isSnappingEnabled,
             },
             theme,
+            showCoatingOrder: showCoatingPaths,
+            coatingSettings: gcodeSettings,
             gcodeSnippets,
         };
         scheduleSave(snapshot);
     }, [
         isGridVisible,
-        gridSize,
+        pixelsPerMm,
         isSnappingEnabled,
         theme,
         workArea,
+        showCoatingPaths,
+        gcodeSettings,
         gcodeSnippets,
         scheduleSave,
     ]);
@@ -264,6 +289,7 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         []
     );
 
+
     const removeGcodeSnippet = useCallback((id: string) => {
         dispatchSnippets({type: "remove", payload: {id}});
     }, []);
@@ -279,21 +305,28 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         []
     );
 
-    const value = useMemo<SettingsContextType>(
+    const value = useMemo(
         () => ({
             // 기존 설정
             isGridVisible,
             setGridVisible,
-            gridSize,
-            setGridSize,
+            pixelsPerMm,
+            setPixelsPerMm,
             isSnappingEnabled,
             setSnappingEnabled,
             theme,
             setTheme,
             workArea,
             setWorkArea,
+            showCoatingPaths,
+            setShowCoatingPaths,
 
-            // 스니펫
+            // G-Code 설정
+            gcodeSettings,
+            updateGcodeSettings,
+            setGcodeSettings,
+
+            // G-Code 스니펫
             gcodeSnippets,
             setAllGcodeSnippets,
             addGcodeSnippet,
@@ -304,10 +337,13 @@ export function SettingsProvider({children}: { children: React.ReactNode }) {
         }),
         [
             isGridVisible,
-            gridSize,
+            pixelsPerMm,
             isSnappingEnabled,
             theme,
             workArea,
+            showCoatingPaths,
+            gcodeSettings,
+            updateGcodeSettings,
             gcodeSnippets,
             setAllGcodeSnippets,
             addGcodeSnippet,

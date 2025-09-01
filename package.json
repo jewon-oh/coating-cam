@@ -64,6 +64,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "three": "^0.179.1",
+    "three-stdlib": "^2.36.0",
     "use-image": "^1.1.4",
     "write-file-atomic": "^6.0.0",
     "zeromq": "^6.5.0"
@@ -106,6 +107,7 @@
     "electron-builder": "^26.0.12",
     "eslint": "^9",
     "eslint-config-next": "15.3.4",
+    "redux-devtools-extension": "^2.13.9",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5",

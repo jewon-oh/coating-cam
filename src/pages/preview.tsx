@@ -8,10 +8,8 @@ import {ScrollArea} from '@/components/ui/scroll-area';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable';
 import {Slider} from '@/components/ui/slider';
 import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause} from 'lucide-react';
-// import {generateCoatingGCode} from '@/lib/coating-gcode-generator';
-// import {setGCode, setGenerating} from '@/store/slices/gcode-slice';
-import Preview3D, {PathPoint} from '@/components/3d-preview';
-// import {useSettings} from '@/contexts/settings-context';
+import Preview3D, {PathPoint} from '@/components/preview-3d/preview-3d';
+import {CustomShapeConfig} from "@/types/custom-konva-config";
 
 /**
  * G0/G1 라인에서 좌표 추출
@@ -60,13 +58,20 @@ function parseGCodeToPathData(gcodeText: string): PathPoint[] {
 export default function PreviewPage() {
     // const dispatch = useAppDispatch();
     const shapes = useAppSelector((state) => state.shapes.shapes);
-    const {gcode,  isGenerating, lastGenerated} = useAppSelector((state) => state.gcode);
+    const {gcode,  lastGenerated} = useAppSelector((state) => state.gcode);
     // const {workArea} = useSettings();
 
     // G-code를 파싱하여 경로 데이터 생성
     const localPathData = useMemo(() => parseGCodeToPathData(gcode || ''), [gcode]);
     const maxStep = Math.max(0, localPathData.length - 1);
     const [step, setStep] = useState<number>(0);
+
+    // G-code가 로드되면 마지막 스텝으로 초기화
+    useEffect(() => {
+        if (maxStep > 0) {
+            setStep(maxStep);
+        }
+    }, [maxStep]);
 
     // 애니메이션 상태
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -79,6 +84,13 @@ export default function PreviewPage() {
     // 3D 툴헤드 포즈
     const [toolheadPos, setToolheadPos] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0]);
 
+    // 이미지 shapes만 필터링
+    const imageShapes = useMemo(() =>
+            shapes.filter((shape): shape is Extract<CustomShapeConfig, { type: 'image' }> =>
+                shape.type === 'image'
+            ),
+        [shapes]
+    );
 
     // 슬라이더 변경 시 툴헤드 위치 반영
     useEffect(() => {
@@ -109,56 +121,6 @@ export default function PreviewPage() {
         };
     }, []);
 
-    // G-code 재생성 함수
-    // const handleRegenerateGCode = useCallback(async () => {
-    //     if (shapes.length === 0) {
-    //         alert('도형이 없습니다. 캔버스에서 도형을 생성하세요.');
-    //         return;
-    //     }
-    //
-    //     dispatch(setGenerating(true));
-    //     try {
-    //         const generatedGCode = await generateCoatingGCode(shapes, {
-    //             ...settings,
-    //             workArea: workArea
-    //         });
-    //
-    //         // G-code 생성 후 Redux에 저장
-    //         const pathForRedux = generatedGCode.split('\n').map(line => {
-    //             if (line.startsWith('G0') || line.startsWith('G1')) {
-    //                 const x = line.match(/X([+-]?\d*\.?\d+)/);
-    //                 const y = line.match(/Y([+-]?\d*\.?\d+)/);
-    //                 const z = line.match(/Z([+-]?\d*\.?\d+)/);
-    //                 return [
-    //                     x ? parseFloat(x[1]) : 0,
-    //                     y ? parseFloat(y[1]) : 0,
-    //                     z ? parseFloat(z[1]) : 0
-    //                 ];
-    //             }
-    //             return null;
-    //         }).filter(p => p !== null) as number[][];
-    //
-    //         dispatch(setGCode({gcode: generatedGCode, path: pathForRedux}));
-    //
-    //         // 첫 번째 위치로 툴헤드 설정
-    //         setStep(0);
-    //         if (localPathData.length > 0) {
-    //             const { pos: [x, y, z] } = localPathData[0];
-    //             setToolheadPos([x, y, z, 0, 0, 0, 0, 0]);
-    //         }
-    //     } catch (error) {
-    //         console.error('G-code 생성 실패:', error);
-    //         alert('G-code 재생성에 실패했습니다.');
-    //     } finally {
-    //         dispatch(setGenerating(false));
-    //     }
-    // });
-    // 컴포넌트 마운트 시 G-code가 없으면 자동 생성
-    // useEffect(() => {
-    //     if (!gcode && shapes.length > 0 && !isGenerating) {
-    //         handleRegenerateGCode();
-    //     }
-    // }, [shapes, gcode, isGenerating, handleRegenerateGCode]);
 
     // G-code 다운로드 함수
     const handleDownloadGCode = () => {
@@ -180,23 +142,29 @@ export default function PreviewPage() {
         if (localPathData.length === 0) return;
 
         if (isPlaying) {
-            // 애니메이션 정지
+            // 애니메이션 일시정지
             setIsPlaying(false);
             if (animationRef.current) {
                 clearInterval(animationRef.current);
                 animationRef.current = null;
             }
         } else {
-            // 애니메이션 시작
+            // 애니메이션 시작 또는 재개
             setIsPlaying(true);
             let currentStep = step;
+
+            // 만약 애니메이션이 끝에 도달했다면 처음부터 다시 시작
+            if (currentStep >= maxStep) {
+                currentStep = 0;
+                setStep(0);
+            }
 
             animationRef.current = setInterval(() => {
                 currentStep++;
                 if (currentStep <= maxStep) {
                     setStep(currentStep);
                 } else {
-                    // 애니메이션 완료
+                    // 애니메이션 완료되면 정지
                     setIsPlaying(false);
                     if (animationRef.current) {
                         clearInterval(animationRef.current);
@@ -302,12 +270,12 @@ export default function PreviewPage() {
                 <Card className="w-96">
                     <CardContent className="text-center p-8">
                         <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4"/>
-                        <h3 className="text-xl font-semibold mb-2">G-code가 없습니다</h3>
+                        <h3 className="text-xl font-semibold mb-2">G-Code가 없습니다</h3>
                         <p className="text-muted-foreground mb-4">
-                            캔버스에서 도형을 생성하고 G-code를 생성하세요.
+                            캔버스에서 도형을 생성하고 G-Code를 생성하세요.
                         </p>
                         <Button onClick={() => window.history.back()}>
-                            캔버스로 돌아가기
+                            작업 공간으로 돌아가기
                         </Button>
                     </CardContent>
                 </Card>
@@ -361,15 +329,6 @@ export default function PreviewPage() {
                                 <CardTitle className="text-base">제어</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
-                                {/*<Button*/}
-                                {/*    onClick={handleRegenerateGCode}*/}
-                                {/*    disabled={isGenerating}*/}
-                                {/*    className="w-full"*/}
-                                {/*    variant="outline"*/}
-                                {/*>*/}
-                                {/*    <RefreshCw className="w-4 h-4 mr-2"/>*/}
-                                {/*    {isGenerating ? '생성 중...' : 'G-code 재생성'}*/}
-                                {/*</Button>*/}
                                 <Button
                                     onClick={handlePlayAnimation}
                                     disabled={!gcode || localPathData.length === 0}
@@ -399,7 +358,7 @@ export default function PreviewPage() {
                                 </Button>
                                 <Button
                                     onClick={handleDownloadGCode}
-                                    disabled={!gcode || isGenerating}
+                                    disabled={!gcode }
                                     className="w-full"
                                 >
                                     <Download className="w-4 h-4 mr-2"/>
@@ -460,6 +419,7 @@ export default function PreviewPage() {
                                         toolheadPos={toolheadPos}
                                         pathData={localPathData}                 // 전체 경로 그대로 전달
                                         activeCount={Math.min(step + 1, localPathData.length)} // 진행 개수만 전달
+                                        imageShapes={imageShapes} // 여러 이미지 전달
                                     />
                                 ) : (
                                     <div className="h-full flex items-center justify-center text-muted-foreground">

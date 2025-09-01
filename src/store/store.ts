@@ -1,14 +1,16 @@
 // src/store/store.ts
-import { configureStore } from '@reduxjs/toolkit';
-import shapesReducer from './slices/shapes-slice';
-import historyReducer from './slices/history-slice';
+import {configureStore} from '@reduxjs/toolkit';
+import shapesReducer from './slices/shape-slice';
+import historyReducer from './slices/shape-history-slice';
 import toolReducer from './slices/tool-slice';
 import gcodeReducer from './slices/gcode-slice';
+import {historySyncListener} from '@/store/middleware/history-sync-listener';
 
+// reducer 키를 프로젝트 전반의 selector와 일치시키기
 export const store = configureStore({
     reducer: {
-        shapes: shapesReducer,
-        history: historyReducer,
+        shapes: shapesReducer,          // state.shapes
+        history: historyReducer,        // state.history (shape 히스토리)
         tool: toolReducer,
         gcode: gcodeReducer,
     },
@@ -19,7 +21,9 @@ export const store = configureStore({
                 ignoredActions: ['shapes/addShape', 'shapes/updateShape'],
                 ignoredPaths: ['shapes.shapes.image'],
             },
-        }),
+        })
+        .prepend(historySyncListener.middleware),
+
     devTools: process.env.NODE_ENV !== 'production',
 });
 

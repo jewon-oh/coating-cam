@@ -1,22 +1,24 @@
 import type { GCodeSnippet} from "@/types/gcode";
+import {CoatingSettings,DEFAULT_COATING_SETTINGS} from "@/types/coating";
 import {nanoid} from "nanoid";
-
-// ---- Settings 파일 스키마(메인과 대응) + 브리지 ----
-export type ThemeMode = "light" | "dark" | "system";
 
 export type SettingsType = {
     version: number;
     workArea: { width: number; height: number };
-    grid: { visible: boolean; size: number; snapping: boolean };
-    theme: ThemeMode;
+    grid: { visible: boolean; pixelsPerMm: number; snapping: boolean };
+    theme: "light" | "dark" | "system";
+    coatingSettings: CoatingSettings;
     gcodeSnippets: GCodeSnippet[];
+    showCoatingOrder?: boolean;
 };
 
 export const DEFAULT_SETTINGS: SettingsType = {
     version: 1,
     workArea: {width: 1000, height: 1000},
-    grid: {visible: true, size: 10, snapping: true},
+    grid: {visible: true, pixelsPerMm: 10, snapping: true},
     theme: "light",
+    showCoatingOrder: false,
+    coatingSettings: DEFAULT_COATING_SETTINGS,
     gcodeSnippets: [
         {
             id: nanoid(),

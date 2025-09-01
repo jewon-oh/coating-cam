@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
-import { useAppDispatch } from '@/hooks/redux';
-import { addShapeToBack } from '@/store/slices/shapes-slice';
+import {useAppDispatch, useAppSelector} from '@/hooks/redux';
+import { addShapeToBack } from '@/store/slices/shape-slice';
 import { setTool } from '@/store/slices/tool-slice';
+import {setPresent} from "@/store/slices/shape-history-slice";
 
 type Size = { width: number; height: number };
 
@@ -183,6 +184,7 @@ async function optimizeImageFile(file: File, opts?: {
 
 export const useInsertImage = () => {
     const dispatch = useAppDispatch();
+    const currentShapes = useAppSelector((state) => state.shapes.shapes);
 
     const handleImageInsert = useCallback(() => {
         const input = document.createElement('input');
@@ -201,9 +203,12 @@ export const useInsertImage = () => {
                     quality: 0.85,   // 압축 품질
                 });
 
-                // 최적화된 dataURL을 저장하고, 디스플레이는 적당한 크기
-                dispatch(addShapeToBack({
-                    type: 'image',
+                // 새 이미지 도형 생성
+                const newImageShape = {
+                    id: crypto.randomUUID(),
+                    parentId: null,
+                    type: 'image' as const,
+                    name: '이미지',
                     x: 150,
                     y: 50,
                     width: displaySize.width,
@@ -212,7 +217,20 @@ export const useInsertImage = () => {
                     scaleX: 1,
                     scaleY: 1,
                     imageDataUrl: dataUrl,
-                }));
+                    isFlipped: false, // 👈 "아직 뒤집히지 않음" 플래그 추가
+                    visible: true,
+                    isLocked: false,
+                    coatingType: 'fill',
+                };
+
+                // 도형 추가
+                dispatch(addShapeToBack(newImageShape));
+
+                // 히스토리에 현재 상태 저장 (이미지 추가 전)
+                dispatch(setPresent(currentShapes));
+                // 이미지 추가 후 히스토리 기록 (새로운 상태로)
+                const next = [newImageShape, ...currentShapes];
+                dispatch(setPresent(next));
 
                 dispatch(setTool('select'));
             } catch (err) {

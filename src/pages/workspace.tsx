@@ -1,169 +1,288 @@
-// Next.js의 클라이언트 컴포넌트로 지정.
-// 이 컴포넌트 내에서는 브라우저 API(window, localStorage 등)를 안전하게 사용할 수 있습니다.
 "use client";
 
-// Next.js의 동적 임포트를 위한 함수
 import dynamic from "next/dynamic";
-// 애플리케이션 상태 관리를 위한 캔버스 컨텍스트
-import { CanvasProvider, useCanvas } from "@/contexts/canvas-context";
-// UI 컴포넌트들
-import { ObjectPanel } from "@/components/workspace/object-panel";
-import { GCodeSettingsDialog } from "@/components/gcode/gcode-settings-dialog";
-import { Toolbar } from "@/components/tool/toolbar";
-import React, { useEffect, useState } from "react";
-import { WorkspaceOverlays } from "@/components/workspace/workspace-overlays";
+import {CanvasProvider} from "@/contexts/canvas-context";
+import {ObjectPanel} from "@/components/object-panel/object-panel";
+import {Toolbar} from "@/components/tool/toolbar";
+import React, {useCallback, useState} from "react";
+import {WorkspaceOverlays} from "@/components/workspace/workspace-overlays";
+import ToolContextPanel from "@/components/workspace/tool-context-panel";
+import {useProjectAutoLoad} from "@/hooks/project/use-project-autoload";
+import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from "@/components/ui/resizable";
+import {PropertyPanel} from "@/components/workspace/property-panel";
+import {useAppDispatch, useAppSelector} from "@/hooks/redux";
+import {useRouter} from "next/navigation";
+import {toast} from "sonner";
+import {useSettings} from "@/contexts/settings-context";
+import {GCodeGenerationDialog} from "@/components/gcode/gcode-generation-dialog";
+import {setGCode} from "@/store/slices/gcode-slice";
+import {generateGcode} from "@/lib/gcode/generate-gcode";
 
-// Redux 액션 및 훅
-import { resetHistory } from "@/store/slices/history-slice";
-import { setAllShapes } from "@/store/slices/shapes-slice";
-import { useAppDispatch } from "@/hooks/redux";
-import { useRouter } from "next/router";
-import { ProjectFileType } from "@/types/project";
-import { updateGcodeSettings } from "@/store/slices/gcode-slice";
-
-// SSR(서버 사이드 렌더링) 비활성화
-// Konva.js와 같은 캔버스 라이브러리는 브라우저 환경에 의존하므로,
-// 서버에서 렌더링되지 않도록 동적으로 임포트합니다.
-const DynamicCanvasStage = dynamic(() => import('@/components/workspace/canvas-stage'), {
+const DynamicCanvasStage = dynamic(() => import('@/components/workspace/workspace-canvas'), {
     ssr: false,
 });
 
-/**
- * 프로젝트 로드 로직을 포함하는 내부 컴포넌트
- * 이 컴포넌트는 CanvasProvider의 컨텍스트에 접근해야 하므로,
- * CanvasProvider 내부에 위치해야 합니다.
- */
 const WorkspaceContent = () => {
-    // G-Code 설정 다이얼로그의 열림/닫힘 상태 관리
-    const [isGCodeDialogOpen, setGCodeDialogOpen] = useState(false);
-    // CanvasProvider 컨텍스트에서 상태 및 함수를 가져옵니다.
-    const { canvasContainerRef, setIsLoading, setLoadingMessage } = useCanvas();
-
     const router = useRouter();
     const dispatch = useAppDispatch();
+    const shapes = useAppSelector((state) => state.shapes.shapes);
+    const { gcodeSettings,workArea,gcodeSnippets } = useSettings();
+    useProjectAutoLoad();
 
-    /**
-     * 프로젝트 로드 효과 훅
-     * 페이지가 로드될 때(router.isReady가 true일 때) 프로젝트 파일을 로드합니다.
-     * 로드 우선순위: Electron IPC (filePath) → sessionStorage → URL 쿼리 (content)
-     */
-    useEffect(() => {
-        // 프로젝트 로드 로직을 비동기 함수로 정의
-        const loadProject = async () => {
-            try {
-                setIsLoading(true);
-                setLoadingMessage('프로젝트 로딩 중...');
+    const selectedShapeIds = useAppSelector((state) => state.shapes.selectedShapeIds);
+    const currentTool = useAppSelector((state) => state.tool.tool);
 
-                let jsonText: string | null = null;
+    const hasSelectedShapes = selectedShapeIds.length > 0;
+    const isDrawingTool = currentTool !== 'select';
 
-                // 1) Electron 환경: URL 쿼리 'filePath'를 통한 파일 로드
-                // Electron의 IPC API가 존재하는지 확인하고, 파일 경로를 통해 파일을 읽습니다.
-                const filePath = typeof router.query.filePath === "string" ? router.query.filePath : undefined;
-                const projectApi = (window as any).projectApi;
-                if (filePath && projectApi) {
-                    jsonText = await projectApi.readFile(filePath, "utf8");
-                }
+    // G-Code 생성 상태
+    const [generationState, setGenerationState] = useState({
+        isOpen: false,
+        progress: 0,
+        status: 'generating' as 'generating' | 'completed' | 'error',
+        currentStep: '',
+        error: ''
+    });
 
-                // 2) 웹 환경: sessionStorage 'pendingProject' 확인
-                // Electron이 아닌 웹 환경에서 파일 드래그앤드롭 등으로 저장된 임시 프로젝트를 로드합니다.
-                if (!jsonText) {
-                    const pending = sessionStorage.getItem("pendingProject");
-                    if (pending) {
-                        jsonText = pending;
-                        sessionStorage.removeItem("pendingProject");
-                    }
-                }
+    // G-code를 경로 데이터로 파싱하는 함수
+    const parseGCodeToPath = (gcodeText: string): number[][] => {
+        const lines = gcodeText.split('\n');
+        const path: number[][] = [];
+        let currentX = 0;
+        let currentY = 0;
+        let currentZ = 5; // 안전 높이
 
-                // 3) 하위호환성: ?content= URL 쿼리 파라미터로 내용 로드
-                // Base64 인코딩된 프로젝트 내용을 디코딩하여 사용합니다.
-                if (!jsonText && typeof router.query.content === "string") {
-                    try {
-                        jsonText = decodeURIComponent(atob(router.query.content));
-                    } catch (e) {
-                        console.warn("Failed to decode content query:", e);
-                    }
-                }
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('G')) continue;
 
-                // 로드할 내용이 없으면 로딩 상태를 초기화하고 함수를 종료합니다.
-                if (!jsonText) {
-                    setLoadingMessage('로딩 중...');
-                    setIsLoading(false);
-                    return;
-                }
+            // G0, G1 명령 파싱
+            if (trimmed.startsWith('G0') || trimmed.startsWith('G1')) {
+                const xMatch = trimmed.match(/X([+-]?\d*\.?\d+)/);
+                const yMatch = trimmed.match(/Y([+-]?\d*\.?\d+)/);
+                const zMatch = trimmed.match(/Z([+-]?\d*\.?\d+)/);
 
-                // 프로젝트 JSON을 파싱하고 Redux 상태에 반영
-                const parsed: ProjectFileType = JSON.parse(jsonText).payload;
-                const { version: parsedVersion, shapes: parsedShapes, gcodeSettings: parsedGcodeSettings } = parsed;
+                if (xMatch) currentX = parseFloat(xMatch[1]);
+                if (yMatch) currentY = parseFloat(yMatch[1]);
+                if (zMatch) currentZ = parseFloat(zMatch[1]);
 
-                console.log(`[Project Load] Project file version: ${parsedVersion}`);
-                // 도형(shapes)과 G-Code 설정을 Redux 스토어에 디스패치
-                dispatch(setAllShapes(parsedShapes));
-                dispatch(updateGcodeSettings(parsedGcodeSettings));
-                // 히스토리(undo/redo)를 초기화하여 새 프로젝트로 시작
-                dispatch(resetHistory(parsedShapes));
-
-                // 로딩 완료 메시지를 잠깐 표시한 후 상태를 초기화합니다.
-                setLoadingMessage('완료!');
-                setTimeout(() => {
-                    setIsLoading(false);
-                    setLoadingMessage('로딩 중...');
-                }, 500);
-            } catch (e) {
-                // 프로젝트 로딩 중 오류 발생 시, 에러를 로깅하고 사용자에게 알립니다.
-                console.error("Failed to load project:", e);
-                setLoadingMessage('로딩 실패');
-                setTimeout(() => {
-                    setIsLoading(false);
-                    setLoadingMessage('로딩 중...');
-                }, 800);
+                // 경로에 점 추가
+                path.push([ currentX, currentY, currentZ]);
             }
-        };
-
-        // Next.js 라우터가 준비된 상태에서만 프로젝트 로드를 시작합니다.
-        if (router.isReady) {
-            void loadProject();
         }
-    }, [router.isReady, router.query, dispatch, setIsLoading, setLoadingMessage]);
 
-    // UI 레이아웃
+        return path;
+    };
+
+    // G-Code 생성 함수
+    const handleGenerateGCode = useCallback(async () => {
+        try {
+            if (shapes.length === 0) {
+                toast.error("G-Code를 생성할 도형이 없습니다.");
+                return;
+            }
+
+            setGenerationState({
+                isOpen: true,
+                progress: 0,
+                status: 'generating',
+                currentStep: '준비 중...',
+                error: ''
+            });
+
+            // 경로/영역 기반 진행률을 전체 진행률로 매핑하는 헬퍼
+            const mapProgress = (
+                rawPercent: number,
+                message: string,
+                totals: { pathIndex?: number; pathTotal?: number; areaIndex?: number; areaTotal?: number }
+            ) => {
+                // 전체 파이프라인 가중치 설정
+                // 0-5%: 초기화/분석, 5-95%: 경로 생성(모든 경로 총합), 95-100%: 파싱/마무리
+                const START_INIT = 0;
+                const END_INIT = 5;
+                const START_PATHS = 5;
+                const END_PATHS = 95;
+
+                const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+
+                const pIdx = totals.pathIndex ?? 0;
+                const pTot = totals.pathTotal ?? 0;
+                const aIdx = totals.areaIndex ?? 0;
+                const aTot = totals.areaTotal ?? 0;
+
+                if (pTot > 0) {
+                    // 각 경로 구간의 전체 진행률 폭
+                    const perPathSpan = (END_PATHS - START_PATHS) / pTot;
+                    // 현재 경로의 시작/끝
+                    const pathStart = START_PATHS + (pIdx - 1) * perPathSpan;
+                    const pathEnd = pathStart + perPathSpan;
+
+                    // 메시지가 영역 i/n 이면 영역 비율로, 아니면 rawPercent(0-100)를 경로 구간으로 매핑
+                    let withinPathRatio: number;
+                    const areaMatch = /영역\s+(\d+)\s*\/\s*(\d+)/.exec(message);
+                    if (areaMatch) {
+                        const ai = Number(areaMatch[1]);
+                        const at = Number(areaMatch[2]);
+                        withinPathRatio = at > 0 ? ai / at : rawPercent / 100;
+                    } else {
+                        withinPathRatio = rawPercent / 100;
+                    }
+
+                    const overall = pathStart + (pathEnd - pathStart) * withinPathRatio;
+                    return clamp(overall, START_PATHS, END_PATHS);
+                }
+
+                // 경로 총수가 없으면 초기화/기타 단계로 간주: INIT 구간에서만 움직이게 (rawPercent 사용)
+                return clamp(START_INIT + (END_INIT - START_INIT) * (rawPercent / 100), START_INIT, END_INIT);
+            };
+
+            // 진행률 계산에 사용할 현재 경로/총 경로 수 추적
+            let currentPathIndex = 0;
+            let totalPaths = 0;
+
+            const onProgress = (raw: number, message: string) => {
+                // 경로 i/n 패턴 파싱
+                const pathMatch = /(\d+)\s*\/\s*(\d+)\s*경로\s*계산\s*중/.exec(message);
+                if (pathMatch) {
+                    currentPathIndex = Number(pathMatch[1]);
+                    totalPaths = Number(pathMatch[2]);
+                }
+
+                // 영역 i/n 패턴도 매핑 시 사용됨
+                const areaMatch = /영역\s+(\d+)\s*\/\s*(\d+)/.exec(message);
+                const areaIndex = areaMatch ? Number(areaMatch[1]) : undefined;
+                const areaTotal = areaMatch ? Number(areaMatch[2]) : undefined;
+
+                const overall = mapProgress(raw, message, {
+                    pathIndex: currentPathIndex || undefined,
+                    pathTotal: totalPaths || undefined,
+                    areaIndex,
+                    areaTotal
+                });
+
+                setGenerationState(prev => ({
+                    ...prev,
+                    progress: Math.min(Math.max(overall, prev.progress), 99.9), // 후반 95~100 구간 위해 상한 99.9
+                    currentStep: message
+                }));
+                console.log(`Progress: ${overall.toFixed(1)}% - ${message}`);
+            };
+
+            // 시작 표기
+            setGenerationState(prev => ({
+                ...prev,
+                progress: 1,
+                currentStep: 'G-code 생성 시작...'
+            }));
+
+            const gcode = await generateGcode(
+                shapes,
+                gcodeSettings,
+                workArea,
+                gcodeSnippets,
+                onProgress
+            );
+
+            // 파싱/마무리 단계(95~100%)
+            setGenerationState(prev => ({
+                ...prev,
+                progress: Math.max(prev.progress, 95),
+                currentStep: 'G-code 파싱 중...'
+            }));
+
+            const path = parseGCodeToPath(gcode);
+            dispatch(setGCode({ gcode, path }));
+
+            // 완료 및 카운트다운(100% 고정)
+            for (let sec = 3; sec > 0; sec--) {
+                setGenerationState(prev => ({
+                    ...prev,
+                    progress: 100,
+                    status: 'completed',
+                    currentStep: `${sec}초 후 미리보기로 이동합니다...`
+                }));
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            router.push('/preview');
+        } catch (error) {
+            console.error('G-Code 생성 실패:', error);
+            setGenerationState(prev => ({
+                ...prev,
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error occurred'
+            }));
+        }
+    }, [shapes, gcodeSettings, workArea, gcodeSnippets, dispatch, router]);
+
+
+    // 미리보기로 이동
+    const handleViewPreview = useCallback(() => {
+        setGenerationState(prev => ({ ...prev, isOpen: false }));
+        router.push('/preview');
+    }, [router]);
+
+    // 모달 닫기
+    const handleCloseModal = useCallback(() => {
+        if (generationState.status !== 'generating') {
+            setGenerationState(prev => ({ ...prev, isOpen: false }));
+        }
+    }, [generationState.status]);
+
+    // 좌측 패널 렌더링 로직
+    const renderLeftPanel = () => {
+        if (isDrawingTool) {
+            return <ToolContextPanel />;
+        }
+
+        if (hasSelectedShapes) {
+            return <PropertyPanel />;
+        }
+
+        return <ToolContextPanel />;
+    };
+
     return (
         <div className="h-full w-full flex flex-col bg-background text-foreground relative">
-            {/* 상단 툴바 컴포넌트 */}
-            <Toolbar onGenerateGCode={() => setGCodeDialogOpen(true)} />
+            <Toolbar onGenerateGCode={handleGenerateGCode} />
 
             <div className="flex flex-1 overflow-hidden relative">
-                {/* 좌측 객체 목록 패널 */}
-                <ObjectPanel />
+                <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+                    <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+                        {renderLeftPanel()}
+                    </ResizablePanel>
 
-                {/* 메인 캔버스 영역 */}
-                <div className="flex-1 flex flex-col p-5 relative">
-                    <div
-                        className="flex-1 w-full h-full bg-muted/30 rounded-lg border relative overflow-hidden"
-                    >
-                        {/* 캔버스 Stage 컴포넌트 */}
-                        {/*<div className="absolute inset-0">*/}
+                    <ResizableHandle withHandle/>
+
+                    <ResizablePanel defaultSize={60} minSize={40}>
+                        <div className="relative h-full w-full overflow-hidden bg-muted/20">
                             <DynamicCanvasStage />
-                        {/*</div>*/}
+                            <WorkspaceOverlays />
+                        </div>
+                    </ResizablePanel>
 
-                        {/* UI 오버레이 (마우스 커서, 그리드 등) */}
-                        <WorkspaceOverlays />
-                    </div>
-                </div>
+                    <ResizableHandle withHandle/>
+
+                    <ResizablePanel defaultSize={20} minSize={10} maxSize={30}>
+                        <ObjectPanel/>
+                    </ResizablePanel>
+                </ResizablePanelGroup>
             </div>
 
-            {/* G-Code 설정 다이얼로그 (열림/닫힘 상태에 따라 렌더링) */}
-            <GCodeSettingsDialog
-                isOpen={isGCodeDialogOpen}
-                onClose={() => setGCodeDialogOpen(false)}
+            {/* G-Code 생성 진행률 모달 */}
+            <GCodeGenerationDialog
+                isOpen={generationState.isOpen}
+                onClose={handleCloseModal}
+                progress={generationState.progress}
+                status={generationState.status}
+                currentStep={generationState.currentStep}
+                error={generationState.error}
+                onViewPreview={handleViewPreview}
             />
         </div>
     );
 };
 
-/**
- * 워크스페이스 페이지의 메인 컴포넌트
- * CanvasProvider로 WorkspaceContent를 감싸서 컨텍스트를 제공합니다.
- */
 export default function WorkspacePage() {
     return (
         <CanvasProvider>

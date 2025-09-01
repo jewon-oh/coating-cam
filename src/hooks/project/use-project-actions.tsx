@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useAppSelector } from '@/hooks/redux';
 import {toast} from "sonner";
 import {ProjectFileType} from "@/types/project";
+import {useSettings} from "@/contexts/settings-context";
 
 type RecentFile = {
     name: string;
@@ -38,13 +39,13 @@ function addRecentFile(file: RecentFile) {
 
 export function useProjectActions() {
     const shapes = useAppSelector((s) => s.shapes.shapes);
-    const {gcodeSettings} = useAppSelector(s => s.gcode);
+    const {gcodeSettings} = useSettings();
 
     const handleSaveProject = useCallback(async () => {
         const payload:ProjectFileType = {
             version: 1,
             shapes,
-            gcodeSettings
+            coatingSettings: gcodeSettings
         };
 
         const projectJson = JSON.stringify({ payload }, null, 2);
