@@ -192,12 +192,17 @@ export class PathCalculator {
         const pattern = this.getFillPattern(boundary);
         const bounds = this.getBounds(boundary);
 
-        if (!bounds) return [];
+        if (!bounds || lineSpacing <= 0) return [];
+
+        // Concentric 패턴 처리
+        if (pattern === 'concentric') {
+            return this.calculateConcentricFillSegments(boundary, lineSpacing);
+        }
 
         // Auto 패턴 단순화: 마스킹 유무에 따른 간단한 분기
         const effectivePattern = pattern === 'auto' ?
             await this.determineSimpleOptimalPattern(boundary, bounds) :
-            pattern;
+            pattern; // 이 시점에서 'horizontal' 또는 'vertical'
 
         return this.generateStreamingFillSegments(boundary, bounds, effectivePattern, lineSpacing);
     }
@@ -276,6 +281,66 @@ export class PathCalculator {
             await this.generateVerticalLines(boundary, bounds, lineSpacing, coatingWidth, segments);
         }
 
+        return segments;
+    }
+
+    /**
+     * Concentric Fill 세그먼트 계산
+     */
+    private calculateConcentricFillSegments(
+        boundary: CustomShapeConfig,
+        lineSpacing: number
+    ): { start: Point; end: Point }[] {
+        const segments: { start: Point; end: Point }[] = [];
+        const coatingWidth = this.getCoatingWidth(boundary);
+
+        if (boundary.type === 'rectangle' || boundary.type === 'image') {
+            const x = boundary.x ?? 0;
+            const y = boundary.y ?? 0;
+            const width = boundary.width ?? 0;
+            const height = boundary.height ?? 0;
+
+            // 코팅 폭보다 작은 도형은 처리하지 않음
+            if (width <= coatingWidth || height <= coatingWidth) return [];
+
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
+            const aspect = height / width;
+
+            // 첫 경로는 코팅 폭의 절반만큼 안쪽으로 이동하여 시작
+            let currentWidth = width - coatingWidth;
+            let currentHeight = height - coatingWidth;
+
+            while (currentWidth > 0 && currentHeight > 0) {
+                const rectX = centerX - currentWidth / 2;
+                const rectY = centerY - currentHeight / 2;
+
+                // 현재 사각형의 세그먼트 추가 (하나의 닫힌 경로)
+                segments.push(
+                    { start: { x: rectX, y: rectY }, end: { x: rectX + currentWidth, y: rectY } },
+                    { start: { x: rectX + currentWidth, y: rectY }, end: { x: rectX + currentWidth, y: rectY + currentHeight } },
+                    { start: { x: rectX + currentWidth, y: rectY + currentHeight }, end: { x: rectX, y: rectY + currentHeight } },
+                    { start: { x: rectX, y: rectY + currentHeight }, end: { x: rectX, y: rectY } }
+                );
+
+                // 다음 경로는 lineSpacing 만큼 안쪽으로 이동
+                currentWidth -= lineSpacing * 2;
+                currentHeight -= lineSpacing * 2 * aspect;
+            }
+        } else if (boundary.type === 'circle') {
+            const centerX = boundary.x ?? 0;
+            const centerY = boundary.y ?? 0;
+            // 첫 경로는 코팅 폭의 절반만큼 안쪽으로 이동하여 시작
+            let currentRadius = (boundary.radius ?? 0) - (coatingWidth / 2);
+            // G-code 정밀도를 위해 원본 반지름 기준으로 세그먼트 수 계산
+            const numSegments = Math.max(32, Math.floor((boundary.radius ?? 0) * 2));
+
+            while (currentRadius > 0) {
+                this.addCircleSegments(segments, centerX, centerY, currentRadius, numSegments);
+                // 다음 경로는 lineSpacing 만큼 안쪽으로 이동
+                currentRadius -= lineSpacing;
+            }
+        }
         return segments;
     }
 
@@ -378,7 +443,7 @@ export class PathCalculator {
         return shape.lineSpacing ?? this.settings.lineSpacing;
     }
 
-    private getFillPattern(shape: CustomShapeConfig): 'horizontal' | 'vertical' | 'auto' {
+    private getFillPattern(shape: CustomShapeConfig): 'horizontal' | 'vertical' | 'auto' | 'concentric' {
         return shape.fillPattern ?? this.settings.fillPattern;
     }
 

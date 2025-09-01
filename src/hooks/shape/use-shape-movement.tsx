@@ -26,6 +26,7 @@ export function useShapeMovement() {
     );
 
     const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
+        console.log('handleDragStart');
         dispatch(setDragging(true));
         const node = e.target;
         const nodeId = node.id();
@@ -44,6 +45,7 @@ export function useShapeMovement() {
     }, [dispatch, selectedShapeIds]);
 
     const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
+        console.log('handleDragMove');
         const node = e.target as Konva.Node & {
             x: () => number;
             y: () => number;
@@ -58,6 +60,7 @@ export function useShapeMovement() {
     }, [snap]);
 
     const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
+        console.log('handleDragEnd');
         dispatch(setDragging(false));
         dispatch(setDraggingShapeIds([])); // 드래그 종료 시 ID 목록 초기화
 

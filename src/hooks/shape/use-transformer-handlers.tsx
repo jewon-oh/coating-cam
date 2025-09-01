@@ -6,6 +6,7 @@ import { setPresent } from '@/store/slices/shape-history-slice';
 import type { CustomShapeConfig } from '@/types/custom-konva-config';
 import { useSettings } from '@/contexts/settings-context';
 import { useShapeSnapping } from './use-shape-snapping';
+import {createCoatingPatternCanvas} from "@/lib/shape-create-utils";
 
 /**
  * Transformer(크기 조절/회전)과 관련된 상태와 핸들러를 캡슐화한 훅
@@ -16,7 +17,7 @@ export function useTransformerHandlers(
     const dispatch = useAppDispatch();
     const shapes = useAppSelector((s) => s.shapes.shapes);
     const { isSnappingEnabled } = useSettings();
-    const { snapToGrid, snapPointToGrid, snapShapeSize, snapCircleRadius } = useShapeSnapping();
+    const { snapCircleRadius, snapShapeSize } = useShapeSnapping();
 
     // 외부에서도 재사용할 수 있도록 이미지 캐시 노출
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -86,113 +87,211 @@ export function useTransformerHandlers(
         const nodes = transformerRef.current?.nodes() || [];
         if (nodes.length === 0) return;
 
-        const node = nodes[0];
+        const node = nodes[0] as Konva.Shape & {};
         const shape = shapes.find(s => s.id === node.id());
-        if (!shape) return;
-
-        // Line 도형 특별 처리
-        if (shape.type === 'line') {
-            // ... (기존 라인 로직 유지)
+        if (!shape || shape.type === 'line') {
             return;
         }
 
-        // 채우기 도형의 실시간 스냅 적용
-        if (shape.coatingType === 'fill' && isSnappingEnabled && shape.fillPattern) {
-            const anchor = transformerRef.current?.getActiveAnchor();
-            if (!anchor?.includes('rotator')) {
-                const currentX = node.x();
-                const currentY = node.y();
+        if (shape.coatingType === 'fill' && shape.lineSpacing && shape.lineSpacing > 0) {
+            const oldScaleX = node.scaleX();
+            const oldScaleY = node.scaleY();
 
-                // 스냅된 위치 적용
-                const snappedPos = snapPointToGrid({ x: currentX, y: currentY });
-                if (Math.abs(snappedPos.x - currentX) > 0.1) node.x(snappedPos.x);
-                if (Math.abs(snappedPos.y - currentY) > 0.1) node.y(snappedPos.y);
+            if (shape.type === 'rectangle') {
+                const currentWidth = node.width() * Math.abs(oldScaleX);
+                const currentHeight = node.height() * Math.abs(oldScaleY);
 
-                if (shape.type === 'rectangle') {
-                    const currentWidth = node.width() * Math.abs(node.scaleX());
-                    const currentHeight = node.height() * Math.abs(node.scaleY());
-                    const { width: snappedWidth, height: snappedHeight } = snapShapeSize(
-                        { width: currentWidth, height: currentHeight },
-                        shape
+                const { width: snappedWidth, height: snappedHeight } = snapShapeSize(
+                    { width: currentWidth, height: currentHeight },
+                    shape
+                );
+
+                const newScaleX = node.width() > 0 ? snappedWidth / node.width() : 0;
+                const newScaleY = node.height() > 0 ? snappedHeight / node.height() : 0;
+
+                node.scaleX(Math.sign(oldScaleX) * newScaleX);
+                node.scaleY(Math.sign(oldScaleY) * newScaleY);
+
+            } else if (shape.type === 'circle' && shape.radius && shape.radius > 0) {
+                const scale = Math.max(Math.abs(oldScaleX), Math.abs(oldScaleY));
+                const currentRadius = shape.radius * scale;
+                const snappedRadius = snapCircleRadius(currentRadius, shape);
+
+                const newScale = shape.radius > 0 ? snappedRadius / shape.radius : 0;
+
+                node.scaleX(Math.sign(oldScaleX) * newScale);
+                node.scaleY(Math.sign(oldScaleY) * newScale);
+            }
+        }
+
+        if (shape.coatingType === 'fill' && shape.fillPattern) {
+            let pattern: HTMLCanvasElement | undefined;
+            const scaleX = Math.abs(node.scaleX());
+            const scaleY = Math.abs(node.scaleY());
+
+            if (shape.type === 'rectangle') {
+                // =================================================================
+                // ✨ BUGFIX: 부동 소수점 오차를 막기 위해 스냅된 크기를 직접 사용
+                // =================================================================
+                const currentWidth = node.width() * scaleX;
+                const currentHeight = node.height() * scaleY;
+                const { width: snappedWidth, height: snappedHeight } = snapShapeSize(
+                    { width: currentWidth, height: currentHeight },
+                    shape
+                );
+
+                if (snappedWidth > 0 && snappedHeight > 0) {
+                    pattern = createCoatingPatternCanvas(
+                        'rectangle',
+                        snappedWidth,   // 스냅된 너비 사용
+                        snappedHeight,  // 스냅된 높이 사용
+                        shape.lineSpacing || 0,
+                        shape.coatingWidth || 0,
+                        shape.fillPattern || 'vertical'
                     );
-
-                    const originalWidth = node.width();
-                    const originalHeight = node.height();
-
-                    if (Math.abs(snappedWidth - currentWidth) > 0.1 && originalWidth > 0) {
-                        node.scaleX(Math.sign(node.scaleX()) * snappedWidth / originalWidth);
+                    if (pattern) {
+                        node.fillPatternImage(pattern);
+                        node.fillPatternScale({ x: 1 / scaleX, y: 1 / scaleY });
                     }
-                    if (Math.abs(snappedHeight - currentHeight) > 0.1 && originalHeight > 0) {
-                        node.scaleY(Math.sign(node.scaleY()) * snappedHeight / originalHeight);
-                    }
-                } else if (shape.type === 'circle') {
-                    const currentRadius = (shape.radius || 0) * Math.abs(node.scaleX());
-                    const snappedRadius = snapCircleRadius(currentRadius, shape);
-                    const originalRadius = shape.radius || 1;
-                    const newScale = snappedRadius / originalRadius;
+                }
+            } else if (shape.type === 'circle' && shape.radius > 0) {
+                // =================================================================
+                // ✨ BUGFIX: 부동 소수점 오차를 막기 위해 스냅된 반지름을 직접 사용
+                // =================================================================
+                const scale = Math.max(scaleX, scaleY);
+                const currentRadius = shape.radius * scale;
+                const snappedRadius = snapCircleRadius(currentRadius, shape);
+                const size = snappedRadius * 2;
 
-                    if (Math.abs(newScale - Math.abs(node.scaleX())) > 0.01) {
-                        const sign = Math.sign(node.scaleX());
-                        node.scaleX(newScale * sign);
-                        node.scaleY(newScale * sign);
+                if (size > 0) {
+                    pattern = createCoatingPatternCanvas(
+                        'circle',
+                        size, // 스냅된 크기 사용
+                        size, // 스냅된 크기 사용
+                        shape.lineSpacing || 0,
+                        shape.coatingWidth || 0,
+                        shape.fillPattern || 'vertical'
+                    );
+                    if (pattern) {
+                        node.fillPatternImage(pattern);
+                        node.fillPatternOffset({ x: snappedRadius, y: snappedRadius }); // 스냅된 반지름으로 offset 설정
+                        node.fillPatternScale({ x: 1 / scale, y: 1 / scale });
                     }
                 }
             }
         }
 
-        // 이미지 Transform 로직 (기존 유지)
         if (shape.type === 'image' && transformStartCache.current) {
-            // ...
+            const anchor = transformerRef.current?.getActiveAnchor();
+            const isCropping = anchor && ['top-center', 'middle-right', 'bottom-center', 'middle-left'].includes(anchor);
+
+            if (isCropping) {
+                const cache = transformStartCache.current;
+                if (!cache.crop || cache.originalImageWidth <= 0 || cache.originalImageHeight <= 0) {
+                    console.warn('❌ Transform cache가 잘못됨:', cache);
+                    return;
+                }
+
+                const newCrop = { ...cache.crop };
+                const currentDisplayedWidth = node.width() * node.scaleX();
+                const currentDisplayedHeight = node.height() * node.scaleY();
+
+                const widthChange = currentDisplayedWidth - cache.nodeWidth;
+                const heightChange = currentDisplayedHeight - cache.nodeHeight;
+
+                const originalDisplayRatioX = cache.nodeWidth / cache.crop.width;
+                const originalDisplayRatioY = cache.nodeHeight / cache.crop.height;
+                if (originalDisplayRatioX <= 0 || originalDisplayRatioY <= 0) {
+                    console.warn('❌ Display ratio가 잘못됨');
+                    return;
+                }
+
+                const cropWidthChange = widthChange / originalDisplayRatioX;
+                const cropHeightChange = heightChange / originalDisplayRatioY;
+
+                switch (anchor) {
+                    case 'middle-right':
+                        newCrop.width = Math.max(1, cache.crop.width + cropWidthChange);
+                        break;
+                    case 'middle-left':
+                        newCrop.x = Math.max(0, cache.crop.x - cropWidthChange);
+                        newCrop.width = Math.max(1, cache.crop.width + cropWidthChange);
+                        break;
+                    case 'top-center':
+                        newCrop.height = Math.max(1, cache.crop.height + cropHeightChange);
+                        break;
+                    case 'bottom-center':
+                        newCrop.y = Math.max(0, cache.crop.y - cropHeightChange);
+                        newCrop.height = Math.max(1, cache.crop.height + cropHeightChange);
+                        break;
+                }
+
+                newCrop.x = Math.max(0, Math.min(newCrop.x, cache.originalImageWidth - 1));
+                newCrop.y = Math.max(0, Math.min(newCrop.y, cache.originalImageHeight - 1));
+                newCrop.width = Math.max(1, Math.min(newCrop.width, cache.originalImageWidth - newCrop.x));
+                newCrop.height = Math.max(1, Math.min(newCrop.height, cache.originalImageHeight - newCrop.y));
+
+                try {
+                    (node as Konva.Image).crop(newCrop);
+                    node.getLayer()?.batchDraw();
+                } catch (error) {
+                    console.error('❌ Crop 적용 실패:', error);
+                }
+            } else {
+                const scaleX = node.scaleX();
+                const scaleY = node.scaleY();
+
+                const uniformScale = Math.min(Math.abs(scaleX), Math.abs(scaleY));
+
+                const finalScaleX = scaleX >= 0 ? uniformScale : -uniformScale;
+                const finalScaleY = scaleY >= 0 ? uniformScale : -uniformScale;
+
+                node.scaleX(finalScaleX);
+                node.scaleY(finalScaleY);
+            }
         }
 
         node.getLayer()?.batchDraw();
-    }, [shapes, transformerRef, isSnappingEnabled, snapPointToGrid, snapShapeSize, snapCircleRadius]);
+    }, [transformerRef, shapes, snapShapeSize, snapCircleRadius]);
 
     const handleTransformEnd = useCallback(() => {
         const nodes = transformerRef.current?.nodes() || [];
 
         const updates = nodes.map(node => {
             const shape = shapes.find(s => s.id === node.id());
-            if (!shape) return null;
-
-            // Line 도형 특별 처리 (기존 유지)
-            if (shape.type === 'line') {
-                // ...
+            if (!shape || shape.type === 'line') {
+                return null;
             }
 
             const oldScaleX = node.scaleX();
             const oldScaleY = node.scaleY();
             const newRotation = node.rotation();
+            const newX = node.x();
+            const newY = node.y();
+
+            // ================================================================
+            // ✨ FIX: 최종 크기를 저장하기 전에 스냅핑을 적용합니다.
+            // ================================================================
             let newWidth = node.width() * Math.abs(oldScaleX);
             let newHeight = node.height() * Math.abs(oldScaleY);
-            let newX = node.x();
-            let newY = node.y();
             let newRadius: number | undefined;
 
-            if (shape.type === 'circle') {
-                const rawRadius = (shape.radius || 0) * Math.abs(oldScaleX);
-                if (shape.coatingType === 'fill' && isSnappingEnabled) {
-                    newRadius = snapCircleRadius(rawRadius, shape);
-                } else if (isSnappingEnabled) {
-                    newRadius = snapToGrid(rawRadius);
-                } else {
-                    newRadius = rawRadius;
-                }
-                newWidth = newHeight = newRadius * 2;
-            } else if (shape.coatingType === 'fill' && isSnappingEnabled && shape.fillPattern) {
-                const { width: finalWidth, height: finalHeight } = snapShapeSize({ width: newWidth, height: newHeight }, shape);
-                newWidth = finalWidth;
-                newHeight = finalHeight;
-            } else if (isSnappingEnabled) {
-                newWidth = snapToGrid(newWidth);
-                newHeight = snapToGrid(newHeight);
-            }
-
             if (isSnappingEnabled) {
-                const snappedPos = snapPointToGrid({ x: newX, y: newY });
-                newX = snappedPos.x;
-                newY = snappedPos.y;
+                if (shape.type === 'rectangle' && shape.coatingType === 'fill' && shape.lineSpacing) {
+                    const snapped = snapShapeSize({ width: newWidth, height: newHeight }, shape);
+                    newWidth = snapped.width;
+                    newHeight = snapped.height;
+                } else if (shape.type === 'circle') {
+                    const rawRadius = (shape.radius || 0) * Math.max(Math.abs(oldScaleX), Math.abs(oldScaleY));
+                    newRadius = snapCircleRadius(rawRadius, shape);
+                    newWidth = newHeight = newRadius * 2;
+                }
+            } else if (shape.type === 'circle') {
+                const rawRadius = (shape.radius || 0) * Math.max(Math.abs(oldScaleX), Math.abs(oldScaleY));
+                newRadius = rawRadius;
+                newWidth = newHeight = newRadius * 2;
             }
+            // ================================================================
 
             const newAttrs: Partial<CustomShapeConfig> = {
                 x: newX,
@@ -241,7 +340,7 @@ export function useTransformerHandlers(
 
         transformStartCache.current = null;
         setIsTransforming(false);
-    }, [dispatch, shapes, transformerRef, isSnappingEnabled, snapCircleRadius, snapShapeSize, snapToGrid, snapPointToGrid]);
+    }, [dispatch, shapes, transformerRef, isSnappingEnabled, snapCircleRadius, snapShapeSize]); // snapShapeSize 의존성 추가
 
     return useMemo(() => ({
         isTransforming,

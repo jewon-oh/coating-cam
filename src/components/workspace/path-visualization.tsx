@@ -2,15 +2,14 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Circle, Group, Line, Rect } from 'react-konva';
+import { Circle, Group, Line, } from 'react-konva';
 import { useAppSelector } from '@/hooks/redux';
 import { useSettings } from '@/contexts/settings-context';
-import { selectShapes, selectIsDragging, selectDraggingShapeIds } from '@/store/slices/shape-slice';
+import { selectShapes,  selectDraggingShapeIds } from '@/store/slices/shape-slice';
 import { GCodeGenerator } from '@/lib/gcode/g-code-generator';
 import { Point } from '@/lib/gcode/point';
 import { CoatingOrderBadge } from './coating-order-badge';
 import { useCanvas } from '@/contexts/canvas-context';
-import { generateFillRects, CoatingRect } from '@/lib/coating-line-utils';
 
 interface PathEndpoint {
     shapeId: string;
@@ -24,11 +23,9 @@ export const PathVisualization = () => {
     const { gcodeSettings, workArea, showCoatingPaths = false } = settings;
     const { stage } = useCanvas();
     const allShapes = useAppSelector(selectShapes);
-    const isDragging = useAppSelector(selectIsDragging);
     const draggingShapeIds = useAppSelector(selectDraggingShapeIds);
 
     const [endpoints, setEndpoints] = useState<PathEndpoint[]>([]);
-    const [coatingRects, setCoatingRects] = useState<Map<string, CoatingRect[]>>(new Map());
     const [isCalculating, setIsCalculating] = useState(false);
 
     const orderedShapes = useMemo(() => {
@@ -49,7 +46,6 @@ export const PathVisualization = () => {
     useEffect(() => {
         if (!showCoatingPaths) {
             setEndpoints([]);
-            setCoatingRects(new Map());
             return;
         }
 
@@ -76,19 +72,10 @@ export const PathVisualization = () => {
                     setEndpoints(newEndpoints);
                 }
 
-                // Coating Rects 계산 (리팩터링된 로직)
-                const newRectsMap = new Map<string, CoatingRect[]>();
-                for (const shape of coatingShapes) {
-                    if (draggingShapeIds.includes(shape.id!)) continue;
-                    const rects = await generateFillRects(shape, allShapes, gcodeSettings);
-                    newRectsMap.set(shape.id!, rects);
-                }
-                setCoatingRects(newRectsMap);
 
             } catch (error) {
                 console.error("경로 시각화 계산 중 오류 발생:", error);
                 setEndpoints([]);
-                setCoatingRects(new Map());
             } finally {
                 setIsCalculating(false);
             }
@@ -97,15 +84,7 @@ export const PathVisualization = () => {
         calculateVisualizations();
     }, [showCoatingPaths, orderedShapes, coatingShapes, gcodeSettings, workArea, allShapes, draggingShapeIds]);
 
-    const getPatternColor = (pattern: string) => {
-        switch (pattern) {
-            case 'horizontal': return '#ff9800';
-            case 'vertical': return '#ff9800';
-            case 'concentric': return '#ff9800';
-            case 'auto': return '#9c27b0';
-            default: return '#00bcd4';
-        }
-    };
+
 
     if (isCalculating || !showCoatingPaths) {
         return null;
@@ -117,29 +96,6 @@ export const PathVisualization = () => {
 
     return (
         <Group>
-            {/* 코팅 경로 시각화 */}
-            {Array.from(coatingRects.entries()).map(([shapeId, rects]) => {
-                if (draggingShapeIds.includes(shapeId)) return null;
-                const shape = allShapes.find(s => s.id === shapeId);
-                if (!shape) return null;
-
-                const patternColor = getPatternColor(shape.fillPattern || 'auto');
-                return (
-                    <Group key={`coating-${shapeId}`}>
-                        {rects.map((rect, index) => (
-                            <Rect
-                                key={`coating-rect-${shapeId}-${index}`}
-                                {...rect}
-                                fill={patternColor}
-                                opacity={0.3}
-                                listening={false}
-                                perfectDrawEnabled={false}
-                            />
-                        ))}
-                    </Group>
-                );
-            })}
-
             {/* 경로 순서 시각화 */}
             {endpoints.map((ep, index) => {
                 if (draggingShapeIds.includes(ep.shapeId)) return null;

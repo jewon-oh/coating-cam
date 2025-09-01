@@ -34,7 +34,7 @@ export function useShapeSnapping() {
                 case 'vertical':
                     width = Math.round(width / lineSpacing) * lineSpacing;
                     break;
-                case 'grid': // Assuming 'grid' or other patterns that snap both
+                case 'concentric':
                 default:
                     width = Math.round(width / lineSpacing) * lineSpacing;
                     height = Math.round(height / lineSpacing) * lineSpacing;

@@ -1,38 +1,46 @@
-
 "use client";
 
-import React, { useMemo, useCallback, useRef, useEffect } from 'react';
-import { Layer, Group, Rect, Circle, Image,  Transformer, Line } from 'react-konva';
+import React, {useMemo, useCallback, useRef, useEffect, useState} from 'react';
+import {Layer, Group, Transformer} from 'react-konva';
 import type Konva from 'konva';
 
+
 // Redux 상태 관리
-import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { updateShape } from '@/store/slices/shape-slice';
+import {useAppDispatch, useAppSelector} from '@/hooks/redux';
+import {updateShape} from '@/store/slices/shape-slice';
 
 // 타입 및 유틸리티
-import { CustomShapeConfig } from '@/types/custom-konva-config';
-import { useCanvas } from '@/contexts/canvas-context';
-import { useTransformerHandlers } from '@/hooks/shape/use-transformer-handlers';
-import { useShapeEvents } from '@/hooks/use-shape-events';
-import { TransformerConfig } from "konva/lib/shapes/Transformer";
-import { flipImageData } from "@/lib/flip-image-data";
+import {CustomShapeConfig} from '@/types/custom-konva-config';
+import {useCanvas} from '@/contexts/canvas-context';
+import {useShapeEvents} from '@/hooks/use-shape-events';
+import {TransformerConfig} from "konva/lib/shapes/Transformer";
+import {flipImageData} from "@/lib/flip-image-data";
+import {getCoatingVisualStyle} from "@/lib/shape-style-utils";
+import {useTransformerHandlers} from "@/hooks/shape/use-transformer-handlers";
+import {ShapeComponent} from "@/components/workspace/shape-component";
+import {ImageComponent} from "@/components/workspace/image-component";
+import {useShapeSnapping} from "@/hooks/shape/use-shape-snapping";
+import {useSettings} from "@/contexts/settings-context";
 
 interface ShapeLayerProps {
     isPanning?: boolean;
 }
 
-export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
+export function ShapeLayer({isPanning = false}: ShapeLayerProps) {
     // Redux 상태
     const dispatch = useAppDispatch();
-    const { shapes, selectedShapeIds } = useAppSelector((state) => state.shapes);
-    const { tool } = useAppSelector((state) => state.tool);
+    const {shapes, selectedShapeIds} = useAppSelector((state) => state.shapes);
+    const {tool} = useAppSelector((state) => state.tool);
 
     // Context 및 훅
-    const { setLoading } = useCanvas();
+    const {setLoading} = useCanvas();
     const shapeEvents = useShapeEvents();
+    const { isSnappingEnabled } = useSettings(); // 스냅 활성화 여부 가져오기
+    // ✨ 2. 스냅 함수 직접 가져오기
+    const {  snapPointToGrid } = useShapeSnapping();
 
     // 로컬 상태
-    const [isHoveringShape, setIsHoveringShape] = React.useState<string | null>(null);
+    const [isHoveringShape, setIsHoveringShape] = useState<string | null>(null);
 
     // 참조들
     const layerRef = useRef<Konva.Layer>(null);
@@ -47,7 +55,7 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         handleTransformEnd
     } = useTransformerHandlers(transformerRef);
 
-    const { imageShapes, otherShapes } = useMemo(() => {
+    const {imageShapes, otherShapes} = useMemo(() => {
         const visibleShapes = shapes.filter(s => s.visible !== false);
 
         // 코팅 타입에 따른 정렬 (fill이 masking보다 앞에 오도록)
@@ -96,14 +104,6 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         centeredScaling: false,
         flipEnabled: false,
         ignoreStroke: true,
-        boundBoxFunc: (oldBox, newBox) => {
-            const minWidth = 5;
-            const minHeight = 5;
-            if (Math.abs(newBox.width) < minWidth || Math.abs(newBox.height) < minHeight) {
-                return oldBox;
-            }
-            return newBox;
-        },
     }), []);
 
     // ===== 이미지 로딩 =====
@@ -120,12 +120,12 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
             setTimeout(() => {
                 const shape = shapes.find(s => s.id === shapeId);
                 if (shape && !shape.crop) {
-                    const defaultCrop = { x: 0, y: 0, width: img.width, height: img.height };
+                    const defaultCrop = {x: 0, y: 0, width: img.width, height: img.height};
                     if (shapeId) {
-                        dispatch(updateShape({ id: shapeId, updatedProps: { crop: defaultCrop } }));
+                        dispatch(updateShape({id: shapeId, updatedProps: {crop: defaultCrop}}));
                     }
                 }
-                setLoading({ isLoading: false });
+                setLoading({isLoading: false});
                 layerRef.current?.batchDraw();
             }, 0);
         };
@@ -134,85 +134,18 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
             console.error(`❌ 이미지 로드 실패 (${shapeId}):`, error);
             imageCache.current.delete(imageDataUrl);
             setTimeout(() => {
-                setLoading({ isLoading: false });
+                setLoading({isLoading: false});
             }, 0);
         };
 
         if (shapeId) {
-            setLoading({ isLoading: true, message: `이미지 로딩 중... (${shapeId})` });
+            setLoading({isLoading: true, message: `이미지 로딩 중... (${shapeId})`});
         }
 
         img.src = imageDataUrl;
         imageCache.current.set(imageDataUrl, img);
         return img.complete ? img : null;
     }, [shapes, dispatch, setLoading]);
-
-    // ===== 스타일 유틸리티들 =====
-    const getCoatingVisualStyle = useCallback((shape: CustomShapeConfig) => {
-        const isLocked = shape.isLocked;
-
-        if (isLocked) {
-            return {
-                fill: shape.fill,
-                stroke: shape.stroke,
-                strokeWidth: shape.strokeWidth,
-                dash: [4, 4],
-                opacity: 0.6
-            };
-        }
-
-        if (shape.skipCoating) {
-            return {
-                fill: shape.fill || '#f8f9fa',
-                stroke: '#6c757d',
-                strokeWidth: 1,
-                dash: [8, 4],
-                opacity: 0.5
-            };
-        }
-
-        switch (shape.coatingType) {
-            case 'fill':
-                return {
-                    fill: '#2196f3',
-                    stroke: '#2196f3',
-                    strokeWidth: 2,
-                    opacity: shape.type === 'image' ? 1 : 0.5,
-                    shadowColor: '#2196f3',
-                    shadowBlur: 5,
-                    shadowOpacity: 0.3
-                };
-            case 'outline':
-                return {
-                    fill: 'transparent',
-                    stroke: '#ff9800',
-                    strokeWidth: 3,
-                    opacity: 1,
-                    shadowColor: '#ff9800',
-                    shadowBlur: 8,
-                    shadowOpacity: 0.4
-                };
-            case 'masking':
-                return {
-                    fill: '#f44336',
-                    stroke: '#f44336',
-                    strokeWidth: 2,
-                    dash: [6, 3],
-                    opacity: shape.type === 'image' ? 1 : 0.6,
-                    shadowColor: '#f44336',
-                    shadowBlur: 4,
-                    shadowOpacity: 0.2
-                };
-            default:
-                return {
-                    fill: shape.fill || '#e9ecef',
-                    stroke: '#6c757d',
-                    strokeWidth: 1,
-                    opacity: 1
-                };
-        }
-    }, []);
-
 
     const makeCommonProps = useCallback((shape: Partial<CustomShapeConfig>) => {
         const isLocked = shape.isLocked;
@@ -256,17 +189,17 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
             shadowOpacity: 1
         } : {};
 
-        const coatingStyle = getCoatingVisualStyle(shape as CustomShapeConfig);
+        const coatingStyle = getCoatingVisualStyle(shape);
 
-        return { ...baseProps, ...coatingStyle, ...hoverEffect };
-    }, [isPanning, tool, isHoveringShape, getCoatingVisualStyle, shapeEvents]);
+        return {...baseProps, ...coatingStyle, ...hoverEffect};
+    }, [isPanning, tool, isHoveringShape, shapeEvents]);
 
     const makeImageProps = useCallback((shape: CustomShapeConfig) => {
         const isLocked = shape.isLocked;
         const baseProps = makeCommonProps(shape);
 
         // Image 컴포넌트에서 사용할 수 없는 속성들 제거
-        const { shadowColor, shadowBlur, shadowOpacity, ...validImageProps } = baseProps;
+        const {shadowColor, shadowBlur, shadowOpacity, ...validImageProps} = baseProps;
 
         const imageSpecificStyle = {
             opacity: isLocked ? 0.4 : (baseProps.opacity || 1),
@@ -298,7 +231,7 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         if (imagesToFlip.length === 0) return;
 
         const processImages = async () => {
-            setLoading({ isLoading: true, message: '이미지 최적화 중...' });
+            setLoading({isLoading: true, message: '이미지 최적화 중...'});
 
             for (const shape of imagesToFlip) {
                 try {
@@ -314,11 +247,11 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
                     }));
                 } catch (error) {
                     console.error(`${shape.id} 이미지 뒤집기 실패:`, error);
-                    dispatch(updateShape({ id: shape.id!, updatedProps: { isFlipped: true } }));
+                    dispatch(updateShape({id: shape.id!, updatedProps: {isFlipped: true}}));
                 }
             }
 
-            setLoading({ isLoading: false });
+            setLoading({isLoading: false});
         };
 
         processImages();
@@ -344,140 +277,31 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         };
     }, []);
 
+
     return (
         <Layer ref={layerRef}>
             {/* 이미지 도형들 */}
             <Group listening={tool === 'select'}>
-                {imageShapes.map((shape) => {
-                    const imageElement = shape.imageDataUrl ? loadImage(shape.imageDataUrl, shape.id) : null;
-
-                    if (!imageElement) {
-                        const style = getCoatingVisualStyle(shape);
-                        return (
-                            <Rect
-                                key={`${shape.id}-loading`}
-                                id={shape.id}
-                                name="shape"
-                                x={shape.x}
-                                y={shape.y}
-                                width={shape.width}
-                                height={shape.height}
-                                fill={style.fill || "#f8f9fa"}
-                                stroke={style.stroke || "#dee2e6"}
-                                strokeWidth={style.strokeWidth || 1}
-                                dash={style.dash || [4, 4]}
-                                opacity={style.opacity || 0.5}
-                                draggable={false}
-                                listening={false}
-                            />
-                        );
-                    }
-
-                    const safeCrop = shape.crop ? {
-                        x: Math.max(0, shape.crop.x),
-                        y: Math.max(0, shape.crop.y),
-                        width: Math.max(1, Math.min(shape.crop.width, imageElement.width - shape.crop.x)),
-                        height: Math.max(1, Math.min(shape.crop.height, imageElement.height - shape.crop.y))
-                    } : {
-                        x: 0,
-                        y: 0,
-                        width: imageElement.width,
-                        height: imageElement.height
-                    };
-
-                    return (
-                        <Image
-                            key={shape.id}
-                            id={shape.id}
-                            alt={shape.name}
-                            name="shape"
-                            x={shape.x}
-                            y={shape.y}
-                            width={shape.width}
-                            height={shape.height}
-                            image={imageElement}
-                            rotation={shape.rotation || 0}
-                            scaleX={shape.scaleX || 1}
-                            scaleY={shape.scaleY || 1}
-                            crop={safeCrop}
-                            onTransformStart={handleTransformStart}
-                            {...makeImageProps(shape)}
-                        />
-                    );
-                })}
+                {imageShapes.map((shape) => (
+                    <ImageComponent
+                        key={shape.id}
+                        shape={shape}
+                        imageElement={shape.imageDataUrl ? loadImage(shape.imageDataUrl, shape.id) : null}
+                        commonProps={makeImageProps(shape)}
+                    />
+                ))}
             </Group>
 
             {/* 다른 도형들 */}
             <Group listening={true}>
                 {otherShapes.map((shape) => {
-                    const commonProps = makeCommonProps(shape);
-
-                    switch (shape.type) {
-                        case 'rectangle':
-                            return (
-                                <Rect
-                                    key={shape.id}
-                                    id={shape.id}
-                                    name="shape"
-                                    x={shape.x}
-                                    y={shape.y}
-                                    width={shape.width}
-                                    height={shape.height}
-                                    rotation={shape.rotation}
-                                    scaleX={shape.scaleX}
-                                    scaleY={shape.scaleY}
-                                    strokeScaleEnabled={false}
-                                    {...commonProps}
-                                />
-                            );
-                        case 'circle':
-                            return (
-                                <Circle
-                                    key={shape.id}
-                                    id={shape.id}
-                                    name="shape"
-                                    x={shape.x}
-                                    y={shape.y}
-                                    radius={shape.radius}
-                                    rotation={shape.rotation}
-                                    scaleX={shape.scaleX}
-                                    scaleY={shape.scaleY}
-                                    strokeScaleEnabled={false}
-                                    {...commonProps}
-                                />
-                            );
-                        case 'line':
-                            return (
-                                <Line
-                                    key={shape.id}
-                                    id={shape.id}
-                                    name="shape"
-                                    x={shape.x}
-                                    y={shape.y}
-                                    points={shape.points}
-                                    rotation={shape.rotation}
-                                    scaleX={shape.scaleX}
-                                    scaleY={shape.scaleY}
-                                    stroke={commonProps.stroke || shape.stroke || '#000000'}
-                                    strokeWidth={commonProps.strokeWidth || shape.strokeWidth || 2}
-                                    strokeScaleEnabled={false}
-                                    dash={commonProps.dash}
-                                    opacity={commonProps.opacity}
-                                    listening={commonProps.listening}
-                                    draggable={commonProps.draggable}
-                                    onClick={commonProps.onClick}
-                                    onContextMenu={commonProps.onContextMenu}
-                                    onMouseEnter={commonProps.onMouseEnter}
-                                    onMouseLeave={commonProps.onMouseLeave}
-                                    onDragStart={commonProps.onDragStart}
-                                    onDragMove={commonProps.onDragMove}
-                                    onDragEnd={commonProps.onDragEnd}
-                                    perfectDrawEnabled={false}
-                                />
-                            );
-                        default:
-                            return null;
-                    }
+                    return (
+                        <ShapeComponent
+                            key={shape.id}
+                            shape={shape}
+                            commonProps={makeCommonProps(shape)}
+                        />
+                    )
                 })}
             </Group>
 

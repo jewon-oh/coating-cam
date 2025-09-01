@@ -219,43 +219,30 @@ const createVerticalLinesAndLabels = (
         );
 
         if (settings.showLabels && x % settings.labelStep === 0) {
-            // X축 라벨 위치 계산 개선
-            const baseOffset = 15; // 기본 오프셋 (픽셀)
-            const scaleAdjustedOffset = baseOffset / scaleInfo.absScaleY;
+            // 라벨의 Y축 오프셋을 계산합니다. 화면 픽셀 기준 오프셋을 현재 Y축 스케일로 나누어
+            // 줌 레벨에 관계없이 일정한 간격을 유지하도록 합니다.
+            const yOffset = GRID_CONSTANTS.LABEL_OFFSET / scaleInfo.absScaleY;
 
-            // 텍스트 크기에 따른 위치 조정
-            const textWidth = (x / pixelsPerMm).toString().length * styles.label.size * 0.6; // 대략적인 텍스트 너비
-            const horizontalOffset = textWidth * 0.5 / scaleInfo.absScaleX;
-
-            const labelX = x;
-            let align: 'left' | 'right' | 'center' = 'center';
-
-            // flipX 상태에 관계없이 중앙 정렬 사용
-            if (scaleInfo.flipX) {
-                // X축이 뒤집힌 경우에도 중앙 정렬 유지
-                align = 'center';
-            } else {
-                align = 'center';
-            }
+            // Y축이 반전(flipY)되었는지에 따라 라벨의 위치를 X축의 위 또는 아래로 결정합니다.
+            // - flipY=true (Y축이 위로 향함): 라벨이 X축 위에 있으려면 양수 Y 좌표가 필요합니다.
+            // - flipY=false (Y축이 아래로 향함): 라벨이 X축 위에 있으려면 음수 Y 좌표가 필요합니다.
+            const labelY = scaleInfo.flipY ? yOffset : -yOffset;
 
             labels.push(
                 <Text
                     key={`xlabel-${x}`}
-                    x={labelX}
-                    y={-scaleAdjustedOffset}
+                    x={x} // 라벨을 그리드 선의 x좌표에 위치시킵니다.
+                    y={labelY} // 계산된 y좌표에 위치시킵니다.
                     text={(x / pixelsPerMm).toString()}
                     fontSize={styles.label.size}
                     fill={styles.label.color}
-                    align={align}
-                    verticalAlign="bottom"
+                    align="center" // 텍스트를 x좌표 기준으로 수평 중앙 정렬합니다.
+                    verticalAlign={scaleInfo.flipY ? 'top' : 'bottom'} // Y축 방향에 따라 수직 정렬을 조정합니다.
                     listening={false}
                     perfectDrawEnabled={false}
-                    // 텍스트가 항상 올바른 방향으로 표시되도록 함
+                    // 캔버스가 뒤집히더라도 텍스트는 항상 정방향으로 보이도록 스케일을 보정합니다.
                     scaleX={scaleInfo.flipX ? -1 : 1}
-                    scaleY={1} // Y축은 뒤집지 않음
-                    // 중앙 정렬을 위한 오프셋
-                    offsetX={0}
-                    offsetY={0}
+                    scaleY={scaleInfo.flipY ? -1 : 1}
                 />
             );
         }

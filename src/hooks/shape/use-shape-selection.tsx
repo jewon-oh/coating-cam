@@ -3,6 +3,8 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {selectMultipleShapes, selectShape, unselectAllShapes} from '@/store/slices/shape-slice';
 import { useSelectionRect } from '@/hooks/use-selection-rect';
+import Konva from "konva";
+import {CustomShapeConfig} from "@/types/custom-konva-config";
 
 export function useShapeSelection() {
     const dispatch = useAppDispatch();
@@ -29,6 +31,8 @@ export function useShapeSelection() {
 
         const transform = stage.getAbsoluteTransform().copy().invert();
         const localPos = transform.point(pointer);
+
+        console.log('start drag selection')
 
         const layer = stage.findOne<Konva.Layer>('Layer')!;
         createTempRect(layer, localPos.x, localPos.y);
@@ -75,7 +79,7 @@ export function useShapeSelection() {
         const transform = stage.getAbsoluteTransform().copy().invert();
         const localPos = transform.point(pointer);
 
-        const start = dragStartRef.current;
+        const start = dragStartRef.current; // 드래그 시작점
         const selectionBox = {
             x: Math.min(start.x, localPos.x),
             y: Math.min(start.y, localPos.y),
@@ -83,12 +87,14 @@ export function useShapeSelection() {
             height: Math.abs(localPos.y - start.y)
         };
 
+        // 선택 영역과 겹치는 도형들의 ID를 찾습니다.
         const selectedIds: string[] = [];
         shapes.forEach(shape => {
             if (!shape.visible || shape.isLocked) return;
 
+            // 각 도형의 경계 상자를 가져옵니다.
             const shapeBox = getShapeBox(shape);
-            if (isBoxIntersecting(selectionBox, shapeBox)) {
+            if (isBoxIntersecting(selectionBox, shapeBox)) { // 경계 상자가 겹치는지 확인합니다.
                 selectedIds.push(shape.id!);
             }
         });
@@ -155,8 +161,17 @@ export function useShapeSelection() {
     };
 }
 
+/** 도형의 경계 상자를 나타내는 타입 */
+interface Box {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
 // 유틸리티 함수들
-function getShapeBox(shape: any) {
+/** 도형의 경계 상자(bounding box)를 계산하여 반환합니다. */
+function getShapeBox(shape: CustomShapeConfig): Box {
     if (shape.type === 'circle') {
         const radius = shape.radius || 0;
         return {
@@ -175,7 +190,8 @@ function getShapeBox(shape: any) {
     }
 }
 
-function isBoxIntersecting(box1: any, box2: any) {
+/** 두 경계 상자가 겹치는지 확인합니다. */
+function isBoxIntersecting(box1: Box, box2: Box): boolean {
     return !(box1.x + box1.width < box2.x ||
         box2.x + box2.width < box1.x ||
         box1.y + box1.height < box2.y ||

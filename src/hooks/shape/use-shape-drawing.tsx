@@ -5,8 +5,11 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { addShape } from '@/store/slices/shape-slice';
 import { setTool } from '@/store/slices/tool-slice';
 import type { CustomShapeConfig } from '@/types/custom-konva-config';
-import { DRAWING_TOOLS, DrawingTool, ToolType } from "@/types/tool-type";
+import { DRAWING_TOOLS, ToolType } from "@/types/tool-type";
 import { useShapeSnapping } from './use-shape-snapping';
+import {createCoatingPatternCanvas} from "@/lib/shape-create-utils";
+
+
 
 export function useShapeDrawing() {
     const dispatch = useAppDispatch();
@@ -18,7 +21,7 @@ export function useShapeDrawing() {
     const drawStartClientRef = useRef<{ x: number; y: number } | null>(null);
     const drawStartStageRef = useRef<{ x: number; y: number } | null>(null); // Stage 좌표 저장
     const tempShapeRef = useRef<Konva.Shape | null>(null);
-    const tempTypeRef = useRef<DrawingTool | null>(null);
+    const tempTypeRef = useRef<ToolType | null>(null);
 
     // 유틸리티 함수들
     const getPointerClient = useCallback((stage: Konva.Stage) => stage.getPointerPosition() || null, []);
@@ -91,6 +94,8 @@ export function useShapeDrawing() {
             const dy = endPoint.y - startPoint.y;
 
             if (toolState.coatingType === "fill") {
+                const { lineSpacing, coatingWidth, fillPattern } = toolState;
+
                 if (temp instanceof Konva.Rect) {
                     const { width: snappedWidth, height: snappedHeight } = snapShapeSize(
                         { width: dx, height: dy },
@@ -102,11 +107,26 @@ export function useShapeDrawing() {
                     const height = Math.abs(snappedHeight);
                     temp.position({ x, y });
                     temp.size({ width, height });
+
+                    const patternImage = createCoatingPatternCanvas('rectangle', width, height, lineSpacing, coatingWidth, fillPattern);
+                    temp.fillPatternImage(patternImage);
+                    temp.fillPatternRepeat('no-repeat');
+                    temp.fill(undefined);
+
                 } else if (temp instanceof Konva.Circle) {
                     const rawRadius = Math.sqrt(dx * dx + dy * dy);
                     const snappedRadius = snapCircleRadius(rawRadius, toolState);
                     temp.position({ x: startPoint.x, y: startPoint.y });
                     temp.radius(snappedRadius);
+
+                    if (snappedRadius > 0) {
+                        const size = snappedRadius * 2;
+                        const patternImage = createCoatingPatternCanvas('circle', size, size, lineSpacing, coatingWidth, fillPattern);
+                        temp.fillPatternImage(patternImage);
+                        temp.fillPatternRepeat('no-repeat');
+                        temp.fillPatternOffset({ x: snappedRadius, y: snappedRadius });
+                        temp.fill(undefined);
+                    }
                 } else if (temp instanceof Konva.Line) {
                     temp.points([startPoint.x, startPoint.y, endPoint.x, endPoint.y]);
                 }
@@ -237,13 +257,15 @@ export function useShapeDrawing() {
                 const y = Math.min(s.y, s.y + snappedHeight);
                 const width = Math.abs(snappedWidth);
                 const height = Math.abs(snappedHeight);
-                newShape = { ...commonShapeProps, type: 'rectangle', x, y, width, height, fill: 'rgba(59,130,246,0.5)' };
+                const fill = toolState.coatingType === 'fill' ? undefined : 'rgba(59,130,246,0.5)';
+                newShape = { ...commonShapeProps, type: 'rectangle', x, y, width, height, fill };
             } else if (toolState.tool === 'circle') {
                 const dx = ept.x - s.x;
                 const dy = ept.y - s.y;
                 const rawRadius = Math.sqrt(dx * dx + dy * dy);
                 const radius = snapCircleRadius(rawRadius, toolState);
-                newShape = { ...commonShapeProps, type: 'circle', x: s.x, y: s.y, radius, fill: 'rgba(59,130,246,0.5)' };
+                const fill = toolState.coatingType === 'fill' ? undefined : 'rgba(59,130,246,0.5)';
+                newShape = { ...commonShapeProps, type: 'circle', x: s.x, y: s.y, radius, fill };
             } else if (toolState.tool === 'line') {
                 newShape = {
                     ...commonShapeProps,

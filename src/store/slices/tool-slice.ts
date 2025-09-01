@@ -3,7 +3,7 @@ import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {ToolType, SHAPE_TOOLS} from '@/types/tool-type';
 import {FillPattern, CoatingType, TravelAvoidanceStrategy} from "@/types/coating";
 
-interface ToolState {
+export interface ToolState {
     tool: ToolType;
 
     // 코팅 타입

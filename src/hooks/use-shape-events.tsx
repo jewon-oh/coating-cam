@@ -25,6 +25,7 @@ export function useShapeEvents() {
         console.log('useShapeEvents: handleMouseDown', tool);
 
         if (DRAWING_TOOLS.includes(tool)) {
+            console.log('drawing tool')
             if (drawing.startDrawing(e)) {
                 return;
             }
