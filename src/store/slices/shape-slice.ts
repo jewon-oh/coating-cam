@@ -92,11 +92,14 @@ const shapeSlice = createSlice({
             Object.assign(state, initialState);
             state.lastUpdateTimestamp = Date.now();
         },
-        // addShape: Object.assign으로 배열 교체 금지 → push 사용
         addShape: (state, action: PayloadAction<SerializableShapePayload>) => {
-            // shapes 안에 있는 같은 타입의 shape 개수를 세어 이름에 사용
             const baseName = action.payload.name || action.payload.type || 'Shape';
             const uniqueName = generateUniqueName(state.shapes, baseName);
+
+            // ✨ FIX: 자동으로 다음 코팅 순서를 할당합니다.
+            const maxCoatingOrder = state.shapes.reduce((max, shape) => {
+                return Math.max(max, shape.coatingOrder || 0);
+            }, 0);
 
             const newShape: CustomShapeConfig = {
                 ...action.payload,
@@ -108,20 +111,21 @@ const shapeSlice = createSlice({
                 isLocked: action.payload.isLocked ?? false,
                 x: action.payload.x ?? 0,
                 y: action.payload.y ?? 0,
-                coatingType: action.payload.coatingType ?? 'masking'
+                coatingType: action.payload.coatingType ?? 'fill', // 기본값 'fill'로 설정
+                coatingOrder: maxCoatingOrder + 1, // 새 코팅 순서 할당
             };
-            // Object.assign(state, {
-            //     shapes: [...state.shapes, newShape]
-            // });
 
             state.shapes.push(newShape);
         },
-
-        // addShapeToBack: 배열 맨 앞에 추가 → unshift 사용
         addShapeToBack: (state, action: PayloadAction<SerializableShapePayload>) => {
             const baseName = action.payload.name || action.payload.type || 'Shape';
             const uniqueName = generateUniqueName(state.shapes, baseName);
 
+            // ✨ FIX: 자동으로 다음 코팅 순서를 할당합니다.
+            const maxCoatingOrder = state.shapes.reduce((max, shape) => {
+                return Math.max(max, shape.coatingOrder || 0);
+            }, 0);
+
             const newShape: CustomShapeConfig = {
                 ...action.payload,
                 type: action.payload.type,
@@ -132,26 +136,18 @@ const shapeSlice = createSlice({
                 isLocked: action.payload.isLocked ?? false,
                 x: action.payload.x ?? 0,
                 y: action.payload.y ?? 0,
+                coatingType: action.payload.coatingType ?? 'fill',
+                coatingOrder: maxCoatingOrder + 1,
             };
-            Object.assign(state, {
-                shapes: [newShape, ...state.shapes]
-            });
 
-            // state.shapes.unshift(newShape);
+            state.shapes.unshift(newShape);
         },
-
-
-        // updateShape는 Immer가 있으니 현재 형태 유지 가능
         updateShape: (state, action: PayloadAction<{ id: string; updatedProps: Partial<CustomShapeConfig> }>) => {
             const index = state.shapes.findIndex(s => s.id === action.payload.id);
             if (index !== -1) {
                 Object.assign(state.shapes[index], {...state.shapes[index], ...action.payload.updatedProps});
-                // state.shapes[index] = { ...state.shapes[index], ...action.payload.updatedProps };
             }
         },
-
-
-        // 배치 작업을 위한 새 리듀서
         batchUpdateShapes: (state, action: PayloadAction<Array<{ id: string; props: Partial<CustomShapeConfig> }>>) => {
             const updateMap = new Map(action.payload.map(update => [update.id, update.props]));
 
@@ -162,20 +158,8 @@ const shapeSlice = createSlice({
                 }),
                 lastUpdateTimestamp: Date.now()
             });
-
-            // state.shapes = state.shapes.map(shape => {
-            //     const update = updateMap.get(shape.id!);
-            //     return update ? { ...shape, ...update } : shape;
-            // });
-            // state.lastUpdateTimestamp = Date.now();
         },
         updateMultipleShapes: (state, action: PayloadAction<{ id: string; props: Partial<CustomShapeConfig> }[]>) => {
-            // action.payload.forEach(update => {
-            //     const index = state.shapes.findIndex(s => s.id === update.id);
-            //     if (index !== -1) {
-            //         state.shapes[index] = { ...state.shapes[index], ...update.props };
-            //     }
-            // });
             const updateMap = new Map(action.payload.map(update => [update.id, update.props]));
 
             Object.assign(state, {
@@ -203,15 +187,6 @@ const shapeSlice = createSlice({
                 selectedShapeIds: [],
                 isGroupSelected: false
             });
-
-            // state.shapes = action.payload.map((s, i) => ({
-            //     ...s,
-            //     name: s.name || `${s.type || 'Shape'} #${i + 1}`,
-            //     visible: s.visible ?? true,
-            //     listening: s.listening ?? false,
-            // }));
-            // state.selectedShapeIds = [];
-            // state.isGroupSelected = false;
         },
         selectShape: (state, action: PayloadAction<string>) => {
             state.selectedShapeIds = [action.payload];
@@ -222,17 +197,15 @@ const shapeSlice = createSlice({
             state.isGroupSelected = true;
         },
         selectAllShapes: (state) => {
-            // 모든 가시적이고 잠기지 않은 도형들의 ID를 수집
             const selectableIds = state.shapes
                 .filter(shape =>
-                    shape.visible !== false && // 보이는 도형만
-                    !shape.isLocked &&         // 잠기지 않은 도형만
-                    shape.id                   // ID가 있는 도형만
+                    shape.visible !== false &&
+                    !shape.isLocked &&
+                    shape.id
                 )
                 .map(shape => shape.id!)
-                .filter(Boolean);            // undefined 제거
+                .filter(Boolean);
 
-            // 선택 가능한 도형이 있으면 모두 선택
             if (selectableIds.length > 0) {
                 state.selectedShapeIds = selectableIds;
             }
@@ -257,7 +230,6 @@ const shapeSlice = createSlice({
                 shape.isLocked = !(shape.isLocked ?? false);
             }
         },
-        // 그룹 관련 최적화된 액션들
         createGroup: (state, action: PayloadAction<{ memberIds: string[]; name?: string; groupId?: string }>) => {
             const memberIds = action.payload.memberIds || [];
             if (!memberIds.length) return;
@@ -266,11 +238,9 @@ const shapeSlice = createSlice({
             const sameTypeCount = state.shapes.filter(s => s.type === 'group').length;
             const groupName = action.payload.name || `그룹 #${sameTypeCount + 1}`;
 
-            // 배치 업데이트로 성능 향상
             const updates = memberIds.map(id => ({ id, props: { parentId: groupId } }));
             const updateMap = new Map(updates.map(update => [update.id, update.props]));
 
-            // 그룹 노드 생성
             const groupNode: CustomShapeConfig = {
                 id: groupId,
                 parentId: null,
@@ -302,10 +272,9 @@ const shapeSlice = createSlice({
             const groupIndex = state.shapes.findIndex(s => s.id === groupId && s.type === 'group');
             if (groupIndex === -1) return;
 
-            // 그룹 멤버들의 parentId를 null로 변경
             Object.assign(state, {
                 shapes: state.shapes
-                    .filter(s => s.id !== groupId) // 그룹 노드 제거
+                    .filter(s => s.id !== groupId)
                     .map(s => s.parentId === groupId ? { ...s, parentId: null } : s),
                 lastUpdateTimestamp: Date.now()
             });
@@ -318,8 +287,6 @@ const shapeSlice = createSlice({
                 state.lastUpdateTimestamp = Date.now();
             }
         },
-
-        // 그룹 가시성 일괄 토글
         toggleGroupVisibility: (state, action: PayloadAction<string>) => {
             const groupId = action.payload;
             const group = state.shapes.find(s => s.id === groupId && s.type === 'group');
@@ -331,7 +298,6 @@ const shapeSlice = createSlice({
                 .map(s => s.id!)
                 .filter(Boolean);
 
-            // 그룹과 모든 멤버의 가시성 일괄 변경
             Object.assign(state, {
                 shapes: state.shapes.map(shape => {
                     if (shape.id === groupId || memberIds.includes(shape.id!)) {
@@ -342,8 +308,6 @@ const shapeSlice = createSlice({
                 lastUpdateTimestamp: Date.now()
             });
         },
-
-        // 그룹 잠금 일괄 토글
         toggleGroupLock: (state, action: PayloadAction<string>) => {
             const groupId = action.payload;
             const group = state.shapes.find(s => s.id === groupId && s.type === 'group');
@@ -355,7 +319,6 @@ const shapeSlice = createSlice({
                 .map(s => s.id!)
                 .filter(Boolean);
 
-            // 그룹과 모든 멤버의 잠금 상태 일괄 변경
             Object.assign(state, {
                 shapes: state.shapes.map(shape => {
                     if (shape.id === groupId || memberIds.includes(shape.id!)) {

@@ -27,7 +27,7 @@ export const CoatingOrderBadge = ({
     const invScaleY = 1 / (parentScaleY || 0.001);
     const textRotation = -parentRotation;
 
-    const badgeRadius = 12;
+    const badgeRadius = 9;
 
     return (
         <Group x={x} y={y}>
@@ -39,7 +39,7 @@ export const CoatingOrderBadge = ({
             />
             <Text
                 text={order.toString()}
-                fontSize={14}
+                fontSize={12}
                 fill="white"
                 fontStyle="bold"
                 align="center"

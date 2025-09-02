@@ -52,6 +52,8 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
 
     const canUndo = past.length > 0;
     const canRedo = future.length > 0;
+    const isLineToolActive = tool === 'line' ;
+    const isSelectToolActive = tool ==='select';
 
     // 현재 모드에 따른 도구들 렌더링
     const renderShapeTools = () => (
@@ -68,7 +70,10 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                     icon={<Slash size={16}/>}
                     label="선"
                     active={tool === 'line'}
-                    onClick={() => dispatch(setTool('line'))}
+                    onClick={() => {
+                        dispatch(setTool('line'));
+                        dispatch(setCoatingType('outline'));
+                    }}
                     className={tool === 'line' ? 'bg-primary/20 border border-primary/40' : ''}
                 />
                 <ToolButton
@@ -118,6 +123,7 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                                         fillPattern: 'horizontal'
                                     }))}
                                     className={coatingType === 'fill' && fillPattern === 'horizontal' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}
+                                    disabled={isLineToolActive || isSelectToolActive}
                                 />
                                 <ToolButton
                                     icon={<MoveVertical size={16}/>}
@@ -128,6 +134,7 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                                         fillPattern: 'vertical'
                                     }))}
                                     className={coatingType === 'fill' && fillPattern === 'vertical' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}
+                                    disabled={isLineToolActive|| isSelectToolActive}
                                 />
                                 <ToolButton
                                     icon={<SquareSquare size={16}/>}
@@ -138,6 +145,7 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                                         fillPattern: 'concentric'
                                     }))}
                                     className={coatingType === 'fill' && fillPattern === 'concentric' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}
+                                    disabled={isLineToolActive|| isSelectToolActive}
                                 />
                                 <ToolButton
                                     icon={<SquaresUnite size={16}/>}
@@ -145,6 +153,7 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                                     active={coatingType === 'outline'}
                                     onClick={() => dispatch(setCoatingType('outline'))}
                                     className={coatingType === 'outline' ? 'bg-yellow-200 border border-yellow-400 hover:bg-yellow-300' : 'hover:bg-yellow-100'}
+                                    disabled={isSelectToolActive}
                                 />
                                 <ToolButton
                                     icon={<SquareX size={16}/>}
@@ -152,6 +161,7 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                                     active={coatingType === 'masking'}
                                     onClick={() => dispatch(setCoatingType('masking'))}
                                     className={coatingType === 'masking' ? 'bg-red-200 border border-red-400 hover:bg-red-300' : 'hover:bg-red-100'}
+                                    disabled={isLineToolActive || isSelectToolActive}
                                 />
                             </div>
                             <span className="text-xs mt-1 text-muted-foreground">코팅 타입</span>

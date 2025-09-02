@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, } from 'react';
+import {useEffect, useMemo, useRef,} from 'react';
 import {useSettings} from "@/contexts/settings-context";
 import {Canvas} from "@react-three/fiber";
 import {OrbitControls, Grid, Text, OrthographicCamera} from "@react-three/drei";
@@ -11,7 +11,7 @@ import {PathPoint} from "@/components/preview-3d/path-point";
 import GCodePath from "@/components/preview-3d/gcode-path";
 import ToolHead from "@/components/preview-3d/toolhead";
 import Preview3DImages from "@/components/preview-3d/preview-3d-images";
-
+import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 interface Preview3DProps {
     toolheadPos: number[];         // [x,y,z,...]

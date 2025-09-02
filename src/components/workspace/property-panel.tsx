@@ -314,7 +314,41 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 />
                             </div>
                         </div>
+                        {/* 세 번째 줄: 윤곽 타입, 오프셋 */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">윤곽 타입</Label>
+                                <Select
+                                    value={commonProperties?.outlineType || 'center'}
+                                    onValueChange={(value) => handlePropertyUpdate('outlineType', value)}
+                                >
+                                    <SelectTrigger className="h-7 text-xs">
+                                        <SelectValue/>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="outside">외곽</SelectItem>
+                                        <SelectItem value="center">중앙</SelectItem>
+                                        <SelectItem value="inside">내부</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">윤곽 오프셋</Label>
+                                <div className="flex items-center gap-1">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        name="outlineInterval"
+                                        value={commonProperties?.outlineInterval || 0}
+                                        onChange={handleInputChange}
+                                        className="h-7 text-xs"
+                                    />
+                                    <span className="text-xs text-muted-foreground">mm</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
                 );
 
             case 'masking':
