@@ -7,10 +7,16 @@ import type Konva from 'konva';
 import type {CustomShapeConfig} from '@/types/custom-konva-config';
 import {getCoatingVisualStyle} from "@/lib/shape-style-utils";
 
+import {KonvaEventObject} from "konva/lib/Node";
+
 interface ImageComponentProps {
     shape: CustomShapeConfig;
     imageElement: HTMLImageElement | null;
-    commonProps: any; // makeImageProps의 결과
+    commonProps: Partial<Konva.ImageConfig> & {
+        onDragStart?: (e: KonvaEventObject<DragEvent>) => void;
+        onDragEnd?: (e: KonvaEventObject<DragEvent>) => void;
+        onTransformEnd?: (e: KonvaEventObject<Event>) => void;
+    };
 }
 
 /**

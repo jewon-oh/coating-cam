@@ -3,7 +3,6 @@ import {Stage, Layer, Rect, Circle, Group} from 'react-konva';
 import {motion} from "framer-motion";
 import {CustomShapeConfig} from "@/types/custom-konva-config";
 import Konva from "konva";
-import {useCanvas} from "@/contexts/canvas-context";
 
 interface MinimapProps {
     shapes: CustomShapeConfig[];
@@ -143,10 +142,10 @@ export default function Minimap({
                                 const fill = getShapeColor(shape);
 
                                 if (shape.type === 'rectangle' || shape.type === 'image') {
-                                    return <Rect {...commonProps} width={shape.width} height={shape.height} fill={fill} opacity={0.8} />;
+                                    return <Rect key={shape.id} {...commonProps} width={shape.width} height={shape.height} fill={fill} opacity={0.8} />;
                                 }
                                 if (shape.type === 'circle') {
-                                    return <Circle {...commonProps} radius={shape.radius} fill={fill} opacity={0.8} />;
+                                    return <Circle key={shape.id} {...commonProps} radius={shape.radius} fill={fill} opacity={0.8} />;
                                 }
                                 return null;
                             })

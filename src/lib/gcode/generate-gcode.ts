@@ -44,14 +44,14 @@ type Vars = {
     pathCount?: number;
     shapeName?: string;
     shapeType?: string;
-    [k: string]: any;
+    [k: string]: string | number | boolean | Record<string, unknown> | undefined;
 };
 
 // G-code 템플릿 문자열을 변수 값으로 렌더링하는 유틸 함수
 function renderTemplate(tpl: string, vars: Vars): string {
     if (!tpl) return '';
     return tpl.replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*}}/g, (_m, key) => {
-        const v = key.split('.').reduce<any>((acc, k) => (acc ? acc[k] : undefined), vars);
+        const v = key.split('.').reduce<string | number | boolean | Record<string, unknown> | undefined>((acc, k) => (acc && typeof acc === 'object' ? acc[k] as string | number | boolean | Record<string, unknown> | undefined : undefined), vars);
         return v === undefined || v === null ? '' : String(v);
     });
 }
@@ -104,7 +104,7 @@ export async function generateGcode(
 
         // 2) 스니펫과 조합
         const baseVars: Vars = {
-            unit: (settings.unit as any) ?? 'mm',
+            unit: settings.unit ?? 'mm',
             workArea: workArea,
             safeHeight: settings.safeHeight,
             time: new Date().toISOString(),

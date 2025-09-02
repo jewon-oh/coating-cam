@@ -44,7 +44,7 @@ export const useLineHandles = (lineNode: Konva.Line | null, selectedLineConfig: 
             start: { ...stageTransform.point(startPosAbs), scale: handleScale },
             end: { ...stageTransform.point(endPosAbs), scale: handleScale },
         };
-    }, [lineNode, stageRef, selectedLineConfig]);
+    }, [lineNode, stageRef]);
 
 
     // 핸들을 드래그하는 동안 실시간으로 라인의 points를 업데이트합니다.

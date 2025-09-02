@@ -1,4 +1,3 @@
-
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { current, isDraft } from 'immer';
@@ -142,12 +141,12 @@ const shapeHistorySlice = createSlice({
         },
 
         // 배치 작업을 위한 히스토리 일시 정지/재개
-        pauseHistory: (state) => {
+        pauseHistory: () => {
             // 상태에 플래그를 추가하려면 HistoryState 인터페이스 수정 필요
             console.log('히스토리가 일시 정지되었습니다.');
         },
 
-        resumeHistory: (state) => {
+        resumeHistory: () => {
             console.log('히스토리가 재개되었습니다.');
         }
     },

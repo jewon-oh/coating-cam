@@ -92,7 +92,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
     }, [selectedShapes]);
 
     // 속성 업데이트 핸들러
-    const handlePropertyUpdate = (property: string, value: any) => {
+    const handlePropertyUpdate = (property: string, value: string | number | boolean | undefined) => {
         if (selectedShapeIds.length === 0) return;
 
         if (selectedShapeIds.length === 1) {

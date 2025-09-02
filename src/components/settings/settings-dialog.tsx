@@ -83,7 +83,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
 /* 일반 탭: workArea 편집 + 테마 즉시 적용 + 현재 테마 표시 */
 function GeneralSettings() {
-    const { theme: persistedTheme, setTheme: setThemePersisted, workArea, setWorkArea, pixelsPerMm } = useSettings();
+    const { setTheme: setThemePersisted, workArea, setWorkArea, pixelsPerMm } = useSettings();
     const { theme: runtimeTheme, setTheme } = useTheme();
 
     const [widthText, setWidthText] = useState(String(workArea.width));
@@ -155,9 +155,9 @@ function GeneralSettings() {
                 <Label className="text-right col-span-1">테마</Label>
                 <div className="col-span-3">
                     <Select
-                        value={(runtimeTheme as any) ?? "system"}
-                        onValueChange={(v) => {
-                            setTheme(v as any);
+                        value={runtimeTheme ?? "system"}
+                        onValueChange={(v: "light" | "dark" | "system") => {
+                            setTheme(v);
                             setThemePersisted(v);
                         }}
                     >

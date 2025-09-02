@@ -51,7 +51,7 @@ export function useShapeEvents() {
         }
     }, [drawing, selection]);
 
-    const handleMouseLeave = useCallback((e: KonvaEventObject<MouseEvent>) => {
+    const handleMouseLeave = useCallback(() => {
         drawing.cancelDrawing();
         selection.cancelDragSelection();
     }, [drawing, selection]);
@@ -62,9 +62,9 @@ export function useShapeEvents() {
     }, [selection]);
 
     // 컨텍스트 메뉴 처리
-    const handleContextMenu = useCallback((e: KonvaEventObject<PointerEvent>) => {
+    const handleContextMenu = useCallback(() => {
         // return selection.handleContextMenuSelection(e);
-    }, [selection]);
+    }, []);
 
     // 캔버스 클릭 핸들러
     const handleCanvasClick = useCallback((e: KonvaEventObject<MouseEvent>) => {

@@ -57,8 +57,7 @@ function findPath(
 
 export async function getCoatingSequenceEndpoints(
     shapes: CustomShapeConfig[],
-    settings: CoatingSettings,
-    workArea: { width: number; height: number }
+    settings: CoatingSettings
 ): Promise<{ start: Point; end: Point; order: number }[]> {
     
     const activeShapes = shapes.filter(s => !shouldSkipCoating(s));

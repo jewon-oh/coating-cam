@@ -243,7 +243,8 @@ export function ShapeLayer({isPanning = false}: ShapeLayerProps) {
     }, [transformableShapes]);
 
     useEffect(() => {
-        return () => imageCache.current.clear();
+        const cache = imageCache.current;
+        return () => cache.clear();
     }, []);
 
     return (

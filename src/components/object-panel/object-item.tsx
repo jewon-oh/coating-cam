@@ -100,15 +100,15 @@ export const ObjectItem = memo<ObjectItemProps>(({
         startEditing(e);
     }, [startEditing]);
 
-    const handleNameBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    const handleNameBlur = useCallback(() => {
         handleNameSubmit();
     }, [handleNameSubmit]);
 
-    const handleDuplicate = useCallback((e: React.MouseEvent) => {
+    const handleDuplicate = useCallback(() => {
         // TODO: 복사 기능 구현
-    }, [dispatch, shape.id]);
+    }, []);
 
-    const handleDelete = useCallback((e: React.MouseEvent) => {
+    const handleDelete = useCallback(() => {
         dispatch(removeShapes([shape.id!]));
     }, [dispatch, shape.id]);
 

@@ -1,11 +1,12 @@
 import {CustomShapeConfig} from "@/types/custom-konva-config";
+import Konva from "konva";
 
 /**
  * 도형의 상태(잠김, 코팅 건너뛰기, 코팅 타입)에 따라 시각적 스타일 객체를 반환합니다.
  * @param shape - 스타일을 결정할 도형 객체
  * @returns Konva 도형에 적용할 스타일 속성 객체
  */
-export const getCoatingVisualStyle = (shape: Partial<CustomShapeConfig>): Record<string, any> => {
+export const getCoatingVisualStyle = (shape: Partial<CustomShapeConfig>): Konva.ShapeConfig => {
     const isLocked = shape.isLocked;
 
     if (isLocked) {

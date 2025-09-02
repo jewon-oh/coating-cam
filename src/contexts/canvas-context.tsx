@@ -90,7 +90,7 @@ function useStageState() {
 
     useEffect(() => {
         try {
-            const { width, height, ...stateToSave } = stage;
+            const { ...stateToSave } = stage;
             localStorage.setItem(STAGE_STATE_STORAGE_KEY, JSON.stringify(stateToSave));
         } catch (e) {
             console.error("localStorage에 캔버스 상태를 저장하지 못했습니다.", e);
