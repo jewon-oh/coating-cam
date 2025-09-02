@@ -1,4 +1,4 @@
-import React, {memo, useCallback, useState, useRef, useEffect} from 'react';
+import React, {memo, useCallback, useState} from 'react';
 import {Badge} from '@/components/ui/badge';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -10,7 +10,6 @@ import {
     Lock,
     Unlock,
     Users,
-    MoreHorizontal,
     Edit2,
     Trash2,
     Copy,
