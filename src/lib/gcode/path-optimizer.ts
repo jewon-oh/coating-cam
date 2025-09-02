@@ -1,6 +1,6 @@
 import {CoatingSettings} from "@/types/coating";
 import { CustomShapeConfig } from '@/types/custom-konva-config';
-import { Point } from '@/lib/gcode/point';
+import { Point } from '@/types/point';
 import { ProgressCallback } from '@/lib/gcode/progress-callback';
 import { GCodeEmitter } from '@/lib/gcode/gcode-emitter';
 

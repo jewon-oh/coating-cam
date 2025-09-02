@@ -25,3 +25,4 @@ export type GCodeSnippet = {
     template: string;     // G-code 텍스트(템플릿 변수 포함 가능)
     description?: string; // 메모
 };
+

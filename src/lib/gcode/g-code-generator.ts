@@ -5,7 +5,7 @@ import { PathCalculator } from "@/lib/gcode/path-calculator";
 import { MaskingManager } from "@/lib/gcode/mask-manager";
 import { PathOptimizer } from "@/lib/gcode/path-optimizer";
 import {CoatingSettings} from "@/types/coating";
-import {Point} from "@/lib/gcode/point";
+import {Point} from "@/types/point";
 
 /**
  * 도형이 코팅에서 제외되어야 하는지 확인합니다.

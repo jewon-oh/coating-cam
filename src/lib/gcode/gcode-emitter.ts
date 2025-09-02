@@ -1,5 +1,14 @@
 import {CoatingSettings} from "@/types/coating";
-import {Point} from "@/lib/gcode/point";
+import {Point} from "@/types/point";
+
+// 이동 데이터를 저장하기 위한 타입 정의
+type Move = {
+    mmX: number;
+    mmY: number;
+    currentZ: number;
+    speed: number;
+    isRapid: boolean;
+};
 
 /**
  * G-code 생성과 상태 추적을 전담하는 클래스
@@ -8,6 +17,8 @@ import {Point} from "@/lib/gcode/point";
 export class GCodeEmitter {
     // 생성된 G-code 문자열을 저장합니다.
     private gcode: string = '';
+    // 이동 데이터를 저장하는 배열
+    private moves: Move[] = [];
     // 마지막 위치를 픽셀과 mm 단위로 모두 저장하여 변환 오류를 방지합니다.
     private lastPixelPosition: Point = { x: 0, y: 0, z: 0 }; // z는 mm 단위
     private lastMmPosition: Point = { x: 0, y: 0, z: 0 };
@@ -48,6 +59,7 @@ export class GCodeEmitter {
     private moveTo(x: number, y: number, z: number | undefined, speed: number, isRapid: boolean) {
         const mmX = this.toMM(x);
         const mmY = this.toMM(y);
+        const currentZ = z !== undefined && z !== null ? z : this.lastMmPosition.z;
 
         // 마지막 mm 위치와 비교하여 불필요한 이동 명령을 방지합니다.
         if (
@@ -58,11 +70,14 @@ export class GCodeEmitter {
             return;
         }
 
+        // 주석 헤더를 위해 이동 데이터 저장
+        this.moves.push({ mmX, mmY, currentZ, speed, isRapid });
+
         const command = isRapid ? 'G0' : 'G1';
+        const zPart = z !== undefined && z !== null ? ` Z${z.toFixed(3)}` : '';
+        
         this.addLine(
-            `${command} F${speed} X${mmX.toFixed(3)} Y${mmY.toFixed(3)}${
-                z !== undefined && z !== null ? ` Z${z.toFixed(3)}` : ''
-            }`,
+            `${command} F${speed} X${mmX.toFixed(3)} Y${mmY.toFixed(3)}${zPart}`,
         );
 
         // 마지막 위치를 픽셀과 mm 단위로 모두 업데이트합니다.
@@ -72,9 +87,6 @@ export class GCodeEmitter {
 
     /**
      * 고속 이동(G0)을 사용하여 지정된 위치로 이동합니다.
-     * @param x X좌표
-     * @param y Y좌표
-     * @param z Z좌표 (선택 사항)
      */
     public travelTo(x: number, y: number, z?: number) {
         this.moveTo(x, y, z, this.settings.moveSpeed, true);
@@ -82,9 +94,6 @@ export class GCodeEmitter {
 
     /**
      * [신규] 지정된 속도를 사용하여 코팅(G1) 이동을 합니다.
-     * @param x X좌표
-     * @param y Y좌표
-     * @param speed 이동 속도 (F값)
      */
     public coatToWithSpeed(x: number, y: number, speed: number) {
         this.moveTo(x, y, this.lastMmPosition.z, speed, false);
@@ -92,8 +101,6 @@ export class GCodeEmitter {
 
     /**
      * 코팅 속도(G1)를 사용하여 현재 Z높이에서 지정된 위치로 이동합니다.
-     * @param x X좌표
-     * @param y Y좌표
      */
     public coatTo(x: number, y: number) {
         this.moveTo(x, y, this.lastMmPosition.z, this.settings.coatingSpeed, false);
@@ -101,8 +108,6 @@ export class GCodeEmitter {
 
     /**
      * 코팅 높이(G1)에서 지정된 위치로 이동합니다.
-     * @param x X좌표
-     * @param y Y좌표
      */
     public travelAtCoatingHeight(x: number, y: number) {
         this.moveTo(x, y, this.settings.coatingHeight, this.settings.moveSpeed, false);
@@ -110,16 +115,13 @@ export class GCodeEmitter {
 
     /**
      * Z축 높이를 설정합니다. (고속 이동)
-     * @param z Z좌표
      */
     public setZ(z: number) {
-        // 마지막 픽셀 위치를 기준으로 Z축만 변경합니다.
         this.moveTo(this.lastPixelPosition.x, this.lastPixelPosition.y, z, this.settings.moveSpeed, true);
     }
 
     /**
      * [선택] 코팅 높이로 내리되, 필요 시 개별 높이를 적용해 사용할 수 있습니다.
-     * 내부적으로는 setZ를 사용합니다.
      */
     public setCoatingZ(z: number) {
         this.setZ(z);
@@ -141,7 +143,6 @@ export class GCodeEmitter {
 
     /**
      * 현재 위치를 반환합니다.
-     * @returns 현재 위치
      */
     public getCurrentPosition(): Point {
         return { ...this.lastPixelPosition, z: this.lastMmPosition.z };
@@ -149,9 +150,21 @@ export class GCodeEmitter {
 
     /**
      * 최종 G-code 문자열을 반환합니다.
-     * @returns 생성된 G-code
+     * 이 함수는 주석 헤더를 생성하고 G-code 본문 앞에 추가합니다.
      */
     public getGCode(): string {
-        return this.gcode;
+        let header = '';
+        if (this.moves.length > 0) {
+            header += ';!OS-GRID\n';
+            for (const move of this.moves) {
+                const commentPrefix = move.isRapid ? ';G2' : ';G5';
+                const spray = move.isRapid ? 0 : 1;
+                const offset = move.isRapid ? 0 : 5;
+                const comment = `${commentPrefix}X${move.mmX.toFixed(3)} Y${move.mmY.toFixed(3)} Z${move.currentZ.toFixed(3)}  A0.000   B30.000  F${move.speed}   Spray${spray}       Needle0       Int0       FC0       PA0       Offset${offset}`;
+                header += comment + '\n';
+            }
+            header += ';!OS-GRID\n';
+        }
+        return header + this.gcode;
     }
 }

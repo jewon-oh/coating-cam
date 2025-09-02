@@ -1,6 +1,6 @@
 import { CustomShapeConfig } from '@/types/custom-konva-config';
 import {CoatingSettings} from "@/types/coating";
-import { Point } from '@/lib/gcode/point';
+import { Point } from '@/types/point';
 import { MaskingManager } from "@/lib/gcode/mask-manager";
 
 /**

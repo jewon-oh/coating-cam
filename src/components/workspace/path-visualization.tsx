@@ -7,7 +7,7 @@ import { useAppSelector } from '@/hooks/redux';
 import { useSettings } from '@/contexts/settings-context';
 import { selectShapes,  selectDraggingShapeIds } from '@/store/slices/shape-slice';
 import { GCodeGenerator } from '@/lib/gcode/g-code-generator';
-import { Point } from '@/lib/gcode/point';
+import { Point } from '@/types/point';
 import { CoatingOrderBadge } from './coating-order-badge';
 import { useCanvas } from '@/contexts/canvas-context';
 
