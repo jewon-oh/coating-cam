@@ -79,7 +79,7 @@ export function useShapeSelection() {
         const transform = stage.getAbsoluteTransform().copy().invert();
         const localPos = transform.point(pointer);
 
-        const start = dragStartRef.current; // 드래그 시작점
+        const start = dragStartRef.current;
         const selectionBox = {
             x: Math.min(start.x, localPos.x),
             y: Math.min(start.y, localPos.y),
@@ -87,14 +87,13 @@ export function useShapeSelection() {
             height: Math.abs(localPos.y - start.y)
         };
 
-        // 선택 영역과 겹치는 도형들의 ID를 찾습니다.
+        // 이 부분은 변경 없음: 수정된 getShapeBox를 사용하게 됨
         const selectedIds: string[] = [];
         shapes.forEach(shape => {
-            if (!shape.visible || shape.isLocked) return;
+            if (shape.isLocked) return;
 
-            // 각 도형의 경계 상자를 가져옵니다.
             const shapeBox = getShapeBox(shape);
-            if (isBoxIntersecting(selectionBox, shapeBox)) { // 경계 상자가 겹치는지 확인합니다.
+            if (isBoxIntersecting(selectionBox, shapeBox)) {
                 selectedIds.push(shape.id!);
             }
         });
@@ -170,25 +169,78 @@ interface Box {
 }
 
 // 유틸리티 함수들
+
+
+// 헬퍼 함수: 라인의 절대 끝점 좌표를 계산합니다.
+function getLineEndPosition(shape: CustomShapeConfig): { x: number; y: number } {
+    const startX = shape.x || 0;
+    const startY = shape.y || 0;
+
+    // points는 시작점 기준 상대 좌표 [0, 0, endX, endY]
+    const relEndX = shape.points?.[2] || 0;
+    const relEndY = shape.points?.[3] || 0;
+    const rotation = shape.rotation || 0;
+
+    // 라디안으로 변환
+    const rad = rotation * (Math.PI / 180);
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // 회전 변환 적용
+    const rotatedX = relEndX * cos - relEndY * sin;
+    const rotatedY = relEndX * sin + relEndY * cos;
+
+    // 절대 좌표 반환
+    return {
+        x: startX + rotatedX,
+        y: startY + rotatedY,
+    };
+}
+
+
+// ⭐️ 수정된 함수: getShapeBox
 /** 도형의 경계 상자(bounding box)를 계산하여 반환합니다. */
 function getShapeBox(shape: CustomShapeConfig): Box {
+    const x = shape.x || 0;
+    const y = shape.y || 0;
+
     if (shape.type === 'circle') {
         const radius = shape.radius || 0;
         return {
-            x: (shape.x || 0) - radius,
-            y: (shape.y || 0) - radius,
+            x: x - radius,
+            y: y - radius,
             width: radius * 2,
             height: radius * 2
         };
-    } else {
+    }
+
+    // 💡 라인 타입에 대한 처리 추가
+    if (shape.type === 'line') {
+        const startPoint = { x, y };
+        const endPoint = getLineEndPosition(shape);
+
+        const minX = Math.min(startPoint.x, endPoint.x);
+        const minY = Math.min(startPoint.y, endPoint.y);
+        const maxX = Math.max(startPoint.x, endPoint.x);
+        const maxY = Math.max(startPoint.y, endPoint.y);
+
         return {
-            x: shape.x || 0,
-            y: shape.y || 0,
-            width: shape.width || 0,
-            height: shape.height || 0
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY,
         };
     }
+
+    // 사각형 및 기타 도형
+    return {
+        x,
+        y,
+        width: shape.width || 0,
+        height: shape.height || 0
+    };
 }
+
 
 /** 두 경계 상자가 겹치는지 확인합니다. */
 function isBoxIntersecting(box1: Box, box2: Box): boolean {

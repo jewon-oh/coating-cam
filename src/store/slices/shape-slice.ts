@@ -110,11 +110,11 @@ const shapeSlice = createSlice({
                 y: action.payload.y ?? 0,
                 coatingType: action.payload.coatingType ?? 'masking'
             };
-            Object.assign(state, {
-                shapes: [...state.shapes, newShape]
-            });
+            // Object.assign(state, {
+            //     shapes: [...state.shapes, newShape]
+            // });
 
-            // state.shapes.push(newShape);
+            state.shapes.push(newShape);
         },
 
         // addShapeToBack: 배열 맨 앞에 추가 → unshift 사용

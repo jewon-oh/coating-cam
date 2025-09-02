@@ -23,8 +23,8 @@ interface CanvasContextValue {
     canvasContainerRef: RefObject<HTMLDivElement|null>;
 
     // 스테이지 상태
-    stage: StageState;
-    setStage: (updater: React.SetStateAction<StageState>) => void;
+    stageState: StageState;
+    setStageState: (updater: React.SetStateAction<StageState>) => void;
 
     // 로딩 상태
     loading: LoadingState;
@@ -253,8 +253,8 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
     const contextValue = useMemo<CanvasContextValue>(() => ({
         stageRef,
         canvasContainerRef,
-        stage,
-        setStage,
+        stageState: stage,
+        setStageState: setStage,
         loading,
         setLoading,
         isCanvasFocused,

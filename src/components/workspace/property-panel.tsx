@@ -358,106 +358,147 @@ export function PropertyPanel({className}: PropertyPanelProps) {
 
     // Line 전용 속성 렌더링 함수 추가
     const renderLineSettings = () => {
-        if (!singleSelectedShape || singleSelectedShape.type !== 'line') return null;
+        // 타입 가드를 통해 singleSelectedShape가 'line' 타입인지 확인합니다.
+        if (singleSelectedShape?.type !== 'line') return null;
 
-        const handlePointUpdate = (pointType: 'startPoint' | 'endPoint', axis: 'x' | 'y', value: string) => {
-            const currentPoint = singleSelectedShape[pointType] || {x: 0, y: 0};
+        const shapeX_px = singleSelectedShape.x || 0;
+        const shapeY_px = singleSelectedShape.y || 0;
+        // points는 shape의 (x, y)에 대한 상대 좌표입니다.
+        const points = singleSelectedShape.points || [0, 0, 0, 0];
+        const [startX_rel_px, startY_rel_px, endX_rel_px, endY_rel_px] = points;
+
+        // UI에 표시할 절대 좌표를 계산합니다.
+        const startX_abs_px = shapeX_px + startX_rel_px;
+        const startY_abs_px = shapeY_px + startY_rel_px;
+        const endX_abs_px = shapeX_px + endX_rel_px;
+        const endY_abs_px = shapeY_px + endY_rel_px;
+
+        /**
+         * 입력된 절대 좌표를 기반으로 shape의 x, y와 points를 업데이트하는 핸들러입니다.
+         * 데이터 일관성을 위해 라인의 시작점을 (x,y)에 맞추고 points를 [0, 0, ...]으로 정규화합니다.
+         */
+        const handleAbsolutePointUpdate = (pointType: 'start' | 'end', axis: 'x' | 'y', value: string) => {
             const mmValue = parseFloat(value) || 0;
-            const pxValue = mmValue * pixelsPerMm;
-            handlePropertyUpdate(pointType, {...currentPoint, [axis]: pxValue});
+            const newAbsCoord_px = mmValue * pixelsPerMm;
+
+            let newShapeX: number;
+            let newShapeY: number;
+            const newPoints = [0, 0, 0, 0]; // 정규화를 위해 [0, 0, ...]으로 시작
+
+            if (pointType === 'start') {
+                // 시작점이 변경되면, shape의 (x, y)를 새로운 시작점의 절대 좌표로 업데이트합니다.
+                newShapeX = axis === 'x' ? newAbsCoord_px : startX_abs_px;
+                newShapeY = axis === 'y' ? newAbsCoord_px : startY_abs_px;
+                // 끝점의 절대 위치는 유지되어야 하므로, 새로운 shape (x,y)에 대한 상대 위치를 재계산합니다.
+                newPoints[2] = endX_abs_px - newShapeX;
+                newPoints[3] = endY_abs_px - newShapeY;
+            } else { // pointType === 'end'
+                // 끝점이 변경되면, 시작점의 절대 위치(즉, shape의 x, y)는 유지됩니다.
+                newShapeX = startX_abs_px;
+                newShapeY = startY_abs_px;
+                // 새로운 끝점의 절대 좌표를 기준으로 상대 위치를 계산합니다.
+                newPoints[2] = (axis === 'x' ? newAbsCoord_px : endX_abs_px) - newShapeX;
+                newPoints[3] = (axis === 'y' ? newAbsCoord_px : endY_abs_px) - newShapeY;
+            }
+
+            // Redux 스토어를 여러 속성으로 한번에 업데이트합니다.
+            dispatch(updateShape({
+                id: singleSelectedShape.id,
+                updatedProps: {
+                    x: newShapeX,
+                    y: newShapeY,
+                    points: newPoints,
+                }
+            }));
         };
 
-        const startX_mm = ((singleSelectedShape.startPoint?.x || 0) / pixelsPerMm).toFixed(2);
-        const startY_mm = ((singleSelectedShape.startPoint?.y || 0) / pixelsPerMm).toFixed(2);
-        const endX_mm = ((singleSelectedShape.endPoint?.x || 0) / pixelsPerMm).toFixed(2);
-        const endY_mm = ((singleSelectedShape.endPoint?.y || 0) / pixelsPerMm).toFixed(2);
+        // UI에 표시할 값들을 mm 단위로 변환합니다.
+        const startX_mm = (startX_abs_px / pixelsPerMm).toFixed(2);
+        const startY_mm = (startY_abs_px / pixelsPerMm).toFixed(2);
+        const endX_mm = (endX_abs_px / pixelsPerMm).toFixed(2);
+        const endY_mm = (endY_abs_px / pixelsPerMm).toFixed(2);
 
+        // 라인 길이를 계산합니다.
         const length_px = Math.sqrt(
-            Math.pow((singleSelectedShape.endPoint?.x || 0) - (singleSelectedShape.startPoint?.x || 0), 2) +
-            Math.pow((singleSelectedShape.endPoint?.y || 0) - (singleSelectedShape.startPoint?.y || 0), 2)
+            Math.pow(endX_abs_px - startX_abs_px, 2) +
+            Math.pow(endY_abs_px - startY_abs_px, 2)
         );
         const length_mm = (length_px / pixelsPerMm).toFixed(2);
 
-
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-sm">라인 속성</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    {/* 시작점 좌표 */}
-                    <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">시작점</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="flex items-center gap-1">
-                                <Label className="text-xs w-4">X</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={startX_mm}
-                                    onChange={(e) => handlePointUpdate('startPoint', 'x', e.target.value)}
-                                    className="h-7 text-xs"
-                                />
-                                <span className="text-xs text-muted-foreground">mm</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <Label className="text-xs w-4">Y</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={startY_mm}
-                                    onChange={(e) => handlePointUpdate('startPoint', 'y', e.target.value)}
-                                    className="h-7 text-xs"
-                                />
-                                <span className="text-xs text-muted-foreground">mm</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 끝점 좌표 */}
-                    <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">끝점</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="flex items-center gap-1">
-                                <Label className="text-xs w-4">X</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={endX_mm}
-                                    onChange={(e) => handlePointUpdate('endPoint', 'x', e.target.value)}
-                                    className="h-7 text-xs"
-                                />
-                                <span className="text-xs text-muted-foreground">mm</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <Label className="text-xs w-4">Y</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={endY_mm}
-                                    onChange={(e) => handlePointUpdate('endPoint', 'y', e.target.value)}
-                                    className="h-7 text-xs"
-                                />
-                                <span className="text-xs text-muted-foreground">mm</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 라인 길이 (읽기 전용) */}
-                    <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">길이</Label>
+            <>
+                {/* 시작점 좌표 */}
+                <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">시작점</Label>
+                    <div className="grid grid-cols-2 gap-2">
                         <div className="flex items-center gap-1">
+                            <Label className="text-xs w-4">X</Label>
                             <Input
-                                type="text"
-                                value={length_mm}
-                                disabled
-                                className="h-7 text-xs bg-muted"
+                                type="number"
+                                step="0.01"
+                                value={startX_mm}
+                                onChange={(e) => handleAbsolutePointUpdate('start', 'x', e.target.value)}
+                                className="h-7 text-xs"
+                            />
+                            <span className="text-xs text-muted-foreground">mm</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <Label className="text-xs w-4">Y</Label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                value={startY_mm}
+                                onChange={(e) => handleAbsolutePointUpdate('start', 'y', e.target.value)}
+                                className="h-7 text-xs"
                             />
                             <span className="text-xs text-muted-foreground">mm</span>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+
+                {/* 끝점 좌표 */}
+                <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">끝점</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="flex items-center gap-1">
+                            <Label className="text-xs w-4">X</Label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                value={endX_mm}
+                                onChange={(e) => handleAbsolutePointUpdate('end', 'x', e.target.value)}
+                                className="h-7 text-xs"
+                            />
+                            <span className="text-xs text-muted-foreground">mm</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <Label className="text-xs w-4">Y</Label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                value={endY_mm}
+                                onChange={(e) => handleAbsolutePointUpdate('end', 'y', e.target.value)}
+                                className="h-7 text-xs"
+                            />
+                            <span className="text-xs text-muted-foreground">mm</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 라인 길이 (읽기 전용) */}
+                <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">길이</Label>
+                    <div className="flex items-center gap-1">
+                        <Input
+                            type="text"
+                            value={length_mm}
+                            disabled
+                            className="h-7 text-xs bg-muted"
+                        />
+                        <span className="text-xs text-muted-foreground">mm</span>
+                    </div>
+                </div>
+            </>
         );
     };
 
@@ -643,36 +684,38 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 {renderLineSettings()}
 
                                 {/* 위치 */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1">
-                                        <Label className="text-xs text-muted-foreground">X 위치</Label>
-                                        <div className="flex items-center gap-1">
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                name="x"
-                                                value={((singleSelectedShape.x || 0) / pixelsPerMm).toFixed(2)}
-                                                onChange={(e) => handleDimensionUpdate('x', e.target.value)}
-                                                className="h-7 text-xs"
-                                            />
-                                            <span className="text-xs text-muted-foreground">mm</span>
+                                {singleSelectedShape.type !== 'line' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <Label className="text-xs text-muted-foreground">X 위치</Label>
+                                            <div className="flex items-center gap-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    name="x"
+                                                    value={((singleSelectedShape.x || 0) / pixelsPerMm).toFixed(2)}
+                                                    onChange={(e) => handleDimensionUpdate('x', e.target.value)}
+                                                    className="h-7 text-xs"
+                                                />
+                                                <span className="text-xs text-muted-foreground">mm</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs text-muted-foreground">Y 위치</Label>
+                                            <div className="flex items-center gap-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    name="y"
+                                                    value={((singleSelectedShape.y || 0) / pixelsPerMm).toFixed(2)}
+                                                    onChange={(e) => handleDimensionUpdate('y', e.target.value)}
+                                                    className="h-7 text-xs"
+                                                />
+                                                <span className="text-xs text-muted-foreground">mm</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs text-muted-foreground">Y 위치</Label>
-                                        <div className="flex items-center gap-1">
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                name="y"
-                                                value={((singleSelectedShape.y || 0) / pixelsPerMm).toFixed(2)}
-                                                onChange={(e) => handleDimensionUpdate('y', e.target.value)}
-                                                className="h-7 text-xs"
-                                            />
-                                            <span className="text-xs text-muted-foreground">mm</span>
-                                        </div>
-                                    </div>
-                                </div>
+                                )}
                                 {/* 회전 */}
                                 {singleSelectedShape.rotation !== undefined && (
                                     <div className="space-y-2">

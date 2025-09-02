@@ -1,6 +1,7 @@
 import { CustomShapeConfig } from '@/types/custom-konva-config';
 import {CoatingSettings} from "@/types/coating";
 import { Point } from '@/lib/gcode/point';
+import {PathSegment} from "@/types/path";
 
 /**
  * 마스킹 계산 및 경로 분할만 담당하는 클래스
@@ -33,9 +34,9 @@ export class MaskingManager {
      * 원본 세그먼트들과 코팅 도형을 받아 마스킹 적용
      */
     public applyMaskingToSegments(
-        segments: { start: Point; end: Point }[],
+        segments: PathSegment[],
         coatingShape: CustomShapeConfig
-    ): { start: Point; end: Point }[] {
+    ): PathSegment[] {
         if (!this.hasMasks()) {
             return segments;
         }
@@ -46,7 +47,7 @@ export class MaskingManager {
             return []; // 빈 배열 반환으로 코팅하지 않음
         }
 
-        const maskedSegments: { start: Point; end: Point }[] = [];
+        const maskedSegments: PathSegment[] = [];
         for (const segment of segments) {
             maskedSegments.push(...this.splitSegmentByMasks(segment, coatingShape));
         }
@@ -213,9 +214,8 @@ export class MaskingManager {
      * 단일 경로 세그먼트를 마스크와 교차하는 부분을 기준으로 잘라냅니다.
      */
     private splitSegmentByMasks(
-        segment: { start: Point; end: Point },
-        coatingShape: CustomShapeConfig
-    ): { start: Point; end: Point }[] {
+        segment: PathSegment,
+    ): PathSegment[] {
         if (!this.settings.enableMasking || this.maskShapes.length === 0) {
             return [segment];
         }
@@ -257,7 +257,7 @@ export class MaskingManager {
         }
 
         // 위험 구간을 제외한 안전한 구간들로 새로운 세그먼트를 만듭니다.
-        const safeSegments: { start: Point; end: Point }[] = [];
+        const safeSegments: PathSegment[] = [];
         let lastT = 0.0;
         const dir = { x: segment.end.x - segment.start.x, y: segment.end.y - segment.start.y };
 
@@ -441,5 +441,56 @@ export class MaskingManager {
 
         return false;
     }
+    /**
+     * [신규] 특정 도형이 활성화된 마스크 중 하나와 겹치는지 확인합니다.
+     * (간단한 경계 상자 검사로 충분)
+     * @param shape 확인할 도형
+     */
+    public isShapeIntersectingMasks(shape: CustomShapeConfig): boolean {
+        if (!this.hasMasks()) return false;
 
+        const shapeBounds = this.getShapeBounds(shape);
+        if (!shapeBounds) return false;
+
+        for (const mask of this.maskShapes) {
+            const maskBounds = this.getShapeBounds(mask, this.getMaskClearance(mask));
+            if (!maskBounds) continue;
+
+            // 경계 상자가 겹치는지 확인
+            if (
+                shapeBounds.left < maskBounds.right &&
+                shapeBounds.right > maskBounds.left &&
+                shapeBounds.top < maskBounds.bottom &&
+                shapeBounds.bottom > maskBounds.top
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * [신규] 도형의 경계 상자를 계산하는 헬퍼 함수
+     */
+    private getShapeBounds(shape: CustomShapeConfig, clearance: number = 0): { left: number, top: number, right: number, bottom: number } | null {
+        const x = shape.x ?? 0;
+        const y = shape.y ?? 0;
+
+        if (shape.type === 'rectangle' || shape.type === 'image') {
+            return {
+                left: x - clearance,
+                top: y - clearance,
+                right: x + (shape.width ?? 0) + clearance,
+                bottom: y + (shape.height ?? 0) + clearance,
+            };
+        } else if (shape.type === 'circle' && shape.radius) {
+            return {
+                left: x - shape.radius - clearance,
+                top: y - shape.radius - clearance,
+                right: x + shape.radius + clearance,
+                bottom: y + shape.radius + clearance,
+            };
+        }
+        return null;
+    }
 }

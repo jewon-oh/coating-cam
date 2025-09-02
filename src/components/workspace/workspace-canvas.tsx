@@ -28,7 +28,7 @@ export default function WorkspaceCanvas() {
     const {
         stageRef,
         canvasContainerRef,
-        stage,
+        stageState,
         isCanvasFocused,
         handleCanvasFocus,
         handleCanvasBlur,
@@ -123,12 +123,12 @@ export default function WorkspaceCanvas() {
         >
             <Stage
                 ref={stageRef}
-                width={stage.width}
-                height={stage.height}
-                scaleX={stage.scaleX}
-                scaleY={stage.scaleY}
-                x={stage.x}
-                y={stage.y}
+                width={stageState.width}
+                height={stageState.height}
+                scaleX={stageState.scaleX}
+                scaleY={stageState.scaleY}
+                x={stageState.x}
+                y={stageState.y}
                 onMouseDown={handleStageMouseDown}
                 onMouseMove={handleStageMouseMove}
                 onMouseUp={handleStageMouseUp}
@@ -141,15 +141,15 @@ export default function WorkspaceCanvas() {
                 <Layer>
                     {/* 캔버스 배경 */}
                     {(() => {
-                        const sx = stage.scaleX || 1;
-                        const sy = stage.scaleY || 1;
-                        const tx = stage.x || 0;
-                        const ty = stage.y || 0;
+                        const sx = stageState.scaleX || 1;
+                        const sy = stageState.scaleY || 1;
+                        const tx = stageState.x || 0;
+                        const ty = stageState.y || 0;
 
                         const vx1 = (0 - tx) / sx;
-                        const vx2 = (stage.width - tx) / sx;
+                        const vx2 = (stageState.width - tx) / sx;
                         const vy1 = (0 - ty) / sy;
-                        const vy2 = (stage.height - ty) / sy;
+                        const vy2 = (stageState.height - ty) / sy;
 
                         const bgX = Math.min(vx1, vx2);
                         const bgY = Math.min(vy1, vy2);
@@ -176,8 +176,8 @@ export default function WorkspaceCanvas() {
                         width={workAreaPx.width}
                         height={workAreaPx.height}
                         stroke="black"
-                        strokeWidth={1 / Math.abs(stage.scaleX)}
-                        dash={[4 / Math.abs(stage.scaleX), 2 / Math.abs(stage.scaleX)]}
+                        strokeWidth={1 / Math.abs(stageState.scaleX)}
+                        dash={[4 / Math.abs(stageState.scaleX), 2 / Math.abs(stageState.scaleX)]}
                         listening={false}
                     />
 
@@ -187,12 +187,12 @@ export default function WorkspaceCanvas() {
                         pixelsPerMm={pixelsPerMm}
                         workArea={workAreaPx}
                         visible={isGridVisible}
-                        stageScaleX={stage.scaleX}
-                        stageScaleY={stage.scaleY}
-                        stageX={stage.x}
-                        stageY={stage.y}
-                        viewportWidth={stage.width}
-                        viewportHeight={stage.height}
+                        stageScaleX={stageState.scaleX}
+                        stageScaleY={stageState.scaleY}
+                        stageX={stageState.x}
+                        stageY={stageState.y}
+                        viewportWidth={stageState.width}
+                        viewportHeight={stageState.height}
                     />
                 </Layer>
 

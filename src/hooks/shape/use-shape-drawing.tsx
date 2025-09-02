@@ -277,8 +277,6 @@ export function useShapeDrawing() {
                     stroke: '#000000',
                     strokeWidth: 2,
                     points: [0, 0, ept.x - s.x, ept.y - s.y],
-                    startPoint: { x: 0, y: 0 },
-                    endPoint: { x: ept.x - s.x, y: ept.y - s.y },
                     coatingType: 'outline'
                 };
             } else {
