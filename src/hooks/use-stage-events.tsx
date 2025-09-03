@@ -71,7 +71,7 @@ export function useStageEvents() {
         }
 
         // 모드별 정리 로직 실행
-        modeEvents.handleMouseLeave(e);
+        modeEvents.handleMouseLeave();
     }, [isPanning, stopPan, modeEvents]);
 
     // 드래그 이벤트 처리 (패닝용)
