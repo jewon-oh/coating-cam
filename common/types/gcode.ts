@@ -1,4 +1,3 @@
-
 export type GCodeHook =
     | 'beforeAll'     // 전체 생성 시작 직전(파일 헤더 등)
     | 'beforeJob'     // 작업 시작(한 프로젝트/세션 단위)

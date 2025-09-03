@@ -1,7 +1,7 @@
 // G-Code 생성에 필요한 커스텀 도형, 설정, 스니펫 타입들을 가져옵니다.
 import { CustomShapeConfig } from '@/types/custom-konva-config';
-import { GCodeSnippet, GCodeHook } from '@/types/gcode';
-import { CoatingSettings } from "@/types/coating";
+import { GCodeSnippet, GCodeHook } from '../../../common/types/gcode';
+import { CoatingSettings } from "../../../common/types/coating";
 import { GCodeEmitter } from "@/lib/gcode/gcode-emitter";
 import { GCodeGenerator } from "@/lib/gcode/g-code-generator";
 import { ProgressCallback } from "@/lib/gcode/progress-callback";

@@ -1,4 +1,4 @@
-import {CoatingSettings} from "@/types/coating";
+import {CoatingSettings} from "../../../common/types/coating";
 import { CustomShapeConfig } from '@/types/custom-konva-config';
 import { Point } from '@/types/point';
 import { ProgressCallback } from '@/lib/gcode/progress-callback';

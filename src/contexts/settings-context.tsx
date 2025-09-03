@@ -12,9 +12,9 @@ import React, {
     useState,
 } from "react";
 import {nanoid} from "nanoid";
-import type {GCodeHook, GCodeSnippet} from "@/types/gcode";
-import {CoatingSettings} from "@/types/coating";
-import {DEFAULT_SETTINGS, SettingsType} from "@/types/settings";
+import type {GCodeHook, GCodeSnippet} from "../../common/types/gcode";
+import {CoatingSettings} from "../../common/types/coating";
+import {DEFAULT_SETTINGS, SettingsType} from "../../common/types/settings";
 
 function useSettingsBridge() {
     const bridge =

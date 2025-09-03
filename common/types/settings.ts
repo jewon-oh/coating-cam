@@ -1,5 +1,6 @@
-import type { GCodeSnippet} from "@/types/gcode";
-import {CoatingSettings,DEFAULT_COATING_SETTINGS} from "@/types/coating";
+// electron 환경을 위해 @ 사용 안함
+import type { GCodeSnippet} from "./gcode";
+import {CoatingSettings,DEFAULT_COATING_SETTINGS} from "./coating";
 import {nanoid} from "nanoid";
 
 export type SettingsType = {

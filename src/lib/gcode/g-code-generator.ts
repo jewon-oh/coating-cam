@@ -4,7 +4,7 @@ import { ProgressCallback } from "@/lib/gcode/progress-callback";
 import { PathCalculator } from "@/lib/gcode/path-calculator";
 import { MaskingManager } from "@/lib/gcode/mask-manager";
 import { PathOptimizer } from "@/lib/gcode/path-optimizer";
-import {CoatingSettings} from "@/types/coating";
+import {CoatingSettings} from "../../../common/types/coating";
 import {Point} from "@/types/point";
 
 /**

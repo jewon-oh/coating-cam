@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useSettings } from '@/contexts/settings-context';
-import {CoatingType, FillPattern} from "@/types/coating";
+import {CoatingType, FillPattern} from "../../../common/types/coating";
 
 export function useShapeSnapping() {
     const { isSnappingEnabled, pixelsPerMm } = useSettings();

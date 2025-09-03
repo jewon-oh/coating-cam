@@ -1,4 +1,4 @@
-import {CoatingSettings} from "@/types/coating";
+import {CoatingSettings} from "../../../common/types/coating";
 import {Point} from "@/types/point";
 
 // 이동 데이터를 저장하기 위한 타입 정의

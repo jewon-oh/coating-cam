@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { updateShape } from '@/store/slices/shape-slice'; // (가정) CoatingTool 타입 import
 import { Paintbrush } from 'lucide-react';
-import { CoatingTool } from '@/types/coating';
+import { CoatingTool } from '../../../common/types/coating';
 import { ToolSelector } from '@/components/tool/tool-selector';
 
 /**

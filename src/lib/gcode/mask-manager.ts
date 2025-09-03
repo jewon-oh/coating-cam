@@ -1,5 +1,5 @@
 import { CustomShapeConfig } from '@/types/custom-konva-config';
-import {CoatingSettings} from "@/types/coating";
+import {CoatingSettings} from "../../../common/types/coating";
 import { Point } from '@/types/point';
 import {PathSegment} from "@/types/path";
 

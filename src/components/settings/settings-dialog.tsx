@@ -21,7 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useSettings } from "@/contexts/settings-context";
-import {GCODE_HOOKS, GCodeHook} from "@/types/gcode";
+import {GCODE_HOOKS, GCodeHook} from "../../../common/types/gcode";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
 

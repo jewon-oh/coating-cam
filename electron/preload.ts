@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import {SettingsType} from "../src/types/settings";
+import {SettingsType} from "@common/types/settings";
 
 contextBridge.exposeInMainWorld('api', {
     ping: () => 'pong',

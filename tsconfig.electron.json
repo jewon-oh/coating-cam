@@ -4,12 +4,17 @@
     "module": "CommonJS",
     "moduleResolution": "Node",
     "lib": ["ES2020"],
-    "outDir": "../electron-dist",
+    "outDir": "./dist",
     "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@common/*": ["common/*"]
+    },
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["./**/*.ts"]
+  "include": ["electron/**/*.ts", "common/**/*.ts"],
+  "exclude": ["node_modules", "src", ".next", "dist"]
 }

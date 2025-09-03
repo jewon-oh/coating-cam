@@ -1,4 +1,4 @@
-import {FillPattern} from "@/types/coating";
+import {FillPattern} from "../../common/types/coating";
 
 /**
  * 도형 채우기 패턴을 그리는 Canvas를 생성합니다.
