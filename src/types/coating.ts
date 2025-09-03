@@ -1,11 +1,11 @@
-export type FillPattern = 'horizontal' | 'vertical' | 'concentric' |'auto';
+export type FillPattern = 'horizontal' | 'vertical' | 'concentric' | 'auto';
 export type CoatingType = 'fill' | 'outline' | 'masking';
 export type TravelAvoidanceStrategy = 'lift' | 'contour';
+export type OutlineType = 'outside' | 'center' | 'inside';
 
 export interface CoatingSettings {
-    // 코팅 관련 설정
+    // 코팅 공통 설정
     coatingWidth: number;        // 코팅 폭 (mm)
-    lineSpacing: number;         // 라인 간격 (mm)
     coatingSpeed: number;        // 코팅 속도 (mm/min)
     moveSpeed: number;           // 이동 속도 (mm/min)
 
@@ -13,14 +13,20 @@ export interface CoatingSettings {
     safeHeight: number;          // 안전 높이 (mm)
     coatingHeight: number;       // 코팅 높이 (mm)
 
-    // 패턴 설정
-    fillPattern: FillPattern;  // 채우기 패턴
+    // 채우기  코팅 설정
+    fillPattern: FillPattern;    // 채우기 패턴
+    lineSpacing: number;         // 라인 간격 (mm)
+
+    // 윤곽 코팅 설정
+    outlineType?: OutlineType;
+    outlinePasses?: number;      // 테두리 코팅 회수
+    outlineInterval?: number;    // 테두리 코팅 오프셋
 
     // 마스킹 설정
     enableMasking: boolean;      // 마스킹 사용 여부
     maskingClearance: number;    // 마스킹 여유 거리 (mm)
-
     travelAvoidanceStrategy: TravelAvoidanceStrategy; // 이동 회피 전략 추가
+
     unit?: 'mm';
     pixelsPerMm: number; // 픽셀-밀리미터 변환 비율
 }

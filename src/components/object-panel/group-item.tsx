@@ -85,7 +85,7 @@ export const GroupItem = memo<GroupItemProps>(({
 
 
     const isVisible = shape.visible ?? true;
-    const isLocked = shape.listening ?? false;
+    const isLocked = shape.isLocked ?? false;
 
     return (
         <ContextMenu>

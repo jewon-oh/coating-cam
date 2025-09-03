@@ -25,14 +25,14 @@ export const ShapeComponent = ({ shape, commonProps }: ShapeComponentProps) => {
         if (shape.type === 'rectangle') {
             return createCoatingPatternCanvas(
                 'rectangle',
-                shape.width,
-                shape.height,
+                shape.width || 0,
+                shape.height || 0,
                 shape.lineSpacing || 0,
                 shape.coatingWidth || 0,
                 shape.fillPattern,
             );
         }
-        if (shape.type === 'circle' && shape.radius > 0) {
+        if (shape.type === 'circle' && shape.radius || 0 > 0) {
             const size = shape.radius * 2;
             return createCoatingPatternCanvas(
                 'circle',

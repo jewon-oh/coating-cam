@@ -82,6 +82,7 @@ export default function Minimap({
         const pos = stage.getPointerPosition();
         if (!pos) return;
 
+
         const transform = new Konva.Transform();
         transform.translate(groupPosition.x, groupPosition.y);
         transform.scale(minimapScaleX, minimapScaleY);

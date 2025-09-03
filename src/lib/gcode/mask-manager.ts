@@ -49,7 +49,7 @@ export class MaskingManager {
 
         const maskedSegments: PathSegment[] = [];
         for (const segment of segments) {
-            maskedSegments.push(...this.splitSegmentByMasks(segment, coatingShape));
+            maskedSegments.push(...this.splitSegmentByMasks(segment));
         }
         return maskedSegments;
     }

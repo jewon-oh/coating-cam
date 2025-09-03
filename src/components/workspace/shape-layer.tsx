@@ -192,18 +192,12 @@ export function ShapeLayer({isPanning = false}: ShapeLayerProps) {
         return {...baseProps, ...coatingStyle, ...hoverEffect};
     }, [isPanning, tool, isHoveringShape, shapeEvents]);
 
-    const makeImageProps = useCallback((shape: CustomShapeConfig) => {
+    const makeImageProps = useCallback((shape: CustomShapeConfig):Partial<Konva.ImageConfig> => {
         const isLocked = shape.isLocked;
         const baseProps = makeCommonProps(shape);
         const {shadowColor, shadowBlur, shadowOpacity, ...validImageProps} = baseProps;
         const imageSpecificStyle = {
             opacity: isLocked ? 0.4 : (baseProps.opacity || 1),
-            filters: (isLocked || shape.skipCoating) ? ['Grayscale'] : undefined,
-            ...(isLocked && {
-                shadowColor: '#6c757d',
-                shadowBlur: 2,
-                shadowOpacity: 0.3
-            })
         };
         return {
             ...validImageProps,

@@ -1,5 +1,5 @@
 import {createSelector, createSlice, PayloadAction} from '@reduxjs/toolkit';
-import {CustomShapeConfig} from '@/types/custom-konva-config';
+import {CustomShapeConfig, SerializableShapePayload} from '@/types/custom-konva-config';
 
 interface ShapesState {
     shapes: CustomShapeConfig[];      // 모든 도형들
@@ -62,7 +62,7 @@ export const selectShapeHierarchy = createSelector(
     }
 );
 // Helper 함수: 고유 이름 생성
-const generateUniqueName = (shapes: CustomShapeConfig[], baseName: string): string => {
+const generateUniqueName = (shapes: SerializableShapePayload[], baseName: string): string => {
     let count = 1;
     let newName = baseName;
     const existingNames = shapes.map(shape => shape.name);
@@ -73,10 +73,7 @@ const generateUniqueName = (shapes: CustomShapeConfig[], baseName: string): stri
     return newName;
 };
 
-// 기존 SerializableShapePayload 유지...
-interface SerializableShapePayload extends Omit<CustomShapeConfig, 'image'> {
-    imageDataUrl?: string;
-}
+
 
 const shapeSlice = createSlice({
     name: 'shape',
@@ -101,7 +98,7 @@ const shapeSlice = createSlice({
                 return Math.max(max, shape.coatingOrder || 0);
             }, 0);
 
-            const newShape: CustomShapeConfig = {
+            const newShape: SerializableShapePayload  = {
                 ...action.payload,
                 type: action.payload.type,
                 id: action.payload.id,
@@ -126,7 +123,7 @@ const shapeSlice = createSlice({
                 return Math.max(max, shape.coatingOrder || 0);
             }, 0);
 
-            const newShape: CustomShapeConfig = {
+            const newShape: SerializableShapePayload = {
                 ...action.payload,
                 type: action.payload.type,
                 id: action.payload.id,

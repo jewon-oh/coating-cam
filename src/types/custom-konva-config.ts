@@ -1,41 +1,46 @@
-import type { CircleConfig } from "konva/lib/shapes/Circle";
-import type { GroupConfig } from "konva/lib/Group";
-import type { ImageConfig } from "konva/lib/shapes/Image";
-import type { LineConfig } from "konva/lib/shapes/Line";
-import type { RectConfig } from "konva/lib/shapes/Rect";
-import { PolygonConfig } from "konva/lib/shapes/Polygon";
+import type {CircleConfig} from "konva/lib/shapes/Circle";
+import type {GroupConfig} from "konva/lib/Group";
+import type {ImageConfig} from "konva/lib/shapes/Image";
+import type {LineConfig} from "konva/lib/shapes/Line";
+import type {RectConfig} from "konva/lib/shapes/Rect";
+import {CoatingType, FillPattern, OutlineType, TravelAvoidanceStrategy} from "@/types/coating";
 
 /**
  * 모든 커스텀 도형에 공통적으로 적용되는 기본 속성입니다.
  * 앱 고유의 메타데이터와 코팅 관련 설정을 포함합니다.
  */
-interface BaseProperties {
-	// 앱 고유 메타데이터
-	parentId: string | null; // 부모 shape id, null 이면 최상위 객체
-	isLocked: boolean;
+export interface BaseProperties {
+// 앱 고유 메타데이터
+    id?: string; // 모든 도형에 id를 필수로 지정합니다.
+    parentId?: string | null; // 부모 shape id, null 이면 최상위 객체
+    isLocked?: boolean;
 
-	// 코팅 유형 설정
-	coatingType?: "fill" | "outline" | "masking";
+// 코팅 유형 설정
+    coatingType?: CoatingType;
 
-	// 코팅 공통 설정
-	coatingOrder?: number; // 코팅 순서 제어
-	skipCoating?: boolean; // 특정 도형 제외
-	coatingHeight?: number; // 코팅 높이
-	coatingSpeed?: number; // 코팅 속도
+// 코팅 공통 설정
+    coatingWidth?: number; // 코팅 폭
+    coatingOrder?: number; // 코팅 순서 제어
+    skipCoating?: boolean; // 특정 도형 제외
 
-	// fill 코팅 설정
-	fillPattern?: "horizontal" | "vertical" | "auto" | "concentric";
-	coatingWidth?: number; // 코팅 폭
-	lineSpacing?: number; // 코팅 라인 간격
+// Z축 설정
+    coatingHeight?: number; // 코팅 높이
+    coatingSpeed?: number; // 코팅 속도
 
-	// outline 코팅 설정
-	outlineType?: "outside" | "center" | "inside";
-	outlinePasses?: number; // 테두리 코팅 회수
-	outlineInterval?: number; // 테두리 코팅 오프셋
+// 채우기 코팅 설정
+    fillPattern?: FillPattern;
+    lineSpacing?: number; // 코팅 라인 간격
 
-	// masking 설정
-	travelAvoidanceStrategy?: "global" | "lift" | "contour";
-	maskClearance?: number; // 마스킹 여유 거리
+// 윤곽 코팅 설정
+    outlineType?: OutlineType;
+    outlinePasses?: number; // 테두리 코팅 회수
+    outlineInterval?: number; // 테두리 코팅 오프셋
+
+// 마스킹 설정
+    travelAvoidanceStrategy?: TravelAvoidanceStrategy;
+    maskClearance?: number; // 마스킹 여유 거리
+
+
 }
 
 /**
@@ -44,21 +49,19 @@ interface BaseProperties {
  * @template K 도형을 식별하는 리터럴 타입 (예: 'rectangle', 'circle')
  */
 type ShapeWithAppConfig<T, K extends string> = T &
-	BaseProperties & {
-		type: K;
-		id: string; // 모든 도형에 id를 필수로 지정합니다.
-	};
+    BaseProperties & {
+    type?: K;
+};
 
 // 제네릭을 사용하여 각 도형의 타입을 정의합니다.
 export type RectangleShapeConfig = ShapeWithAppConfig<RectConfig, "rectangle">;
 export type CircleShapeConfig = ShapeWithAppConfig<CircleConfig, "circle">;
 export type LineShapeConfig = ShapeWithAppConfig<LineConfig, "line">;
-export type PolygonShapeConfig = ShapeWithAppConfig<PolygonConfig, "polygon">;
 export type GroupShapeConfig = ShapeWithAppConfig<GroupConfig, "group">;
 
 // Image와 같이 추가적인 커스텀 속성이 필요한 경우, 별도로 확장합니다.
 export type ImageShapeConfig = ShapeWithAppConfig<ImageConfig, "image"> & {
-	imageDataUrl?: string; // 이미지 데이터 URL 추가
+    imageDataUrl?: string; // 이미지 데이터 URL 추가
 };
 
 /**
@@ -66,9 +69,14 @@ export type ImageShapeConfig = ShapeWithAppConfig<ImageConfig, "image"> & {
  * 'type' 속성을 통해 각 도형의 구체적인 타입을 식별할 수 있습니다.
  */
 export type CustomShapeConfig =
-	| RectangleShapeConfig
-	| CircleShapeConfig
-	| PolygonShapeConfig
-	| ImageShapeConfig
-	| GroupShapeConfig
-	| LineShapeConfig;
+    | RectangleShapeConfig
+    | CircleShapeConfig
+    | ImageShapeConfig
+    | GroupShapeConfig
+    | LineShapeConfig;
+
+// 기존 SerializableShapePayload 유지...
+export interface SerializableShapePayload extends Omit<CustomShapeConfig, 'image'> {
+    imageDataUrl?: string;
+    fillPatternImageSrc?: string;
+}

@@ -218,11 +218,19 @@ const WorkspaceContent = () => {
             }, 1000);
 
         } catch (error) {
-            console.error('G-Code 생성 실패:', error);
+            let errorMessage = '알 수 없는 오류';
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            } else {
+                errorMessage = String(error);
+            }
+            console.error('G-code 생성 중 오류:', errorMessage);
             setGenerationState(prev => ({
                 ...prev,
                 status: 'error',
-                error: error instanceof Error ? error.message : 'Unknown error occurred'
+                error: errorMessage
             }));
         }
     }, [shapes, gcodeSettings, workArea, gcodeSnippets, dispatch, router]);
@@ -278,7 +286,7 @@ const WorkspaceContent = () => {
                     <ResizableHandle withHandle/>
 
                     <ResizablePanel defaultSize={20} minSize={10} maxSize={30}>
-                        <ObjectPanel/>
+                        <ObjectPanel />
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>

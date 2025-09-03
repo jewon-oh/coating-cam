@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useSettings } from '@/contexts/settings-context';
-import type { ToolState } from '@/store/slices/tool-slice';
+import {CoatingType, FillPattern} from "@/types/coating";
 
 export function useShapeSnapping() {
     const { isSnappingEnabled, pixelsPerMm } = useSettings();
@@ -18,7 +18,7 @@ export function useShapeSnapping() {
     const snapShapeSize = useCallback(
         (
             size: { width: number; height: number },
-            tool: { coatingType: ToolState['coatingType']; fillPattern?: ToolState['fillPattern']; lineSpacing?: ToolState['lineSpacing'] }
+            tool: { coatingType: CoatingType; fillPattern?: FillPattern; lineSpacing?: number }
         ) => {
             if (tool.coatingType !== 'fill' || !tool.lineSpacing) {
                 return size;
@@ -45,7 +45,7 @@ export function useShapeSnapping() {
         []
     );
     
-    const snapCircleRadius = useCallback((radius: number, tool: { coatingType: ToolState['coatingType']; lineSpacing?: ToolState['lineSpacing'] }) => {
+    const snapCircleRadius = useCallback((radius: number, tool: { coatingType: CoatingType; lineSpacing?: number }) => {
         if (tool.coatingType !== 'fill' || !tool.lineSpacing) {
             return radius;
         }

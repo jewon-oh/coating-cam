@@ -642,8 +642,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                             <>
                                 {/* 크기 */}
                                 {(singleSelectedShape.type === 'rectangle' ||
-                                    singleSelectedShape.type === 'image' ||
-                                    singleSelectedShape.type === 'polygon') && (
+                                    singleSelectedShape.type === 'image') && (
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1">
                                             <Label className="text-xs text-muted-foreground">가로</Label>

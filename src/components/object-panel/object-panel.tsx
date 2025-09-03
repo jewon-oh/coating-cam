@@ -49,8 +49,10 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-
-export const ObjectPanel = memo(( className?: string) => {
+interface ObjectPanelProps {
+    className?: string;
+}
+export const ObjectPanel = memo(({ className }: ObjectPanelProps) => {
     const dispatch = useAppDispatch();
     const shapes = useAppSelector(selectShapes);
     const selectedShapeIds = useAppSelector(selectSelectedShapeIds);
@@ -175,7 +177,7 @@ export const ObjectPanel = memo(( className?: string) => {
                 for (const child of children) {
                     if (child.type === 'group') {
                         descendants.push(...collectDescendantShapeIds(child.id!));
-                    } else if (child.visible !== false && !child.listening) {
+                    } else if (child.visible !== false && !child.isLocked) {
                         descendants.push(child.id!);
                     }
                 }
@@ -194,7 +196,7 @@ export const ObjectPanel = memo(( className?: string) => {
         }
 
         // 개별 객체 선택 로직
-        if (shape.listening) return;
+        if (shape.isLocked) return;
 
         if (e.shiftKey && selectedShapeIds.length > 0) {
             // 범위 선택 로직 (트리 구조에서)

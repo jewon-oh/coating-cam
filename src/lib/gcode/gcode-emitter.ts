@@ -59,7 +59,10 @@ export class GCodeEmitter {
     private moveTo(x: number, y: number, z: number | undefined, speed: number, isRapid: boolean) {
         const mmX = this.toMM(x);
         const mmY = this.toMM(y);
-        const currentZ = z !== undefined && z !== null ? z : this.lastMmPosition.z;
+        let currentZ = z !== undefined && z !== null ? z : this.lastMmPosition.z;
+        if (currentZ === undefined) {
+            currentZ= this.settings.safeHeight;
+        }
 
         // 마지막 mm 위치와 비교하여 불필요한 이동 명령을 방지합니다.
         if (
