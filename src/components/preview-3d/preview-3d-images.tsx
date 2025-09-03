@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
-import {CustomShapeConfig} from "@/types/custom-konva-config";
-import {   Text} from "@react-three/drei";
+import {ImageShapeConfig} from "@/types/custom-konva-config";
+import { Text} from "@react-three/drei";
 import * as THREE from "three";
 
 /**
@@ -47,7 +47,7 @@ export default function Preview3DImages({
                                   imageShapes,
                                   scaleFactor,
                               }: {
-    imageShapes: Extract<CustomShapeConfig, { type: 'image' }>[];
+    imageShapes: ImageShapeConfig[];
     scaleFactor: number;
 }) {
     const [textures, setTextures] = useState<Map<string, THREE.Texture>>(new Map());

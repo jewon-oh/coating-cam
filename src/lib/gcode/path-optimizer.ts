@@ -99,7 +99,7 @@ export class PathOptimizer {
         // 1. 클러스터링
         const zones = this.clusterSegmentsWithKMeans(segments, 5, 5);
 
-        const shapeTypeLabel = coatingShape.type === 'image' ? 'PCB' : coatingShape.type.toUpperCase();
+        const shapeTypeLabel = coatingShape.type === 'image' ? 'PCB' : coatingShape.type?.toUpperCase();
         emitter.addLine(`; ---- ${shapeTypeLabel} ${coatingShape.name ?? 'unknown'} start ----`);
         const shapeCoatingZ = getCoatingHeight(coatingShape, this.settings);
 

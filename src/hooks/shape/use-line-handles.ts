@@ -111,7 +111,10 @@ export const useLineHandles = (lineNode: Konva.Line | null, selectedLineConfig: 
 
         updatedProps.points = [0, 0, newEndPointLocal.x, newEndPointLocal.y];
 
-        dispatch(updateShape({ id: selectedLineConfig.id, updatedProps }));
+        if(selectedLineConfig.id){
+            dispatch(updateShape({ id: selectedLineConfig.id, updatedProps }));
+        }
+
         const updatedShape = { ...selectedLineConfig, ...updatedProps };
         const updatedShapesForHistory = shapes.map(s => s.id === updatedShape.id ? updatedShape : s);
         dispatch(setPresent(updatedShapesForHistory));

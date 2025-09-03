@@ -69,7 +69,7 @@ export class GCodeGenerator {
             return null;
         }
 
-        // 3. Get optimized path using the new method in PathOptimizer
+        // 3. Get an optimized path using the new method in PathOptimizer
         return await this.optimizer.getOptimizedPathForVisualization(
             maskedSegments,
             startPoint
@@ -100,7 +100,7 @@ export class GCodeGenerator {
                 const boundary = orderedBoundaries[bi];
                 const boundaryProgressBase = 5 + (bi / orderedBoundaries.length) * 90;
 
-                const shapeTypeLabel = boundary.type === 'image' ? 'PCB' : boundary.type.toUpperCase();
+                const shapeTypeLabel = boundary.type === 'image' ? 'PCB' : boundary.type?.toUpperCase();
                 if (onProgress) onProgress(boundaryProgressBase, `${shapeTypeLabel} ${bi + 1}/${orderedBoundaries.length} 경로 계산 중...`);
 
                 // 1. 경로 계산 - G-code 생성용: 절대 좌표로 계산

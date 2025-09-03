@@ -13,7 +13,7 @@ export type EllipsizeOptions = {
 export function ellipsize(input: string, maxLength: number, options: EllipsizeOptions = {}): string {
     const { mode = 'end', preserveExtension = false } = options;
 
-    if (typeof input !== 'string') return '';
+
     if (!Number.isFinite(maxLength) || maxLength <= 0) return '';
 
     const cps = Array.from(input); // 코드포인트 단위

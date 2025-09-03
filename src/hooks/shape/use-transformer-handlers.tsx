@@ -291,7 +291,7 @@ export function useTransformerHandlers(
                     });
                     newWidth = snapped.width;
                     newHeight = snapped.height;
-                } else if (shape.type === 'circle') {
+                } else if (shape.type === 'circle' && shape.coatingType === 'fill' && shape.lineSpacing) {
                     const rawRadius = (shape.radius || 0) * Math.max(Math.abs(oldScaleX), Math.abs(oldScaleY));
                     newRadius = snapCircleRadius(rawRadius, {
                         coatingType: shape.coatingType,

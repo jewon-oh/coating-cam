@@ -258,7 +258,7 @@ export const ObjectItem = memo<ObjectItemProps>(({
                         {/* 액션 버튼들 */}
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                             <ToggleIconButton
-                                pressed={shape.isLocked}
+                                pressed={shape.isLocked??false}
                                 onClick={toggleLock}
                                 label={shape.isLocked ? "잠금 해제" : "잠그기"}
                                 className="opacity-0 group-hover/item:opacity-100 transition-opacity"

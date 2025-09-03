@@ -167,7 +167,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
             const shape = singleSelectedShape!;
             return {
                 label: shape.name || shape.type,
-                icon: getShapeIcon(shape.type),
+                icon: getShapeIcon(shape.type??'unknown'),
                 desc: `${shape.type} 객체의 속성을 편집할 수 있습니다.`,
             };
         }
@@ -435,15 +435,17 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                 newPoints[3] = (axis === 'y' ? newAbsCoord_px : endY_abs_px) - newShapeY;
             }
 
-            // Redux 스토어를 여러 속성으로 한번에 업데이트합니다.
-            dispatch(updateShape({
-                id: singleSelectedShape.id,
-                updatedProps: {
-                    x: newShapeX,
-                    y: newShapeY,
-                    points: newPoints,
-                }
-            }));
+            if(singleSelectedShape.id){
+                // Redux 스토어를 여러 속성으로 한번에 업데이트합니다.
+                dispatch(updateShape({
+                    id: singleSelectedShape.id,
+                    updatedProps: {
+                        x: newShapeX,
+                        y: newShapeY,
+                        points: newPoints,
+                    }
+                }));
+            }
         };
 
         // UI에 표시할 값들을 mm 단위로 변환합니다.
