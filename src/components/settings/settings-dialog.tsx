@@ -412,7 +412,7 @@ function GCodeSnippetsSection() {
 
     const grouped = useMemo(() => {
         const map = new Map<GCodeHook, typeof gcodeSnippets>();
-        hooks.forEach((h) => map.set(h.value, []));
+        hooks.forEach((h) => map.set(h.value as GCodeHook, []));
         for (const s of gcodeSnippets) {
             const list = map.get(s.hook);
             (list ? list : []).push(s);
@@ -434,7 +434,7 @@ function GCodeSnippetsSection() {
     }, [addGcodeSnippet, newName, newHook]);
 
     const moveWithinHook = useCallback(
-        (hook: string, id: string, dir: "up" | "down") => {
+        (hook: GCodeHook, id: string, dir: "up" | "down") => {
             const list = grouped.get(hook) ?? [];
             const ids = list.map((s) => s.id);
             const idx = ids.indexOf(id);
@@ -488,7 +488,7 @@ function GCodeSnippetsSection() {
             {/* 목록 */}
             <div className="space-y-6">
                 {hooks.map(({ value: hookValue, label }) => {
-                    const list = grouped.get(hookValue) ?? [];
+                    const list = grouped.get(hookValue as GCodeHook) ?? [];
                     return (
                         <div key={hookValue} className="rounded-md border">
                             <div className="px-3 py-2 bg-muted/50 flex items-center justify-between">
@@ -523,7 +523,7 @@ function GCodeSnippetsSection() {
                                                         size="icon"
                                                         variant="ghost"
                                                         className="h-8 w-8"
-                                                        onClick={() => moveWithinHook(hookValue, snip.id, "up")}
+                                                        onClick={() => moveWithinHook(hookValue as GCodeHook, snip.id, "up")}
                                                         disabled={idx === 0}
                                                         title="위로"
                                                     >
@@ -533,7 +533,7 @@ function GCodeSnippetsSection() {
                                                         size="icon"
                                                         variant="ghost"
                                                         className="h-8 w-8"
-                                                        onClick={() => moveWithinHook(hookValue, snip.id, "down")}
+                                                        onClick={() => moveWithinHook(hookValue as GCodeHook, snip.id, "down")}
                                                         disabled={idx === list.length - 1}
                                                         title="아래로"
                                                     >

@@ -123,7 +123,6 @@ export default function Minimap({
                             .filter(s => s.visible !== false && s.type !== 'group')
                             .map(shape => {
                                 const commonProps = {
-                                    key: shape.id,
                                     x: shape.x || 0,
                                     y: shape.y || 0,
                                     rotation: shape.rotation || 0,

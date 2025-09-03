@@ -15,7 +15,7 @@ export function CoatingToolSelector() {
     const dispatch = useAppDispatch();
     // Redux 스토어에서 필요한 상태(도형, 선택된 도형 ID, 코팅 도구 목록)를 가져옵니다.
     const { shapes, selectedShapeIds } = useAppSelector((state) => state.shapes);
-    const { coatingTools } = useAppSelector((state) => state.coatingTools);
+
 
     // 현재 선택된 도형 객체 목록을 메모화합니다.
     const selectedShapes = useMemo(() =>
@@ -58,6 +58,7 @@ export function CoatingToolSelector() {
 
     // 드롭다운에 표시될 옵션 목록을 메모화합니다.
     const options = useMemo(() => {
+        const coatingTools: CoatingTool[] = [];
         const toolOptions = coatingTools?.map((tool: CoatingTool) => ({
             value: tool.id,
             label: tool.name,
@@ -67,7 +68,7 @@ export function CoatingToolSelector() {
             { value: 'none', label: '도구 없음' },
             ...toolOptions
         ];
-    }, [coatingTools]);
+    }, []);
 
     return (
         <ToolSelector

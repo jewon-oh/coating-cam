@@ -25,6 +25,11 @@ export interface CoatingSettings {
     pixelsPerMm: number; // 픽셀-밀리미터 변환 비율
 }
 
+export type CoatingTool = {
+    id: string;
+    name: string;
+};
+
 export const DEFAULT_COATING_SETTINGS: CoatingSettings = {
     // 코팅 기본 설정
     coatingWidth: 10,           // 10mm 코팅 폭

@@ -103,10 +103,10 @@ function multistepDownscale(
     // DOM 캔버스로 보장(OffscreenCanvas → transferToImageBitmap 대신 dataURL을 쓸 것이므로)
     if (!(curCanvas instanceof HTMLCanvasElement)) {
         const domCanvas = document.createElement('canvas');
-        domCanvas.width = curCanvas.width;
-        domCanvas.height = curCanvas.height;
+        domCanvas.width = (curCanvas as OffscreenCanvas).width;
+        domCanvas.height = (curCanvas as OffscreenCanvas).height;
         const dctx = domCanvas.getContext('2d', { willReadFrequently: true })!;
-        dctx.drawImage(curCanvas, 0, 0);
+        dctx.drawImage(curCanvas as unknown as CanvasImageSource, 0, 0);
         return domCanvas;
     }
     return curCanvas;

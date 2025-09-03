@@ -3,6 +3,7 @@ import type { GroupConfig } from "konva/lib/Group";
 import type { ImageConfig } from "konva/lib/shapes/Image";
 import type { LineConfig } from "konva/lib/shapes/Line";
 import type { RectConfig } from "konva/lib/shapes/Rect";
+import { PolygonConfig } from "konva/lib/shapes/Polygon";
 
 /**
  * 모든 커스텀 도형에 공통적으로 적용되는 기본 속성입니다.
@@ -52,7 +53,7 @@ type ShapeWithAppConfig<T, K extends string> = T &
 export type RectangleShapeConfig = ShapeWithAppConfig<RectConfig, "rectangle">;
 export type CircleShapeConfig = ShapeWithAppConfig<CircleConfig, "circle">;
 export type LineShapeConfig = ShapeWithAppConfig<LineConfig, "line">;
-// export type PolygonShapeConfig = ShapeWithAppConfig<PolygonConfig, "polygon">;
+export type PolygonShapeConfig = ShapeWithAppConfig<PolygonConfig, "polygon">;
 export type GroupShapeConfig = ShapeWithAppConfig<GroupConfig, "group">;
 
 // Image와 같이 추가적인 커스텀 속성이 필요한 경우, 별도로 확장합니다.
@@ -67,7 +68,7 @@ export type ImageShapeConfig = ShapeWithAppConfig<ImageConfig, "image"> & {
 export type CustomShapeConfig =
 	| RectangleShapeConfig
 	| CircleShapeConfig
-	// | PolygonShapeConfig
+	| PolygonShapeConfig
 	| ImageShapeConfig
 	| GroupShapeConfig
 	| LineShapeConfig;

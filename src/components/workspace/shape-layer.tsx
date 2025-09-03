@@ -93,7 +93,7 @@ export function ShapeLayer({isPanning = false}: ShapeLayerProps) {
     useEffect(() => {
         if (selectedLineConfig && layerRef.current) {
             const node = layerRef.current.findOne<Konva.Line>(`#${selectedLineConfig.id}`);
-            setSelectedLineNode(node);
+            setSelectedLineNode(node || null);
         } else {
             setSelectedLineNode(null);
         }
@@ -166,8 +166,8 @@ export function ShapeLayer({isPanning = false}: ShapeLayerProps) {
                 e.evt.preventDefault();
                 if (!isPanning && !isLocked) shapeEvents.handleSelect(e);
             },
-            onContextMenu: (e: Konva.KonvaEventObject<PointerEvent>) => {
-                if (!isPanning && !isLocked) shapeEvents.handleContextMenu(e);
+            onContextMenu: () => {
+                if (!isPanning && !isLocked) shapeEvents.handleContextMenu();
             },
             onMouseEnter: () => {
                 if (!isInteractionBlocked) setIsHoveringShape(shape.id!);

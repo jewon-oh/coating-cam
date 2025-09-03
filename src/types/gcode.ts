@@ -9,7 +9,7 @@ export type GCodeHook =
 
 export const GCODE_HOOKS= [
     { value: "beforeAll", label: "전체 시작(beforeAll)" },
-    { value: "beforeCoating", label: "작업 시작(beforeJob)" },
+    { value: "beforeJob", label: "작업 시작(beforeJob)" },
     { value: "beforePath", label: "경로 시작(beforePath)" },
     { value: "afterPath", label: "경로 종료(afterPath)" },
     { value: "afterJob", label: "작업 종료(afterJob)" },
