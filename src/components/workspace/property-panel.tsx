@@ -53,15 +53,67 @@ export function PropertyPanel({className}: PropertyPanelProps) {
     const [name, setName] = useState('');
     const [isEditingName, setIsEditingName] = useState(false);
 
+    // 숫자 입력 필드를 위한 로컬 상태
+    const [dimensionInputs, setDimensionInputs] = useState({
+        width: '',
+        height: '',
+        radius: '',
+        diameter: '',
+        x: '',
+        y: '',
+    });
+    const [lineCoordinates, setLineCoordinates] = useState({
+        startX: '',
+        startY: '',
+        endX: '',
+        endY: '',
+    });
+    const [coatingSettingInputs, setCoatingSettingInputs] = useState({
+        coatingWidth: '',
+        lineSpacing: '',
+        coatingSpeed: '',
+        coatingHeight: '',
+        outlinePasses: '',
+        outlineInterval: '',
+        coatingOrder: '',
+    });
+
+
     useEffect(() => {
         if (singleSelectedShape) {
             setName(singleSelectedShape.name || '');
             setIsEditingName(false); // 선택 변경 시 편집 모드 해제
+            setDimensionInputs({
+                width: ((singleSelectedShape.width || 0) / pixelsPerMm).toFixed(2),
+                height: ((singleSelectedShape.height || 0) / pixelsPerMm).toFixed(2),
+                radius: ((singleSelectedShape.radius || 0) / pixelsPerMm).toFixed(2),
+                diameter: (((singleSelectedShape.radius || 0) * 2) / pixelsPerMm).toFixed(2),
+                x: ((singleSelectedShape.x || 0) / pixelsPerMm).toFixed(2),
+                y: ((singleSelectedShape.y || 0) / pixelsPerMm).toFixed(2),
+            });
+
+            if (singleSelectedShape.type === 'line') {
+                const shapeX_px = singleSelectedShape.x || 0;
+                const shapeY_px = singleSelectedShape.y || 0;
+                const points = singleSelectedShape.points || [0, 0, 0, 0];
+                const [startX_rel_px, startY_rel_px, endX_rel_px, endY_rel_px] = points;
+
+                const startX_abs_px = shapeX_px + startX_rel_px;
+                const startY_abs_px = shapeY_px + startY_rel_px;
+                const endX_abs_px = shapeX_px + endX_rel_px;
+                const endY_abs_px = shapeY_px + endY_rel_px;
+
+                setLineCoordinates({
+                    startX: (startX_abs_px / pixelsPerMm).toFixed(2),
+                    startY: (startY_abs_px / pixelsPerMm).toFixed(2),
+                    endX: (endX_abs_px / pixelsPerMm).toFixed(2),
+                    endY: (endY_abs_px / pixelsPerMm).toFixed(2),
+                });
+            }
         } else {
             setIsEditingName(false);
         }
-    }, [singleSelectedShape]);
-
+    }, [singleSelectedShape, pixelsPerMm]);
 
     // 다중 선택 시 공통 속성 계산
     const commonProperties = useMemo(() => {
@@ -91,6 +143,20 @@ export function PropertyPanel({className}: PropertyPanelProps) {
         return common;
     }, [selectedShapes]);
 
+    useEffect(() => {
+        if (commonProperties) {
+            setCoatingSettingInputs({
+                coatingWidth: (commonProperties.coatingWidth ?? gcodeSettings.coatingWidth).toFixed(2),
+                lineSpacing: (commonProperties.lineSpacing ?? gcodeSettings.lineSpacing).toFixed(2),
+                coatingSpeed: (commonProperties.coatingSpeed ?? gcodeSettings.coatingSpeed).toString(),
+                coatingHeight: (commonProperties.coatingHeight ?? gcodeSettings.coatingHeight).toFixed(2),
+                outlinePasses: (commonProperties.outlinePasses ?? 1).toString(),
+                outlineInterval: (commonProperties.outlineInterval ?? 0).toFixed(2),
+                coatingOrder: (commonProperties.coatingOrder ?? 0).toString(),
+            });
+        }
+    }, [commonProperties, gcodeSettings]);
+
     // 속성 업데이트 핸들러
     const handlePropertyUpdate = (property: string, value: string | number | boolean | undefined) => {
         if (selectedShapeIds.length === 0) return;
@@ -109,11 +175,14 @@ export function PropertyPanel({className}: PropertyPanelProps) {
         }
     };
 
-    const handleDimensionUpdate = (property: string, value: string) => {
-        const pxValue = parseFloat(value) * pixelsPerMm;
+    const handleDimensionUpdate = (property: 'width' | 'height' | 'x' | 'y', value: string) => {
+        const mmValue = parseFloat(value) || 0;
+        const pxValue = mmValue * pixelsPerMm;
+
         if (!isNaN(pxValue)) {
             handlePropertyUpdate(property, pxValue);
         }
+        setDimensionInputs(prev => ({...prev, [property]: mmValue.toFixed(2)}));
     };
 
     const handleNameUpdate = () => {
@@ -130,10 +199,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
         setIsEditingName(false);
     };
 
-    // 입력 변경 핸들러 (G-Code 설정용)
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const {name, value} = e.target;
-        handlePropertyUpdate(name, parseFloat(value) || 0);
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            (e.target as HTMLInputElement).blur();
+        }
     };
 
     // 도형 아이콘 가져오기
@@ -182,6 +251,23 @@ export function PropertyPanel({className}: PropertyPanelProps) {
     const renderCoatingSettings = () => {
         const coatingType = commonProperties?.coatingType || 'fill';
 
+        const handleSettingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+            const {name, value} = e.target;
+            setCoatingSettingInputs(prev => ({...prev, [name]: value}));
+        };
+
+        const handleSettingBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+            const {name, value} = e.target;
+            const numValue = parseFloat(value) || 0;
+            handlePropertyUpdate(name, numValue);
+
+            const needsFormatting = ['coatingWidth', 'lineSpacing', 'coatingHeight', 'outlineInterval'].includes(name);
+            setCoatingSettingInputs(prev => ({
+                ...prev,
+                [name]: needsFormatting ? numValue.toFixed(2) : numValue.toString()
+            }));
+        };
+
         switch (coatingType) {
             case 'fill':
                 return (
@@ -195,8 +281,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         type="number"
                                         step="0.01"
                                         name="coatingWidth"
-                                        value={commonProperties?.coatingWidth || gcodeSettings.coatingWidth}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.coatingWidth}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm</span>
@@ -209,8 +297,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         type="number"
                                         step="0.01"
                                         name="lineSpacing"
-                                        value={commonProperties?.lineSpacing || gcodeSettings.lineSpacing}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.lineSpacing}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm</span>
@@ -225,9 +315,12 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 <div className="flex items-center gap-1">
                                     <Input
                                         type="number"
+                                        step="10"
                                         name="coatingSpeed"
-                                        value={commonProperties?.coatingSpeed || gcodeSettings.coatingSpeed}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.coatingSpeed}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm/min</span>
@@ -240,8 +333,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         type="number"
                                         step="0.01"
                                         name="coatingHeight"
-                                        value={commonProperties?.coatingHeight || gcodeSettings.coatingHeight}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.coatingHeight}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm</span>
@@ -263,8 +358,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         type="number"
                                         step="0.01"
                                         name="coatingWidth"
-                                        value={commonProperties?.coatingWidth || gcodeSettings.coatingWidth}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.coatingWidth}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm</span>
@@ -275,9 +372,12 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 <div className="flex items-center gap-1">
                                     <Input
                                         type="number"
+                                        step="10"
                                         name="coatingSpeed"
-                                        value={commonProperties?.coatingSpeed || gcodeSettings.coatingSpeed}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.coatingSpeed}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm/min</span>
@@ -294,8 +394,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         type="number"
                                         step="0.01"
                                         name="coatingHeight"
-                                        value={commonProperties?.coatingHeight || gcodeSettings.coatingHeight}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.coatingHeight}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm</span>
@@ -305,11 +407,14 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 <Label className="text-xs text-muted-foreground">패스 수</Label>
                                 <Input
                                     type="number"
+                                    step="1"
                                     min="1"
                                     max="10"
                                     name="outlinePasses"
-                                    value={commonProperties?.outlinePasses || 1}
-                                    onChange={handleInputChange}
+                                    value={coatingSettingInputs.outlinePasses}
+                                    onChange={handleSettingChange}
+                                    onBlur={handleSettingBlur}
+                                    onKeyDown={handleKeyDown}
                                     className="h-7 text-xs"
                                 />
                             </div>
@@ -339,8 +444,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         type="number"
                                         step="0.01"
                                         name="outlineInterval"
-                                        value={commonProperties?.outlineInterval || 0}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.outlineInterval}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm</span>
@@ -362,9 +469,12 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                 <div className="flex items-center gap-1">
                                     <Input
                                         type="number"
+                                        step="10"
                                         name="coatingSpeed"
-                                        value={commonProperties?.coatingSpeed || gcodeSettings.coatingSpeed}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.coatingSpeed}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm/min</span>
@@ -377,8 +487,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                         type="number"
                                         step="0.01"
                                         name="coatingHeight"
-                                        value={commonProperties?.coatingHeight || gcodeSettings.coatingHeight}
-                                        onChange={handleInputChange}
+                                        value={coatingSettingInputs.coatingHeight}
+                                        onChange={handleSettingChange}
+                                        onBlur={handleSettingBlur}
+                                        onKeyDown={handleKeyDown}
                                         className="h-7 text-xs"
                                     />
                                     <span className="text-xs text-muted-foreground">mm</span>
@@ -448,12 +560,6 @@ export function PropertyPanel({className}: PropertyPanelProps) {
             }
         };
 
-        // UI에 표시할 값들을 mm 단위로 변환합니다.
-        const startX_mm = (startX_abs_px / pixelsPerMm).toFixed(2);
-        const startY_mm = (startY_abs_px / pixelsPerMm).toFixed(2);
-        const endX_mm = (endX_abs_px / pixelsPerMm).toFixed(2);
-        const endY_mm = (endY_abs_px / pixelsPerMm).toFixed(2);
-
         // 라인 길이를 계산합니다.
         const length_px = Math.sqrt(
             Math.pow(endX_abs_px - startX_abs_px, 2) +
@@ -472,8 +578,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                             <Input
                                 type="number"
                                 step="0.01"
-                                value={startX_mm}
-                                onChange={(e) => handleAbsolutePointUpdate('start', 'x', e.target.value)}
+                                value={lineCoordinates.startX}
+                                onChange={(e) => setLineCoordinates(prev => ({...prev, startX: e.target.value}))}
+                                onBlur={(e) => handleAbsolutePointUpdate('start', 'x', e.target.value)}
+                                onKeyDown={handleKeyDown}
                                 className="h-7 text-xs"
                             />
                             <span className="text-xs text-muted-foreground">mm</span>
@@ -483,8 +591,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                             <Input
                                 type="number"
                                 step="0.01"
-                                value={startY_mm}
-                                onChange={(e) => handleAbsolutePointUpdate('start', 'y', e.target.value)}
+                                value={lineCoordinates.startY}
+                                onChange={(e) => setLineCoordinates(prev => ({...prev, startY: e.target.value}))}
+                                onBlur={(e) => handleAbsolutePointUpdate('start', 'y', e.target.value)}
+                                onKeyDown={handleKeyDown}
                                 className="h-7 text-xs"
                             />
                             <span className="text-xs text-muted-foreground">mm</span>
@@ -501,8 +611,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                             <Input
                                 type="number"
                                 step="0.01"
-                                value={endX_mm}
-                                onChange={(e) => handleAbsolutePointUpdate('end', 'x', e.target.value)}
+                                value={lineCoordinates.endX}
+                                onChange={(e) => setLineCoordinates(prev => ({...prev, endX: e.target.value}))}
+                                onBlur={(e) => handleAbsolutePointUpdate('end', 'x', e.target.value)}
+                                onKeyDown={handleKeyDown}
                                 className="h-7 text-xs"
                             />
                             <span className="text-xs text-muted-foreground">mm</span>
@@ -512,8 +624,10 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                             <Input
                                 type="number"
                                 step="0.01"
-                                value={endY_mm}
-                                onChange={(e) => handleAbsolutePointUpdate('end', 'y', e.target.value)}
+                                value={lineCoordinates.endY}
+                                onChange={(e) => setLineCoordinates(prev => ({...prev, endY: e.target.value}))}
+                                onBlur={(e) => handleAbsolutePointUpdate('end', 'y', e.target.value)}
+                                onKeyDown={handleKeyDown}
                                 className="h-7 text-xs"
                             />
                             <span className="text-xs text-muted-foreground">mm</span>
@@ -653,8 +767,11 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                                     type="number"
                                                     step="0.01"
                                                     name="width"
-                                                    value={((singleSelectedShape.width || 0) / pixelsPerMm).toFixed(2)}
-                                                    onChange={(e) => handleDimensionUpdate('width', e.target.value)}
+                                                    value={dimensionInputs.width}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onChange={(e) => setDimensionInputs(prev => ({...prev, width: e.target.value}))}
+                                                    onBlur={(e) => handleDimensionUpdate('width', e.target.value)}
+                                                    onKeyDown={handleKeyDown}
                                                     className="h-7 text-xs"
                                                 />
                                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -667,8 +784,11 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                                     type="number"
                                                     step="0.01"
                                                     name="height"
-                                                    value={((singleSelectedShape.height || 0) / pixelsPerMm).toFixed(2)}
-                                                    onChange={(e) => handleDimensionUpdate('height', e.target.value)}
+                                                    value={dimensionInputs.height}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onChange={(e) => setDimensionInputs(prev => ({...prev, height: e.target.value}))}
+                                                    onBlur={(e) => handleDimensionUpdate('height', e.target.value)}
+                                                    onKeyDown={handleKeyDown}
                                                     className="h-7 text-xs"
                                                 />
                                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -686,11 +806,19 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={((singleSelectedShape.radius || 0) / pixelsPerMm).toFixed(2)}
-                                                    onChange={(e) => {
-                                                        const radius = (parseFloat(e.target.value) || 0) * pixelsPerMm;
-                                                        handlePropertyUpdate('radius', radius);
+                                                    value={dimensionInputs.radius}
+                                                    onChange={(e) => setDimensionInputs(prev => ({...prev, radius: e.target.value}))}
+                                                    onBlur={(e) => {
+                                                        const mmValue = parseFloat(e.target.value) || 0;
+                                                        const radiusInPx = mmValue * pixelsPerMm;
+                                                        handlePropertyUpdate('radius', radiusInPx);
+                                                        setDimensionInputs(prev => ({
+                                                            ...prev,
+                                                            radius: mmValue.toFixed(2),
+                                                            diameter: (mmValue * 2).toFixed(2)
+                                                        }));
                                                     }}
+                                                    onKeyDown={handleKeyDown}
                                                     className="h-7 text-xs"
                                                 />
                                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -702,11 +830,19 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={(((singleSelectedShape.radius || 0) * 2) / pixelsPerMm).toFixed(2)}
-                                                    onChange={(e) => {
-                                                        const diameter = parseFloat(e.target.value) || 0;
-                                                        handlePropertyUpdate('radius', (diameter / 2) * pixelsPerMm);
+                                                    value={dimensionInputs.diameter}
+                                                    onChange={(e) => setDimensionInputs(prev => ({...prev, diameter: e.target.value}))}
+                                                    onBlur={(e) => {
+                                                        const mmValue = parseFloat(e.target.value) || 0;
+                                                        const radiusInPx = (mmValue / 2) * pixelsPerMm;
+                                                        handlePropertyUpdate('radius', radiusInPx);
+                                                        setDimensionInputs(prev => ({
+                                                            ...prev,
+                                                            radius: (mmValue / 2).toFixed(2),
+                                                            diameter: mmValue.toFixed(2)
+                                                        }));
                                                     }}
+                                                    onKeyDown={handleKeyDown}
                                                     className="h-7 text-xs"
                                                 />
                                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -728,8 +864,11 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                                     type="number"
                                                     step="0.01"
                                                     name="x"
-                                                    value={((singleSelectedShape.x || 0) / pixelsPerMm).toFixed(2)}
-                                                    onChange={(e) => handleDimensionUpdate('x', e.target.value)}
+                                                    value={dimensionInputs.x}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onChange={(e) => setDimensionInputs(prev => ({...prev, x: e.target.value}))}
+                                                    onBlur={(e) => handleDimensionUpdate('x', e.target.value)}
+                                                    onKeyDown={handleKeyDown}
                                                     className="h-7 text-xs"
                                                 />
                                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -742,8 +881,11 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                                     type="number"
                                                     step="0.01"
                                                     name="y"
-                                                    value={((singleSelectedShape.y || 0) / pixelsPerMm).toFixed(2)}
-                                                    onChange={(e) => handleDimensionUpdate('y', e.target.value)}
+                                                    value={dimensionInputs.y}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onChange={(e) => setDimensionInputs(prev => ({...prev, y: e.target.value}))}
+                                                    onBlur={(e) => handleDimensionUpdate('y', e.target.value)}
+                                                    onKeyDown={handleKeyDown}
                                                     className="h-7 text-xs"
                                                 />
                                                 <span className="text-xs text-muted-foreground">mm</span>
@@ -817,10 +959,13 @@ export function PropertyPanel({className}: PropertyPanelProps) {
                                     <div className="flex items-center gap-1">
                                         <Input
                                             type="number"
+                                            step="1"
                                             min="0"
                                             name="coatingOrder"
-                                            value={commonProperties?.coatingOrder || 0}
-                                            onChange={handleInputChange}
+                                            value={coatingSettingInputs.coatingOrder}
+                                            onChange={(e) => setCoatingSettingInputs(prev => ({...prev, coatingOrder: e.target.value}))}
+                                            onBlur={(e) => handlePropertyUpdate('coatingOrder', parseInt(e.target.value) || 0)}
+                                            onKeyDown={handleKeyDown}
                                             className="h-7 text-xs"
                                             disabled={commonProperties?.skipCoating === true}
                                         />
