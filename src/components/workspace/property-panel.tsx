@@ -237,7 +237,7 @@ export function PropertyPanel({className}: PropertyPanelProps) {
             return {
                 label: shape.name || shape.type,
                 icon: getShapeIcon(shape.type??'unknown'),
-                desc: `${shape.type} 객체의 속성을 편집할 수 있습니다.`,
+                // desc: `${shape.type} 객체의 속성을 편집할 수 있습니다.`,
             };
         }
 

@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 import {CanvasProvider} from "@/contexts/canvas-context";
-import {ObjectPanel} from "@/components/object-panel/object-panel";
 import {Toolbar} from "@/components/tool/toolbar";
 import React, {useCallback, useState, useRef, useEffect} from "react";
 import {WorkspaceOverlays} from "@/components/workspace/workspace-overlays";
@@ -276,17 +275,11 @@ const WorkspaceContent = () => {
 
                     <ResizableHandle withHandle/>
 
-                    <ResizablePanel defaultSize={60} minSize={40}>
+                    <ResizablePanel defaultSize={80}>
                         <div className="relative h-full w-full overflow-hidden bg-muted/20">
                             <DynamicCanvasStage />
                             <WorkspaceOverlays />
                         </div>
-                    </ResizablePanel>
-
-                    <ResizableHandle withHandle/>
-
-                    <ResizablePanel defaultSize={20} minSize={10} maxSize={30}>
-                        <ObjectPanel />
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>
@@ -311,4 +304,3 @@ export default function WorkspacePage() {
         </CanvasProvider>
     );
 }
-

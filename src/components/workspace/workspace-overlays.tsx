@@ -10,6 +10,7 @@ import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/compon
 import {Button} from "@/components/ui/button";
 import {Keyboard} from "lucide-react";
 import dynamic from "next/dynamic";
+import {MiniObjectPanel} from "./mini-object-panel";
 
 const DynamicMinimap = dynamic(() => import('@/components/workspace/minimap'), {
     ssr: false,
@@ -58,6 +59,8 @@ export const WorkspaceOverlays = () => {
                 viewport={stageState}
                 onViewportChange={handleViewportChange}
             />
+
+            <MiniObjectPanel />
 
             {/* 단축키 가이드 버튼 */}
             <TooltipProvider>
