@@ -2,7 +2,7 @@
 name: "✨ Feature Request"
 about: 새로운 기능이나 개선 사항을 제안하는 템플릿입니다.
 title: "[FEAT] "
-labels: feature
+labels: enhancement
 assignees: jewon-oh
 
 ---
