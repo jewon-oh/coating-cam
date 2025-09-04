@@ -59,7 +59,7 @@ function multistepDownscale(
     target: Size
 ): HTMLCanvasElement {
     const hasOffscreen = typeof window.OffscreenCanvas === 'function';
-    const makeCanvas = (w: number, h: number) => {
+    const makeCanvas = (w: number, h: number): HTMLCanvasElement => {
         if (hasOffscreen) {
             const off = new window.OffscreenCanvas(w, h);
             return off as unknown as HTMLCanvasElement; // 타입 호환용
@@ -70,12 +70,12 @@ function multistepDownscale(
         return c;
     };
 
-    let curCanvas = makeCanvas((src as any).width, (src as any).height);
+    let curCanvas: HTMLCanvasElement = makeCanvas(src.width, src.height);
     let ctx = curCanvas.getContext('2d', { willReadFrequently: true })!;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.clearRect(0, 0, curCanvas.width, curCanvas.height);
-    ctx.drawImage(src as any, 0, 0);
+    ctx.drawImage(src, 0, 0);
 
     // 단계적으로 절반씩 축소하며 목표에 근접
     const steps = [];
@@ -95,7 +95,7 @@ function multistepDownscale(
         nctx.imageSmoothingEnabled = true;
         nctx.imageSmoothingQuality = 'high';
         nctx.clearRect(0, 0, s.w, s.h);
-        nctx.drawImage(curCanvas as any, 0, 0, s.w, s.h);
+        nctx.drawImage(curCanvas, 0, 0, s.w, s.h);
         curCanvas = nextCanvas;
         ctx = nctx;
     }
@@ -103,10 +103,10 @@ function multistepDownscale(
     // DOM 캔버스로 보장(OffscreenCanvas → transferToImageBitmap 대신 dataURL을 쓸 것이므로)
     if (!(curCanvas instanceof HTMLCanvasElement)) {
         const domCanvas = document.createElement('canvas');
-        domCanvas.width = curCanvas.width;
-        domCanvas.height = curCanvas.height;
+        domCanvas.width = (curCanvas as OffscreenCanvas).width;
+        domCanvas.height = (curCanvas as OffscreenCanvas).height;
         const dctx = domCanvas.getContext('2d', { willReadFrequently: true })!;
-        dctx.drawImage(curCanvas as any, 0, 0);
+        dctx.drawImage(curCanvas as unknown as CanvasImageSource, 0, 0);
         return domCanvas;
     }
     return curCanvas;
@@ -243,7 +243,7 @@ export const useInsertImage = () => {
         };
 
         input.click();
-    }, [dispatch]);
+    }, [dispatch, currentShapes]);
 
     return { handleImageInsert };
 };

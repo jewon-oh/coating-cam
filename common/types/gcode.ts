@@ -1,4 +1,3 @@
-
 export type GCodeHook =
     | 'beforeAll'     // 전체 생성 시작 직전(파일 헤더 등)
     | 'beforeJob'     // 작업 시작(한 프로젝트/세션 단위)
@@ -9,7 +8,7 @@ export type GCodeHook =
 
 export const GCODE_HOOKS= [
     { value: "beforeAll", label: "전체 시작(beforeAll)" },
-    { value: "beforeCoating", label: "작업 시작(beforeJob)" },
+    { value: "beforeJob", label: "작업 시작(beforeJob)" },
     { value: "beforePath", label: "경로 시작(beforePath)" },
     { value: "afterPath", label: "경로 종료(afterPath)" },
     { value: "afterJob", label: "작업 종료(afterJob)" },
@@ -25,3 +24,4 @@ export type GCodeSnippet = {
     template: string;     // G-code 텍스트(템플릿 변수 포함 가능)
     description?: string; // 메모
 };
+

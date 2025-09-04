@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
-import {CustomShapeConfig} from "@/types/custom-konva-config";
-import {   Text} from "@react-three/drei";
+import {ImageShapeConfig} from "@/types/custom-konva-config";
+import { Text} from "@react-three/drei";
 import * as THREE from "three";
 
 /**
@@ -47,7 +47,7 @@ export default function Preview3DImages({
                                   imageShapes,
                                   scaleFactor,
                               }: {
-    imageShapes: Extract<CustomShapeConfig, { type: 'image' }>[];
+    imageShapes: ImageShapeConfig[];
     scaleFactor: number;
 }) {
     const [textures, setTextures] = useState<Map<string, THREE.Texture>>(new Map());
@@ -157,12 +157,10 @@ export default function Preview3DImages({
                 const rotation = imageShape.rotation ?? 0;
                 const visible = imageShape.visible ?? true;
 
-                let effectiveX, effectiveY, effectiveWidth, effectiveHeight;
-
-                effectiveX = baseX;
-                effectiveY = baseY;
-                effectiveWidth = (imageShape.width ?? 0) * scaleX;
-                effectiveHeight = (imageShape.height ?? 0) * scaleY;
+                const effectiveX = baseX;
+                const effectiveY = baseY;
+                const effectiveWidth = (imageShape.width ?? 0) * scaleX;
+                const effectiveHeight = (imageShape.height ?? 0) * scaleY;
 
                 // 3D 공간에서의 실제 크기 (X,Y 바뀐 상태)
                 const actualWidth = effectiveHeight / scaleFactor;

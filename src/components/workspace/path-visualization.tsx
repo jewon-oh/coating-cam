@@ -7,7 +7,7 @@ import { useAppSelector } from '@/hooks/redux';
 import { useSettings } from '@/contexts/settings-context';
 import { selectShapes,  selectDraggingShapeIds } from '@/store/slices/shape-slice';
 import { GCodeGenerator } from '@/lib/gcode/g-code-generator';
-import { Point } from '@/lib/gcode/point';
+import { Point } from '@/types/point';
 import { CoatingOrderBadge } from './coating-order-badge';
 import { useCanvas } from '@/contexts/canvas-context';
 
@@ -21,7 +21,7 @@ interface PathEndpoint {
 export const PathVisualization = () => {
     const settings = useSettings();
     const { gcodeSettings, workArea, showCoatingPaths = false } = settings;
-    const { stage } = useCanvas();
+    const { stageState } = useCanvas();
     const allShapes = useAppSelector(selectShapes);
     const draggingShapeIds = useAppSelector(selectDraggingShapeIds);
 
@@ -90,8 +90,8 @@ export const PathVisualization = () => {
         return null;
     }
 
-    const scaleX = stage.scaleX;
-    const scaleY = stage.scaleY;
+    const scaleX = stageState.scaleX;
+    const scaleY = stageState.scaleY;
     const invScale = Math.max(0.1, Math.min(10, 1 / Math.min(Math.abs(scaleX), Math.abs(scaleY))));
 
     return (

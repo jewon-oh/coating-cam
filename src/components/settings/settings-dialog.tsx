@@ -21,7 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useSettings } from "@/contexts/settings-context";
-import {GCODE_HOOKS, GCodeHook} from "@/types/gcode";
+import {GCODE_HOOKS, GCodeHook} from "../../../common/types/gcode";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -83,7 +83,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
 /* 일반 탭: workArea 편집 + 테마 즉시 적용 + 현재 테마 표시 */
 function GeneralSettings() {
-    const { theme: persistedTheme, setTheme: setThemePersisted, workArea, setWorkArea, pixelsPerMm } = useSettings();
+    const { setTheme: setThemePersisted, workArea, setWorkArea, pixelsPerMm } = useSettings();
     const { theme: runtimeTheme, setTheme } = useTheme();
 
     const [widthText, setWidthText] = useState(String(workArea.width));
@@ -155,9 +155,9 @@ function GeneralSettings() {
                 <Label className="text-right col-span-1">테마</Label>
                 <div className="col-span-3">
                     <Select
-                        value={(runtimeTheme as any) ?? "system"}
-                        onValueChange={(v) => {
-                            setTheme(v as any);
+                        value={runtimeTheme ?? "system"}
+                        onValueChange={(v: "light" | "dark" | "system") => {
+                            setTheme(v);
                             setThemePersisted(v);
                         }}
                     >
@@ -412,7 +412,7 @@ function GCodeSnippetsSection() {
 
     const grouped = useMemo(() => {
         const map = new Map<GCodeHook, typeof gcodeSnippets>();
-        hooks.forEach((h) => map.set(h.value, []));
+        hooks.forEach((h) => map.set(h.value as GCodeHook, []));
         for (const s of gcodeSnippets) {
             const list = map.get(s.hook);
             (list ? list : []).push(s);
@@ -434,7 +434,7 @@ function GCodeSnippetsSection() {
     }, [addGcodeSnippet, newName, newHook]);
 
     const moveWithinHook = useCallback(
-        (hook: string, id: string, dir: "up" | "down") => {
+        (hook: GCodeHook, id: string, dir: "up" | "down") => {
             const list = grouped.get(hook) ?? [];
             const ids = list.map((s) => s.id);
             const idx = ids.indexOf(id);
@@ -488,7 +488,7 @@ function GCodeSnippetsSection() {
             {/* 목록 */}
             <div className="space-y-6">
                 {hooks.map(({ value: hookValue, label }) => {
-                    const list = grouped.get(hookValue) ?? [];
+                    const list = grouped.get(hookValue as GCodeHook) ?? [];
                     return (
                         <div key={hookValue} className="rounded-md border">
                             <div className="px-3 py-2 bg-muted/50 flex items-center justify-between">
@@ -523,7 +523,7 @@ function GCodeSnippetsSection() {
                                                         size="icon"
                                                         variant="ghost"
                                                         className="h-8 w-8"
-                                                        onClick={() => moveWithinHook(hookValue, snip.id, "up")}
+                                                        onClick={() => moveWithinHook(hookValue as GCodeHook, snip.id, "up")}
                                                         disabled={idx === 0}
                                                         title="위로"
                                                     >
@@ -533,7 +533,7 @@ function GCodeSnippetsSection() {
                                                         size="icon"
                                                         variant="ghost"
                                                         className="h-8 w-8"
-                                                        onClick={() => moveWithinHook(hookValue, snip.id, "down")}
+                                                        onClick={() => moveWithinHook(hookValue as GCodeHook, snip.id, "down")}
                                                         disabled={idx === list.length - 1}
                                                         title="아래로"
                                                     >

@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import {CanvasProvider} from "@/contexts/canvas-context";
 import {ObjectPanel} from "@/components/object-panel/object-panel";
 import {Toolbar} from "@/components/tool/toolbar";
-import React, {useCallback, useState} from "react";
+import React, {useCallback, useState, useRef, useEffect} from "react";
 import {WorkspaceOverlays} from "@/components/workspace/workspace-overlays";
 import ToolContextPanel from "@/components/workspace/tool-context-panel";
 import {useProjectAutoLoad} from "@/hooks/project/use-project-autoload";
@@ -29,13 +29,14 @@ const WorkspaceContent = () => {
     const { gcodeSettings,workArea,gcodeSnippets } = useSettings();
     useProjectAutoLoad();
 
+    const navigationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
     const selectedShapeIds = useAppSelector((state) => state.shapes.selectedShapeIds);
     const currentTool = useAppSelector((state) => state.tool.tool);
 
     const hasSelectedShapes = selectedShapeIds.length > 0;
     const isDrawingTool = currentTool !== 'select';
 
-    // G-Code 생성 상태
     const [generationState, setGenerationState] = useState({
         isOpen: false,
         progress: 0,
@@ -44,19 +45,17 @@ const WorkspaceContent = () => {
         error: ''
     });
 
-    // G-code를 경로 데이터로 파싱하는 함수
     const parseGCodeToPath = (gcodeText: string): number[][] => {
         const lines = gcodeText.split('\n');
         const path: number[][] = [];
         let currentX = 0;
         let currentY = 0;
-        let currentZ = 5; // 안전 높이
+        let currentZ = 5;
 
         for (const line of lines) {
             const trimmed = line.trim();
             if (!trimmed.startsWith('G')) continue;
 
-            // G0, G1 명령 파싱
             if (trimmed.startsWith('G0') || trimmed.startsWith('G1')) {
                 const xMatch = trimmed.match(/X([+-]?\d*\.?\d+)/);
                 const yMatch = trimmed.match(/Y([+-]?\d*\.?\d+)/);
@@ -66,7 +65,6 @@ const WorkspaceContent = () => {
                 if (yMatch) currentY = parseFloat(yMatch[1]);
                 if (zMatch) currentZ = parseFloat(zMatch[1]);
 
-                // 경로에 점 추가
                 path.push([ currentX, currentY, currentZ]);
             }
         }
@@ -74,8 +72,22 @@ const WorkspaceContent = () => {
         return path;
     };
 
-    // G-Code 생성 함수
+    useEffect(() => {
+        return () => {
+            if (navigationTimerRef.current) {
+                // ✨ FIX: setTimeout -> setInterval에 맞춰 clearInterval로 변경
+                clearInterval(navigationTimerRef.current);
+            }
+        };
+    }, []);
+
+
     const handleGenerateGCode = useCallback(async () => {
+        if (navigationTimerRef.current) {
+            // ✨ FIX: setTimeout -> setInterval에 맞춰 clearInterval로 변경
+            clearInterval(navigationTimerRef.current);
+        }
+
         try {
             if (shapes.length === 0) {
                 toast.error("G-Code를 생성할 도형이 없습니다.");
@@ -90,14 +102,11 @@ const WorkspaceContent = () => {
                 error: ''
             });
 
-            // 경로/영역 기반 진행률을 전체 진행률로 매핑하는 헬퍼
             const mapProgress = (
                 rawPercent: number,
                 message: string,
                 totals: { pathIndex?: number; pathTotal?: number; areaIndex?: number; areaTotal?: number }
             ) => {
-                // 전체 파이프라인 가중치 설정
-                // 0-5%: 초기화/분석, 5-95%: 경로 생성(모든 경로 총합), 95-100%: 파싱/마무리
                 const START_INIT = 0;
                 const END_INIT = 5;
                 const START_PATHS = 5;
@@ -107,17 +116,12 @@ const WorkspaceContent = () => {
 
                 const pIdx = totals.pathIndex ?? 0;
                 const pTot = totals.pathTotal ?? 0;
-                const aIdx = totals.areaIndex ?? 0;
-                const aTot = totals.areaTotal ?? 0;
 
                 if (pTot > 0) {
-                    // 각 경로 구간의 전체 진행률 폭
                     const perPathSpan = (END_PATHS - START_PATHS) / pTot;
-                    // 현재 경로의 시작/끝
                     const pathStart = START_PATHS + (pIdx - 1) * perPathSpan;
                     const pathEnd = pathStart + perPathSpan;
 
-                    // 메시지가 영역 i/n 이면 영역 비율로, 아니면 rawPercent(0-100)를 경로 구간으로 매핑
                     let withinPathRatio: number;
                     const areaMatch = /영역\s+(\d+)\s*\/\s*(\d+)/.exec(message);
                     if (areaMatch) {
@@ -132,23 +136,19 @@ const WorkspaceContent = () => {
                     return clamp(overall, START_PATHS, END_PATHS);
                 }
 
-                // 경로 총수가 없으면 초기화/기타 단계로 간주: INIT 구간에서만 움직이게 (rawPercent 사용)
                 return clamp(START_INIT + (END_INIT - START_INIT) * (rawPercent / 100), START_INIT, END_INIT);
             };
 
-            // 진행률 계산에 사용할 현재 경로/총 경로 수 추적
             let currentPathIndex = 0;
             let totalPaths = 0;
 
             const onProgress = (raw: number, message: string) => {
-                // 경로 i/n 패턴 파싱
                 const pathMatch = /(\d+)\s*\/\s*(\d+)\s*경로\s*계산\s*중/.exec(message);
                 if (pathMatch) {
                     currentPathIndex = Number(pathMatch[1]);
                     totalPaths = Number(pathMatch[2]);
                 }
 
-                // 영역 i/n 패턴도 매핑 시 사용됨
                 const areaMatch = /영역\s+(\d+)\s*\/\s*(\d+)/.exec(message);
                 const areaIndex = areaMatch ? Number(areaMatch[1]) : undefined;
                 const areaTotal = areaMatch ? Number(areaMatch[2]) : undefined;
@@ -162,13 +162,11 @@ const WorkspaceContent = () => {
 
                 setGenerationState(prev => ({
                     ...prev,
-                    progress: Math.min(Math.max(overall, prev.progress), 99.9), // 후반 95~100 구간 위해 상한 99.9
+                    progress: Math.min(Math.max(overall, prev.progress), 99.9),
                     currentStep: message
                 }));
-                console.log(`Progress: ${overall.toFixed(1)}% - ${message}`);
             };
 
-            // 시작 표기
             setGenerationState(prev => ({
                 ...prev,
                 progress: 1,
@@ -183,7 +181,6 @@ const WorkspaceContent = () => {
                 onProgress
             );
 
-            // 파싱/마무리 단계(95~100%)
             setGenerationState(prev => ({
                 ...prev,
                 progress: Math.max(prev.progress, 95),
@@ -193,52 +190,77 @@ const WorkspaceContent = () => {
             const path = parseGCodeToPath(gcode);
             dispatch(setGCode({ gcode, path }));
 
-            // 완료 및 카운트다운(100% 고정)
-            for (let sec = 3; sec > 0; sec--) {
-                setGenerationState(prev => ({
-                    ...prev,
-                    progress: 100,
-                    status: 'completed',
-                    currentStep: `${sec}초 후 미리보기로 이동합니다...`
-                }));
-                await new Promise(r => setTimeout(r, 1000));
-            }
+            // ✨ FIX: 실시간 카운트다운 로직으로 변경
+            let countdown = 3;
+            setGenerationState(prev => ({
+                ...prev,
+                progress: 100,
+                status: 'completed',
+                currentStep: `${countdown}초 후 미리보기로 이동합니다...`
+            }));
 
-            router.push('/preview');
+            navigationTimerRef.current = setInterval(() => {
+                countdown -= 1;
+                if (countdown > 0) {
+                    setGenerationState(prev => ({
+                        ...prev,
+                        progress: 100,
+                        status: 'completed',
+                        currentStep: `${countdown}초 후 미리보기로 이동합니다...`
+                    }));
+                } else {
+                    if (navigationTimerRef.current) {
+                        clearInterval(navigationTimerRef.current);
+                    }
+                    setGenerationState(prev => ({ ...prev, currentStep: "이동 중..." }));
+                    router.push('/preview');
+                }
+            }, 1000);
+
         } catch (error) {
-            console.error('G-Code 생성 실패:', error);
+            let errorMessage = '알 수 없는 오류';
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            } else {
+                errorMessage = String(error);
+            }
+            console.error('G-code 생성 중 오류:', errorMessage);
             setGenerationState(prev => ({
                 ...prev,
                 status: 'error',
-                error: error instanceof Error ? error.message : 'Unknown error occurred'
+                error: errorMessage
             }));
         }
     }, [shapes, gcodeSettings, workArea, gcodeSnippets, dispatch, router]);
 
-
-    // 미리보기로 이동
     const handleViewPreview = useCallback(() => {
+        if (navigationTimerRef.current) {
+            // ✨ FIX: setTimeout -> setInterval에 맞춰 clearInterval로 변경
+            clearInterval(navigationTimerRef.current);
+        }
         setGenerationState(prev => ({ ...prev, isOpen: false }));
         router.push('/preview');
     }, [router]);
 
-    // 모달 닫기
     const handleCloseModal = useCallback(() => {
         if (generationState.status !== 'generating') {
+            if (navigationTimerRef.current) {
+                // ✨ FIX: setTimeout -> setInterval에 맞춰 clearInterval로 변경
+                clearInterval(navigationTimerRef.current);
+            }
             setGenerationState(prev => ({ ...prev, isOpen: false }));
         }
     }, [generationState.status]);
 
-    // 좌측 패널 렌더링 로직
     const renderLeftPanel = () => {
         if (isDrawingTool) {
             return <ToolContextPanel />;
         }
-
         if (hasSelectedShapes) {
             return <PropertyPanel />;
         }
-
         return <ToolContextPanel />;
     };
 
@@ -264,12 +286,11 @@ const WorkspaceContent = () => {
                     <ResizableHandle withHandle/>
 
                     <ResizablePanel defaultSize={20} minSize={10} maxSize={30}>
-                        <ObjectPanel/>
+                        <ObjectPanel />
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>
 
-            {/* G-Code 생성 진행률 모달 */}
             <GCodeGenerationDialog
                 isOpen={generationState.isOpen}
                 onClose={handleCloseModal}
@@ -290,3 +311,4 @@ export default function WorkspacePage() {
         </CanvasProvider>
     );
 }
+

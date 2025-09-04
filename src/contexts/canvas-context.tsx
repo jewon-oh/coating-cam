@@ -23,8 +23,8 @@ interface CanvasContextValue {
     canvasContainerRef: RefObject<HTMLDivElement|null>;
 
     // 스테이지 상태
-    stage: StageState;
-    setStage: (updater: React.SetStateAction<StageState>) => void;
+    stageState: StageState;
+    setStageState: (updater: React.SetStateAction<StageState>) => void;
 
     // 로딩 상태
     loading: LoadingState;
@@ -46,12 +46,11 @@ const EPSILON = {
     POSITION: 0.25, // quarter pixel to reduce thrash
 } as const;
 
-// 기본 줌 레벨 상수 추가
-const DEFAULT_ZOOM_LEVEL = 2; // 원하는 기본 배율로 설정 (1.5배, 2배, 3배 등)
+const DEFAULT_ZOOM_LEVEL = 2;
 
 const DEFAULT_STAGE_STATE: StageState = {
-    scaleX: -DEFAULT_ZOOM_LEVEL, // X축 반전과 함께 확대
-    scaleY: DEFAULT_ZOOM_LEVEL,  // Y축 확대
+    scaleX: -DEFAULT_ZOOM_LEVEL,
+    scaleY: DEFAULT_ZOOM_LEVEL,
     x: 0,
     y: 0,
     width: 0,
@@ -64,24 +63,50 @@ const DEFAULT_LOADING_STATE: LoadingState = {
     message: '로딩 중...',
 } as const;
 
+const STAGE_STATE_STORAGE_KEY = 'canvasStageState';
+
 // === Context ===
 const CanvasContext = createContext<CanvasContextValue | null>(null);
 
 // === 커스텀 훅: 스테이지 상태 관리 ===
 function useStageState() {
+    // 1. 항상 기본 상태로 시작합니다.
     const [stage, setStageState] = useState<StageState>(DEFAULT_STAGE_STATE);
+
+    // 2. 컴포넌트가 마운트된 후 (클라이언트 측에서) localStorage에서 상태를 불러옵니다.
+    useEffect(() => {
+        try {
+            const savedStateJSON = localStorage.getItem(STAGE_STATE_STORAGE_KEY);
+            if (savedStateJSON) {
+                const savedState = JSON.parse(savedStateJSON);
+                // 불러온 상태로 업데이트합니다.
+                setStageState(prevState => ({
+                    ...prevState, // 기본 상태 유지
+                    ...savedState, // 저장된 상태 덮어쓰기
+                    width: 0, // width/height는 항상 컨테이너에 맞춰 재계산
+                    height: 0,
+                }));
+            }
+        } catch (e) {
+            console.error("localStorage에서 캔버스 상태를 불러오지 못했습니다.", e);
+        }
+    }, []); // 빈 배열을 전달하여 마운트 시 한 번만 실행되도록 합니다.
+
+    // 3. 상태가 변경될 때마다 localStorage에 저장합니다.
+    useEffect(() => {
+        try {
+            const { ...stateToSave } = stage;
+            localStorage.setItem(STAGE_STATE_STORAGE_KEY, JSON.stringify(stateToSave));
+        } catch (e) {
+            console.error("localStorage에 캔버스 상태를 저장하지 못했습니다.", e);
+        }
+    }, [stage]);
 
     const setStage = useCallback<React.Dispatch<React.SetStateAction<StageState>>>((updater) => {
         setStageState((prev) => {
             const next = typeof updater === 'function' ? updater(prev) : updater;
+            const syncedNext = { ...next, scale: Math.abs(next.scaleX) };
 
-            // scale 필드 동기화 (실제 확대/축소 배율)
-            const syncedNext = {
-                ...next,
-                scale: Math.abs(next.scaleX) // scaleX의 절댓값을 scale로 사용
-            };
-
-            // 불필요한 상태 업데이트 방지
             const hasSignificantChange = (
                 Math.abs(syncedNext.scaleX - prev.scaleX) >= EPSILON.SCALE ||
                 Math.abs(syncedNext.scaleY - prev.scaleY) >= EPSILON.SCALE ||
@@ -92,7 +117,6 @@ function useStageState() {
             );
 
             return hasSignificantChange ? syncedNext : prev;
-
         });
     }, []);
 
@@ -106,21 +130,19 @@ function useStageState() {
                 return prev;
             }
 
-            // 높은 배율에서 더 좋은 초기 위치 설정
-            const zoomLevel = Math.abs(prev.scaleX);
+            let newX = prev.x;
+            let newY = prev.y;
 
-            // 원점(0,0)이 보이도록 초기 위치 설정
-            // scaleX가 -1일 때: 우상단이 원점이므로 살짝 좌하단으로 이동
-            const offsetX = width * (0.8 / zoomLevel);  // 배율에 따라 오프셋 조정
-            const offsetY = height * (0.2 / zoomLevel); // 배율에 따라 오프셋 조정
+            const isInitialSizing = prev.width === 0 && prev.height === 0;
+            const isDefaultPosition = prev.x === DEFAULT_STAGE_STATE.x && prev.y === DEFAULT_STAGE_STATE.y;
 
-            return {
-                ...prev,
-                width,
-                height,
-                x: offsetX,
-                y: offsetY
-            };
+            if (isInitialSizing && isDefaultPosition) {
+                const zoomLevel = Math.abs(prev.scaleX);
+                newX = width * (0.8 / zoomLevel);
+                newY = height * (0.2 / zoomLevel);
+            }
+
+            return { ...prev, width, height, x: newX, y: newY };
         });
     }, [setStage]);
 
@@ -131,7 +153,6 @@ function useStageState() {
 function useLoadingState() {
     const [loading, setLoadingState] = useState<LoadingState>(DEFAULT_LOADING_STATE);
 
-    // 상태 업데이트를 렌더링과 분리하기 위해 비동기 호출로 처리
     const setLoading = useCallback((partialLoading: Partial<LoadingState>) => {
         setTimeout(() => {
             setLoadingState(prev => ({ ...prev, ...partialLoading }));
@@ -153,11 +174,7 @@ function useCanvasFocusState() {
         setIsCanvasFocused(false);
     }, []);
 
-    return {
-        isCanvasFocused,
-        handleCanvasFocus,
-        handleCanvasBlur
-    };
+    return { isCanvasFocused, handleCanvasFocus, handleCanvasBlur };
 }
 
 // === 커스텀 훅: 리사이즈 관리 ===
@@ -180,12 +197,8 @@ function useCanvasResize(
             const width = Math.max(0, Math.floor(rect.width));
             const height = Math.max(0, Math.floor(rect.height));
 
-            // 크기가 0보다 클 때만 상태 업데이트를 진행하여 사라지는 현상 방지
             if (width > 0 && height > 0) {
-                // 스테이지 상태 업데이트
                 updateStageSize(width, height);
-
-                // Konva 스테이지 크기 업데이트
                 if (stage) {
                     if (stage.width() !== width) stage.width(width);
                     if (stage.height() !== height) stage.height(height);
@@ -202,9 +215,7 @@ function useCanvasResize(
             updateSize();
 
             resizeObserver = new ResizeObserver(() => {
-                if (animationFrameId) {
-                    cancelAnimationFrame(animationFrameId);
-                }
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
                 animationFrameId = requestAnimationFrame(updateSize);
             });
 
@@ -213,23 +224,16 @@ function useCanvasResize(
 
         initializeObserver();
 
-        // 윈도우 리사이즈 폴백
         const handleWindowResize = () => {
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-            }
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
             animationFrameId = requestAnimationFrame(updateSize);
         };
 
         window.addEventListener('resize', handleWindowResize);
 
         return () => {
-            if (resizeObserver) {
-                resizeObserver.disconnect();
-            }
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-            }
+            if (resizeObserver) resizeObserver.disconnect();
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
             window.removeEventListener('resize', handleWindowResize);
         };
     }, [canvasContainerRef, stageRef, updateStageSize]);
@@ -237,24 +241,20 @@ function useCanvasResize(
 
 // === Provider 컴포넌트 ===
 export function CanvasProvider({ children }: { children: React.ReactNode }) {
-    // 참조 생성
     const stageRef = useRef<Konva.Stage>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-    // 상태 관리 훅들
     const { stage, setStage, resetStage, updateStageSize } = useStageState();
     const { loading, setLoading } = useLoadingState();
     const { isCanvasFocused, handleCanvasFocus, handleCanvasBlur } = useCanvasFocusState();
 
-    // 리사이즈 관리
     useCanvasResize(canvasContainerRef, stageRef, updateStageSize);
 
-    // Context 값 메모이제이션
     const contextValue = useMemo<CanvasContextValue>(() => ({
         stageRef,
         canvasContainerRef,
-        stage,
-        setStage,
+        stageState: stage,
+        setStageState: setStage,
         loading,
         setLoading,
         isCanvasFocused,
@@ -274,11 +274,9 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
 // === 훅 ===
 export function useCanvas() {
     const context = useContext(CanvasContext);
-
     if (!context) {
         throw new Error('useCanvas must be used within CanvasProvider');
     }
-
     return context;
 }
 
@@ -287,10 +285,7 @@ export function useCanvasLoading() {
     const { loading, setLoading } = useCanvas();
 
     const startLoading = useCallback((message?: string) => {
-        setLoading({
-            isLoading: true,
-            message: message || '로딩 중...'
-        });
+        setLoading({ isLoading: true, message: message || '로딩 중...' });
     }, [setLoading]);
 
     const stopLoading = useCallback(() => {

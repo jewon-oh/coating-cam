@@ -6,13 +6,15 @@ export default function ToolHead({position, scaleFactor}: { position: number[], 
     const cylinderHeight = 2;
 
     // 위치 계산 로직을 useMemo로 분리하여 불필요한 계산 방지
-    const toolheadPosition = useMemo(() => {
-        if (!position) return [0, cylinderHeight / 2, 0];
+    const toolheadPosition: [number, number, number] = useMemo(() => {
+        if (!position || position.length < 3) {
+            return [0, cylinderHeight / 2, 0];
+        }
         return [
             (position[1] ?? 0) / scaleFactor,
             ((position[2] ?? 0) / scaleFactor) + cylinderHeight / 2,
             (position[0] ?? 0) / scaleFactor
-        ] as [number, number, number];
+        ];
     }, [position, scaleFactor]);
 
     return (

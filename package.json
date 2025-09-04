@@ -1,25 +1,28 @@
 {
-  "name": "image-to-gcode",
+  "name": "coating-cam",
+  "description": "A CAM software for coating applications",
+  "author": "jewon-oh",
   "version": "0.1.0",
   "private": true,
-  "main": "electron-dist/main.js",
+  "main": "dist/electron/main.js",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "next build && node scripts/move.js",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
-    "preflight": "yarn build && yarn vitest && yarn lint && yarn tsc",
-    "build:electron": "tsc -p electron/tsconfig.json",
-    "watch:electron": "tsc -p electron/tsconfig.json -w",
-    "electron:dev": "concurrently -k \"yarn dev\" \"yarn watch:electron\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:prod": "cross-env NODE_ENV=production yarn build && yarn build:electron && electron .",
+    "preflight": "yarn build && yarn lint && yarn tsc",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "watch:electron": "tsc -p tsconfig.electron.json -w",
+    "electron:dev": "concurrently -k \"yarn dev\" \"yarn watch:electron\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "electron:prod": "cross-env NODE_ENV=production yarn build &&  yarn build:electron && cross-env NODE_ENV=production electron .",
     "electron:build": "cross-env NODE_ENV=production yarn build && yarn build:electron && electron-builder"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
+    "@electron-forge/shared-types": "^7.8.3",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-checkbox": "^1.3.2",
     "@radix-ui/react-collapsible": "^1.1.11",
@@ -44,6 +47,8 @@
     "@types/recharts": "^2.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron-is-dev": "^3.0.1",
+    "electron-serve": "^2.1.1",
     "formidable": "^3.5.4",
     "framer-motion": "^12.23.12",
     "input": "^1.0.1",
@@ -70,16 +75,13 @@
     "zeromq": "^6.5.0"
   },
   "build": {
-    "appId": "com.path-generator",
-    "productName": "Path Generator",
+    "appId": "com.coating-cam",
+    "productName": "Coating CAM",
     "files": [
-      "electron-dist/**/*",
-      ".next/**/*",
-      "next.config.*",
-      "package.json"
+      "./dist/**/*"
     ],
-    "extraMetadata": {
-      "main": "electron-dist/main.js"
+    "directories": {
+      "output": "release"
     },
     "mac": {
       "category": "public.app-category.productivity"
@@ -107,8 +109,11 @@
     "electron-builder": "^26.0.12",
     "eslint": "^9",
     "eslint-config-next": "15.3.4",
+    "fs-extra": "^11.3.1",
     "redux-devtools-extension": "^2.13.9",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.16",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5",
     "vitest": "^3.2.4",

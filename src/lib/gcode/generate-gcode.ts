@@ -1,10 +1,10 @@
 // G-Code 생성에 필요한 커스텀 도형, 설정, 스니펫 타입들을 가져옵니다.
-import {CustomShapeConfig} from '@/types/custom-konva-config';
-import { GCodeSnippet, GCodeHook} from '@/types/gcode';
-import {CoatingSettings} from "@/types/coating";
-import {GCodeEmitter} from "@/lib/gcode/gcode-emitter";
-import {GCodeGenerator} from "@/lib/gcode/g-code-generator";
-import {ProgressCallback} from "@/lib/gcode/progress-callback";
+import { CustomShapeConfig } from '@/types/custom-konva-config';
+import { GCodeSnippet, GCodeHook } from '../../../common/types/gcode';
+import { CoatingSettings } from "../../../common/types/coating";
+import { GCodeEmitter } from "@/lib/gcode/gcode-emitter";
+import { GCodeGenerator } from "@/lib/gcode/g-code-generator";
+import { ProgressCallback } from "@/lib/gcode/progress-callback";
 
 
 /**
@@ -23,14 +23,19 @@ export async function generateCoatingGCode(
     onProgress?: ProgressCallback
 ): Promise<string> {
     const emitter = new GCodeEmitter(settings);
-    const gCodeGenerator = new GCodeGenerator(settings, workArea,shapes);
+    const gCodeGenerator = new GCodeGenerator(settings, workArea, shapes);
 
     // await 키워드 추가
     await gCodeGenerator.generatePaths(emitter, onProgress);
 
     return emitter.getGCode();
 }
-
+// Vars 객체 내부에 존재할 수 있는 모든 값의 형태를 정의하는 재귀 타입
+type GCodeValue =
+    | string
+    | number
+    | undefined
+    | { [key: string]: GCodeValue };
 /**
  * 스니펫 합성 유틸 & 통합 함수
  */
@@ -44,14 +49,25 @@ type Vars = {
     pathCount?: number;
     shapeName?: string;
     shapeType?: string;
-    [k: string]: any;
+    // 다른 모든 속성을 허용하되, 구체적인 타입을 위해 인덱스 시그니처를 사용합니다.
+    [key: string]: GCodeValue;
 };
+
 
 // G-code 템플릿 문자열을 변수 값으로 렌더링하는 유틸 함수
 function renderTemplate(tpl: string, vars: Vars): string {
     if (!tpl) return '';
     return tpl.replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*}}/g, (_m, key) => {
-        const v = key.split('.').reduce<any>((acc, k) => (acc ? acc[k] : undefined), vars);
+        const v = key.split('.').reduce((acc: GCodeValue, k: string) => {
+            // ✨ 타입 가드: acc가 객체일 때만 다음 속성에 접근합니다.
+            if (acc && typeof acc === 'object') {
+                // `acc`는 GCodeValue 객체이므로 `acc[k]` 접근이 타입 안전합니다.
+                return acc[k];
+            }
+            // 객체가 아니면 탐색을 중단하고 undefined를 반환합니다.
+            return undefined;
+        }, vars); // 초기값은 'vars' 객체입니다.
+
         return v === undefined || v === null ? '' : String(v);
     });
 }
@@ -88,52 +104,47 @@ export async function generateGcode(
     snippets: GCodeSnippet[],
     onProgress?: ProgressCallback
 ): Promise<string> {
-    try {
-        console.log('G-code 생성 시작:', {
-            shapesCount: shapes.length,
-            fillPattern: settings.fillPattern,
-            lineSpacing: settings.lineSpacing
-        });
 
-        // 1) 코팅 바디 G-code만 생성 (await 추가)
-        const body = await generateCoatingGCode(shapes, settings,workArea, onProgress);
+    console.log('G-code 생성 시작:', {
+        shapesCount: shapes.length,
+        fillPattern: settings.fillPattern,
+        lineSpacing: settings.lineSpacing
+    });
 
-        if (!body || body.trim().length === 0) {
-            throw new Error('G-code 바디가 생성되지 않았습니다. 도형과 설정을 확인해주세요.');
-        }
+    // 1) 코팅 바디 G-code만 생성 (await 추가)
+    const body = await generateCoatingGCode(shapes, settings, workArea, onProgress);
 
-        // 2) 스니펫과 조합
-        const baseVars: Vars = {
-            unit: (settings.unit as any) ?? 'mm',
-            workArea: workArea,
-            safeHeight: settings.safeHeight,
-            time: new Date().toISOString(),
-        };
-
-        let out = '';
-        out += emit(snippets, 'beforeAll', baseVars);
-        // out += emit(snippets, 'beforeJob', baseVars);
-
-        const pathVars: Vars = {
-            ...baseVars,
-            pathIndex: 1,
-            pathCount: 1,
-            shapeName: 'Coating',
-            shapeType: 'coating'
-        };
-        out += emit(snippets, 'beforePath', pathVars);
-        out += body.trim() + '\n';
-        out += emit(snippets, 'afterPath', pathVars);
-        // out += emit(snippets, 'afterJob', baseVars);
-        out += emit(snippets, 'afterAll', baseVars);
-
-        const result = out.trimEnd() + '\n';
-        console.log('G-code 생성 완료, 길이:', result.length);
-
-        return result;
-
-    } catch (error) {
-        console.error('G-code 생성 중 오류:', error);
-        throw new Error(`G-code 생성 실패: ${error.message || '알 수 없는 오류'}`);
+    if (!body || body.trim().length === 0) {
+        throw new Error('G-code 바디가 생성되지 않았습니다. 도형과 설정을 확인해주세요.');
     }
+
+    // 2) 스니펫과 조합
+    const baseVars: Vars = {
+        unit: settings.unit ?? 'mm',
+        workArea: workArea,
+        safeHeight: settings.safeHeight,
+        time: new Date().toISOString(),
+    };
+
+    let out = '';
+    out += emit(snippets, 'beforeAll', baseVars);
+    // out += emit(snippets, 'beforeJob', baseVars);
+
+    const pathVars: Vars = {
+        ...baseVars,
+        pathIndex: 1,
+        pathCount: 1,
+        shapeName: 'Coating',
+        shapeType: 'coating'
+    };
+    out += emit(snippets, 'beforePath', pathVars);
+    out += body.trim() + '\n';
+    out += emit(snippets, 'afterPath', pathVars);
+    // out += emit(snippets, 'afterJob', baseVars);
+    out += emit(snippets, 'afterAll', baseVars);
+
+    const result = out.trimEnd() + '\n';
+    console.log('G-code 생성 완료, 길이:', result.length);
+
+    return result;
 }

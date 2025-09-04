@@ -1,5 +1,5 @@
 // hooks/useItemActions.ts
-import { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { CustomShapeConfig } from '@/types/custom-konva-config';
 
 interface UseItemActionsProps {

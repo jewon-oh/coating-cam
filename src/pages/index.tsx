@@ -33,14 +33,14 @@ export default function HomePage() {
     const handleOpenFile = async (file: RecentFile) => {
         // Electron: 경로만 넘기고 /canvas에서 읽기
         // Web: sessionStorage를 사용해 대용량 쿼리 제거
-        if (file.filePath && (window as any).projectApi) {
+        if (file.filePath && (window as Window & typeof globalThis & { projectApi?: { openFile: (path: string) => void } }).projectApi) {
             const qp = new URLSearchParams({filePath: file.filePath});
-            router.push(`/workspace?${qp.toString()}`);
+            await router.push(`/workspace?${qp.toString()}`);
             return;
         }
         if (file.content) {
             sessionStorage.setItem('pendingProject', file.content);
-            router.push('/workspace');
+            await router.push('/workspace');
             return;
         }
         alert('파일 정보를 찾을 수 없습니다.');

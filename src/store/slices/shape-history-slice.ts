@@ -1,6 +1,5 @@
-
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { CustomShapeConfig } from '@/types/custom-konva-config';
+import {CustomShapeConfig, SerializableShapePayload} from '@/types/custom-konva-config';
 import { current, isDraft } from 'immer';
 
 // 히스토리 상태 타입 정의
@@ -22,15 +21,15 @@ const initialState: HistoryState = {
 };
 
 // 유틸리티 함수들
-const createDeepCopy = (shapes: CustomShapeConfig[]): CustomShapeConfig[] => {
+const createDeepCopy = (shapes: SerializableShapePayload[]): SerializableShapePayload[] => {
     return shapes.map(shape => ({ ...shape }));
 };
 
-const trimHistoryArray = (array: CustomShapeConfig[][], maxSize: number): CustomShapeConfig[][] => {
+const trimHistoryArray = (array: SerializableShapePayload[][], maxSize: number): SerializableShapePayload[][] => {
     return array.length > maxSize ? array.slice(-maxSize) : array;
 };
 
-const areShapesEqual = (shapes1: CustomShapeConfig[], shapes2: CustomShapeConfig[]): boolean => {
+const areShapesEqual = (shapes1: SerializableShapePayload[], shapes2: SerializableShapePayload[]): boolean => {
     if (shapes1.length !== shapes2.length) return false;
 
     return shapes1.every((shape1, index) => {
@@ -91,7 +90,7 @@ const shapeHistorySlice = createSlice({
             }
         },
 
-        setPresent: (state, action: PayloadAction<CustomShapeConfig[]>) => {
+        setPresent: (state, action: PayloadAction<SerializableShapePayload[]>) => {
             const newShapes = action.payload;
             const currentShapes = isDraft(state.present) ? current(state.present) : state.present;
 
@@ -117,7 +116,7 @@ const shapeHistorySlice = createSlice({
             }
         },
 
-        resetHistory: (state, action: PayloadAction<CustomShapeConfig[]>) => {
+        resetHistory: (state, action: PayloadAction<SerializableShapePayload[]>) => {
             state.past = [];
             state.present = createDeepCopy(action.payload);
             state.future = [];
@@ -142,12 +141,12 @@ const shapeHistorySlice = createSlice({
         },
 
         // 배치 작업을 위한 히스토리 일시 정지/재개
-        pauseHistory: (state) => {
+        pauseHistory: () => {
             // 상태에 플래그를 추가하려면 HistoryState 인터페이스 수정 필요
             console.log('히스토리가 일시 정지되었습니다.');
         },
 
-        resumeHistory: (state) => {
+        resumeHistory: () => {
             console.log('히스토리가 재개되었습니다.');
         }
     },

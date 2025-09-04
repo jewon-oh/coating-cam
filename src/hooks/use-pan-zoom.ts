@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { StageState } from '@/contexts/canvas-context';
 import Konva from "konva";

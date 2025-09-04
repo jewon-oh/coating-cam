@@ -10,7 +10,7 @@ import { useShapeEvents } from "@/hooks/use-shape-events";
 
 export function useStageEvents() {
     const dispatch = useAppDispatch();
-    const { canvasContainerRef, setStage } = useCanvas();
+    const { canvasContainerRef, setStageState } = useCanvas();
 
     // 팬/줌 기능
     const {
@@ -19,7 +19,7 @@ export function useStageEvents() {
         stopPan,
         updateStagePosition,
         handleWheel
-    } = usePanZoom(setStage);
+    } = usePanZoom(setStageState);
 
     // 모든 모드의 이벤트 핸들러를 항상 생성 (훅 규칙 준수)
     const shapeEvents = useShapeEvents();
@@ -71,7 +71,7 @@ export function useStageEvents() {
         }
 
         // 모드별 정리 로직 실행
-        modeEvents.handleMouseLeave(e);
+        modeEvents.handleMouseLeave();
     }, [isPanning, stopPan, modeEvents]);
 
     // 드래그 이벤트 처리 (패닝용)

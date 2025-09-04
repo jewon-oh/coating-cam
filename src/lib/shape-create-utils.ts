@@ -1,4 +1,4 @@
-import {FillPattern} from "@/types/coating";
+import {FillPattern} from "../../common/types/coating";
 
 /**
  * 도형 채우기 패턴을 그리는 Canvas를 생성합니다.
@@ -79,13 +79,15 @@ export const createCoatingPatternCanvas = (
         const buildConcentricPath = () => {
             ctx.beginPath();
             if (shapeType === 'rectangle') {
-                const aspect = height / width;
-                let w = width - lineSpacingPx;
-                let h = height - lineSpacingPx * aspect;
+                // ✨ FIX: 첫 경로의 중심선을 `코팅 폭` 기준으로 계산하여 G-code 로직과 일치시킵니다.
+                let w = width - coatingWidthPx;
+                let h = height - coatingWidthPx;
+
+                // 경로가 유효할 때만 그림
                 while (w > 0 && h > 0) {
                     ctx.rect(centerX - w / 2, centerY - h / 2, w, h);
                     w -= lineSpacingPx * 2;
-                    h -= lineSpacingPx * 2 * aspect;
+                    h -= lineSpacingPx * 2;
                 }
             } else { // circle
                 let radius = (Math.min(width, height) / 2) - lineSpacingPx / 2;

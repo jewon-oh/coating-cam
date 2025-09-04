@@ -1,7 +1,7 @@
 
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {ToolType, SHAPE_TOOLS} from '@/types/tool-type';
-import {FillPattern, CoatingType, TravelAvoidanceStrategy} from "@/types/coating";
+import {FillPattern, CoatingType, TravelAvoidanceStrategy} from "../../../common/types/coating";
 
 export interface ToolState {
     tool: ToolType;

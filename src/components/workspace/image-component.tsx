@@ -7,29 +7,30 @@ import type Konva from 'konva';
 import type {CustomShapeConfig} from '@/types/custom-konva-config';
 import {getCoatingVisualStyle} from "@/lib/shape-style-utils";
 
+import {KonvaEventObject} from "konva/lib/Node";
+
 interface ImageComponentProps {
     shape: CustomShapeConfig;
     imageElement: HTMLImageElement | null;
-    commonProps: any; // makeImageProps의 결과
+    commonProps: Partial<Konva.ImageConfig> & {
+        onDragStart?: (e: KonvaEventObject<DragEvent>) => void;
+        onDragEnd?: (e: KonvaEventObject<DragEvent>) => void;
+        onTransformEnd?: (e: KonvaEventObject<Event>) => void;
+    };
 }
 
 /**
  * Konva Image 도형을 렌더링하는 컴포넌트입니다.
- * 이미지 로딩 상태에 따라 로딩 플레이스홀더 또는 실제 이미지를 렌더링합니다.
- * 필터 적용 시 Konva 노드를 캐시하는 역할도 담당합니다.
  */
 export const ImageComponent = ({shape, imageElement, commonProps}: ImageComponentProps) => {
     const imageRef = useRef<Konva.Image>(null);
 
-    // Konva 필터(예: Grayscale)가 적용될 때, 성능을 위해 노드를 캐시해야 합니다.
-    // 필터 속성이 변경되거나 이미지가 바뀔 때마다 캐시를 다시 실행하여 뷰를 업데이트합니다.
     useEffect(() => {
-        if (imageRef.current) {
+        if (imageRef.current && commonProps.filters) {
             imageRef.current.cache();
         }
     }, [commonProps.filters, imageElement]);
 
-    // 이미지가 로드되지 않았을 경우, 로딩 상태를 나타내는 Rect 플레이스홀더를 렌더링합니다.
     if (!imageElement) {
         const style = getCoatingVisualStyle(shape);
         return (
@@ -52,18 +53,11 @@ export const ImageComponent = ({shape, imageElement, commonProps}: ImageComponen
         );
     }
 
-    // 이미지가 렌더링될 영역을 안전하게 계산합니다. (crop 영역이 이미지 크기를 벗어나지 않도록)
-    const safeCrop = shape.crop ? {
-        x: Math.max(0, shape.crop.x),
-        y: Math.max(0, shape.crop.y),
-        width: Math.max(1, Math.min(shape.crop.width, imageElement.width - shape.crop.x)),
-        height: Math.max(1, Math.min(shape.crop.height, imageElement.height - shape.crop.y))
-    } : {
-        x: 0,
-        y: 0,
-        width: imageElement.width,
-        height: imageElement.height
-    };
+    // ✨ FIX: crop 속성을 shape 데이터에서 직접 사용하고, 없을 경우에만 fallback 처리합니다.
+    const cropConfig = shape.crop && shape.crop.width > 0 && shape.crop.height > 0
+        ? shape.crop
+        : undefined; // crop 데이터가 유효하지 않으면 undefined를 전달하여 전체 이미지를 표시합니다.
+
 
     return (
         <Image
@@ -80,7 +74,7 @@ export const ImageComponent = ({shape, imageElement, commonProps}: ImageComponen
             rotation={shape.rotation || 0}
             scaleX={shape.scaleX || 1}
             scaleY={shape.scaleY || 1}
-            crop={safeCrop}
+            crop={cropConfig} // 수정된 crop 설정을 적용합니다.
             {...commonProps}
         />
     );

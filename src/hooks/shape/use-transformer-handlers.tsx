@@ -1,11 +1,11 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 import type Konva from 'konva';
-import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { batchUpdateShapes } from '@/store/slices/shape-slice';
-import { setPresent } from '@/store/slices/shape-history-slice';
-import type { CustomShapeConfig } from '@/types/custom-konva-config';
-import { useSettings } from '@/contexts/settings-context';
-import { useShapeSnapping } from './use-shape-snapping';
+import {useAppDispatch, useAppSelector} from '@/hooks/redux';
+import {batchUpdateShapes} from '@/store/slices/shape-slice';
+import {setPresent} from '@/store/slices/shape-history-slice';
+import type {CustomShapeConfig} from '@/types/custom-konva-config';
+import {useSettings} from '@/contexts/settings-context';
+import {useShapeSnapping} from './use-shape-snapping';
 import {createCoatingPatternCanvas} from "@/lib/shape-create-utils";
 
 /**
@@ -16,8 +16,8 @@ export function useTransformerHandlers(
 ) {
     const dispatch = useAppDispatch();
     const shapes = useAppSelector((s) => s.shapes.shapes);
-    const { isSnappingEnabled } = useSettings();
-    const { snapCircleRadius, snapShapeSize } = useShapeSnapping();
+    const {isSnappingEnabled} = useSettings();
+    const {snapCircleRadius, snapShapeSize} = useShapeSnapping();
 
     // 외부에서도 재사용할 수 있도록 이미지 캐시 노출
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -64,7 +64,7 @@ export function useTransformerHandlers(
                 imageNode.crop(currentCrop);
             }
             if (!currentCrop) {
-                currentCrop = { x: 0, y: 0, width: originalImage.width, height: originalImage.height };
+                currentCrop = {x: 0, y: 0, width: originalImage.width, height: originalImage.height};
                 imageNode.crop(currentCrop);
             }
 
@@ -73,7 +73,7 @@ export function useTransformerHandlers(
                 nodeY: node.y(),
                 nodeWidth: node.width() * node.scaleX(),
                 nodeHeight: node.height() * node.scaleY(),
-                crop: { ...currentCrop },
+                crop: {...currentCrop},
                 originalImageWidth: originalImage.width,
                 originalImageHeight: originalImage.height,
             };
@@ -83,7 +83,7 @@ export function useTransformerHandlers(
     }, [shapes, transformerRef]);
 
 
-    const handleTransform = useCallback((e: Konva.KonvaEventObject<Event>) => {
+    const handleTransform = useCallback(() => {
         const nodes = transformerRef.current?.nodes() || [];
         if (nodes.length === 0) return;
 
@@ -101,9 +101,9 @@ export function useTransformerHandlers(
                 const currentWidth = node.width() * Math.abs(oldScaleX);
                 const currentHeight = node.height() * Math.abs(oldScaleY);
 
-                const { width: snappedWidth, height: snappedHeight } = snapShapeSize(
-                    { width: currentWidth, height: currentHeight },
-                    shape
+                const {width: snappedWidth, height: snappedHeight} = snapShapeSize(
+                    {width: currentWidth, height: currentHeight},
+                    {coatingType: shape.coatingType, lineSpacing: shape.lineSpacing}
                 );
 
                 const newScaleX = node.width() > 0 ? snappedWidth / node.width() : 0;
@@ -114,9 +114,13 @@ export function useTransformerHandlers(
 
             } else if (shape.type === 'circle' && shape.radius && shape.radius > 0) {
                 const scale = Math.max(Math.abs(oldScaleX), Math.abs(oldScaleY));
-                const currentRadius = shape.radius * scale;
-                const snappedRadius = snapCircleRadius(currentRadius, shape);
+                const currentRadius = (shape.radius || 0) * scale;
+                const snappedRadius = snapCircleRadius(currentRadius, {
+                    coatingType: shape.coatingType,
+                    lineSpacing: shape.lineSpacing
+                });
 
+                // NOTE: `shape.radius` is guaranteed to be > 0 here by the `if` condition.
                 const newScale = shape.radius > 0 ? snappedRadius / shape.radius : 0;
 
                 node.scaleX(Math.sign(oldScaleX) * newScale);
@@ -135,9 +139,9 @@ export function useTransformerHandlers(
                 // =================================================================
                 const currentWidth = node.width() * scaleX;
                 const currentHeight = node.height() * scaleY;
-                const { width: snappedWidth, height: snappedHeight } = snapShapeSize(
-                    { width: currentWidth, height: currentHeight },
-                    shape
+                const {width: snappedWidth, height: snappedHeight} = snapShapeSize(
+                    {width: currentWidth, height: currentHeight},
+                    {coatingType: shape.coatingType, lineSpacing: shape.lineSpacing}
                 );
 
                 if (snappedWidth > 0 && snappedHeight > 0) {
@@ -151,16 +155,19 @@ export function useTransformerHandlers(
                     );
                     if (pattern) {
                         node.fillPatternImage(pattern);
-                        node.fillPatternScale({ x: 1 / scaleX, y: 1 / scaleY });
+                        node.fillPatternScale({x: 1 / scaleX, y: 1 / scaleY});
                     }
                 }
-            } else if (shape.type === 'circle' && shape.radius > 0) {
+            } else if (shape.type === 'circle' && shape.radius && shape.radius > 0) {
                 // =================================================================
                 // ✨ BUGFIX: 부동 소수점 오차를 막기 위해 스냅된 반지름을 직접 사용
                 // =================================================================
                 const scale = Math.max(scaleX, scaleY);
-                const currentRadius = shape.radius * scale;
-                const snappedRadius = snapCircleRadius(currentRadius, shape);
+                const currentRadius = (shape.radius || 0) * scale;
+                const snappedRadius = snapCircleRadius(currentRadius, {
+                    coatingType: shape.coatingType,
+                    lineSpacing: shape.lineSpacing
+                });
                 const size = snappedRadius * 2;
 
                 if (size > 0) {
@@ -174,8 +181,8 @@ export function useTransformerHandlers(
                     );
                     if (pattern) {
                         node.fillPatternImage(pattern);
-                        node.fillPatternOffset({ x: snappedRadius, y: snappedRadius }); // 스냅된 반지름으로 offset 설정
-                        node.fillPatternScale({ x: 1 / scale, y: 1 / scale });
+                        node.fillPatternOffset({x: snappedRadius, y: snappedRadius}); // 스냅된 반지름으로 offset 설정
+                        node.fillPatternScale({x: 1 / scale, y: 1 / scale});
                     }
                 }
             }
@@ -192,7 +199,7 @@ export function useTransformerHandlers(
                     return;
                 }
 
-                const newCrop = { ...cache.crop };
+                const newCrop = {...cache.crop};
                 const currentDisplayedWidth = node.width() * node.scaleX();
                 const currentDisplayedHeight = node.height() * node.scaleY();
 
@@ -278,17 +285,22 @@ export function useTransformerHandlers(
 
             if (isSnappingEnabled) {
                 if (shape.type === 'rectangle' && shape.coatingType === 'fill' && shape.lineSpacing) {
-                    const snapped = snapShapeSize({ width: newWidth, height: newHeight }, shape);
+                    const snapped = snapShapeSize({width: newWidth, height: newHeight}, {
+                        coatingType: shape.coatingType,
+                        lineSpacing: shape.lineSpacing
+                    });
                     newWidth = snapped.width;
                     newHeight = snapped.height;
-                } else if (shape.type === 'circle') {
+                } else if (shape.type === 'circle' && shape.coatingType === 'fill' && shape.lineSpacing) {
                     const rawRadius = (shape.radius || 0) * Math.max(Math.abs(oldScaleX), Math.abs(oldScaleY));
-                    newRadius = snapCircleRadius(rawRadius, shape);
+                    newRadius = snapCircleRadius(rawRadius, {
+                        coatingType: shape.coatingType,
+                        lineSpacing: shape.lineSpacing
+                    });
                     newWidth = newHeight = newRadius * 2;
                 }
             } else if (shape.type === 'circle') {
-                const rawRadius = (shape.radius || 0) * Math.max(Math.abs(oldScaleX), Math.abs(oldScaleY));
-                newRadius = rawRadius;
+                newRadius = (shape.radius || 0) * Math.max(Math.abs(oldScaleX), Math.abs(oldScaleY));
                 newWidth = newHeight = newRadius * 2;
             }
             // ================================================================
@@ -310,7 +322,7 @@ export function useTransformerHandlers(
             if (shape.type === 'image') {
                 const currentCrop = (node as Konva.Image).crop();
                 if (currentCrop) {
-                    newAttrs.crop = { ...currentCrop };
+                    newAttrs.crop = {...currentCrop};
                 }
             }
 
@@ -326,14 +338,14 @@ export function useTransformerHandlers(
                 node.height(newAttrs.radius * 2);
             }
 
-            return { id: shape.id!, props: { ...shape, ...newAttrs } };
+            return {id: shape.id!, props: {...shape, ...newAttrs}};
         }).filter((u): u is { id: string; props: CustomShapeConfig } => u !== null);
 
         if (updates.length > 0) {
             dispatch(batchUpdateShapes(updates as { id: string; props: Partial<CustomShapeConfig> }[]));
             const updatedShapesForHistory = shapes.map(s => {
                 const update = updates.find(u => u.id === s.id);
-                return update ? { ...s, ...update.props } : s;
+                return update ? {...s, ...update.props} : s;
             });
             dispatch(setPresent(updatedShapesForHistory));
         }

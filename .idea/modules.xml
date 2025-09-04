@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/image-to-gcode.iml" filepath="$PROJECT_DIR$/.idea/image-to-gcode.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/coating-cam.iml" filepath="$PROJECT_DIR$/.idea/coating-cam.iml" />
     </modules>
   </component>
 </project>

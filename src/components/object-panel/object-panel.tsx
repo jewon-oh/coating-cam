@@ -49,18 +49,20 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-
-export const ObjectPanel = memo(( className?: string) => {
+interface ObjectPanelProps {
+    className?: string;
+}
+export const ObjectPanel = memo(({ className }: ObjectPanelProps) => {
     const dispatch = useAppDispatch();
     const shapes = useAppSelector(selectShapes);
     const selectedShapeIds = useAppSelector(selectSelectedShapeIds);
 
     // 로컬 상태
-    const [panelCollapsed, setPanelCollapsed] = useState(false);
+    const [panelCollapsed, ] = useState(false);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-    const [openItemId, setOpenItemId] = useState<string | null>(null);
-    const [isDragModeEnabled, setIsDragModeEnabled] = useState(true);
-    const [activeId, setActiveId] = useState<string | null>(null);
+    const [, setOpenItemId] = useState<string | null>(null);
+    const [isDragModeEnabled, ] = useState(true);
+    const [, setActiveId] = useState<string | null>(null);
 
     // DnD 센서 설정
     const sensors = useSensors(
@@ -119,10 +121,10 @@ export const ObjectPanel = memo(( className?: string) => {
         if (newGroupIds.length > 0) {
             setExpandedIds(prev => new Set([...prev, ...newGroupIds]));
         }
-    }, [shapes]); // 의존성 배열에서 expandedIds 제거
+    }, [shapes, expandedIds]);
 
     // 통계 텍스트
-    const statsText = useMemo(() => {
+    useMemo(() => {
         const total = shapes.length;
         const selected = selectedShapeIds.length;
         const coatingItems = shapesWithCoatingOrder.length;
@@ -175,7 +177,7 @@ export const ObjectPanel = memo(( className?: string) => {
                 for (const child of children) {
                     if (child.type === 'group') {
                         descendants.push(...collectDescendantShapeIds(child.id!));
-                    } else if (child.visible !== false && !child.listening) {
+                    } else if (child.visible !== false && !child.isLocked) {
                         descendants.push(child.id!);
                     }
                 }
@@ -194,7 +196,7 @@ export const ObjectPanel = memo(( className?: string) => {
         }
 
         // 개별 객체 선택 로직
-        if (shape.listening) return;
+        if (shape.isLocked) return;
 
         if (e.shiftKey && selectedShapeIds.length > 0) {
             // 범위 선택 로직 (트리 구조에서)

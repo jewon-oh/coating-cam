@@ -13,7 +13,6 @@ import {
     RectangleHorizontal as RectangleHorizontalIcon,
     Circle as CircleIcon,
     Info,
-    Settings,
     MoveHorizontal,
     MoveVertical,
     SquaresUnite,

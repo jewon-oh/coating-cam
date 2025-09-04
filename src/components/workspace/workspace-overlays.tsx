@@ -24,7 +24,7 @@ export const WorkspaceOverlays = () => {
     const shapes = useAppSelector((state) => state.shapes.shapes);
     const selectedShapeIds = useAppSelector((state) => state.shapes.selectedShapeIds);
     const {workArea, pixelsPerMm} = useSettings();
-    const {stage, loading, setStage} = useCanvas(); // ✅ setStage 추가
+    const {stageState, loading, setStageState} = useCanvas(); // ✅ setStageState 추가
 
     const workAreaPx = React.useMemo(() => ({
         width: workArea.width * pixelsPerMm,
@@ -35,12 +35,12 @@ export const WorkspaceOverlays = () => {
 
     // ✅ 미니맵에서 뷰포트 변경 핸들러 추가
     const handleViewportChange = useCallback((x: number, y: number) => {
-        setStage(prevStage => ({
+        setStageState(prevStage => ({
             ...prevStage,
             x,
             y
         }));
-    }, [setStage]);
+    }, [setStageState]);
 
     return (
         <>
@@ -48,14 +48,14 @@ export const WorkspaceOverlays = () => {
             <StatusBar
                 shapes={shapes}
                 selectedCount={selectedShapeIds.length}
-                zoom={stage.scale}
+                zoom={stageState.scale}
                 isLoading={loading.isLoading}
             />
             {/* 미니맵 */}
             <DynamicMinimap
                 shapes={shapes}
                 workArea={workAreaPx}
-                viewport={stage}
+                viewport={stageState}
                 onViewportChange={handleViewportChange}
             />
 

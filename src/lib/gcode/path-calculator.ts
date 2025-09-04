@@ -1,6 +1,6 @@
 import { CustomShapeConfig } from '@/types/custom-konva-config';
-import {CoatingSettings} from "@/types/coating";
-import { Point } from '@/lib/gcode/point';
+import {CoatingSettings} from "../../../common/types/coating";
+import { Point } from '@/types/point';
 import { MaskingManager } from "@/lib/gcode/mask-manager";
 
 /**
@@ -177,12 +177,12 @@ export class PathCalculator {
             };
         }
     }
+
     // 기존 메서드 유지 (하위 호환성) - 배열 직접 반환
     public async calculateForShapeAbsolute(boundary: CustomShapeConfig): Promise<{ start: Point; end: Point }[]> {
         const result = await this.calculateForShape(boundary, { relative: false });
         return result.segments;
     }
-
 
     /**
      * Fill 세그먼트 계산 - 대폭 단순화
@@ -300,14 +300,16 @@ export class PathCalculator {
             const width = boundary.width ?? 0;
             const height = boundary.height ?? 0;
 
-            // 코팅 폭보다 작은 도형은 처리하지 않음
-            if (width <= coatingWidth || height <= coatingWidth) return [];
+            // [수정 1] 코팅 폭보다 도형이 작거나 같으면 경로를 생성하지 않도록 명확하게 처리합니다.
+            // 첫 경로의 너비/높이가 0보다 커야만 의미가 있습니다.
+            if (width <= coatingWidth || height <= coatingWidth) {
+                return [];
+            }
 
             const centerX = x + width / 2;
             const centerY = y + height / 2;
-            const aspect = height / width;
 
-            // 첫 경로는 코팅 폭의 절반만큼 안쪽으로 이동하여 시작
+            // 첫 경로는 코팅 폭만큼 안쪽으로 이동하여 시작
             let currentWidth = width - coatingWidth;
             let currentHeight = height - coatingWidth;
 
@@ -315,7 +317,7 @@ export class PathCalculator {
                 const rectX = centerX - currentWidth / 2;
                 const rectY = centerY - currentHeight / 2;
 
-                // 현재 사각형의 세그먼트 추가 (하나의 닫힌 경로)
+                // 현재 사각형의 세그먼트 추가
                 segments.push(
                     { start: { x: rectX, y: rectY }, end: { x: rectX + currentWidth, y: rectY } },
                     { start: { x: rectX + currentWidth, y: rectY }, end: { x: rectX + currentWidth, y: rectY + currentHeight } },
@@ -323,9 +325,9 @@ export class PathCalculator {
                     { start: { x: rectX, y: rectY + currentHeight }, end: { x: rectX, y: rectY } }
                 );
 
-                // 다음 경로는 lineSpacing 만큼 안쪽으로 이동
+                // [수정 2] 다음 경로는 가로/세로 모두 동일하게 lineSpacing 만큼 안쪽으로 이동합니다.
                 currentWidth -= lineSpacing * 2;
-                currentHeight -= lineSpacing * 2 * aspect;
+                currentHeight -= lineSpacing * 2; // aspect를 사용하지 않습니다.
             }
         } else if (boundary.type === 'circle') {
             const centerX = boundary.x ?? 0;
@@ -417,6 +419,28 @@ export class PathCalculator {
     }
 
     /**
+     *  Line 세그먼트 계산
+     */
+    private generateLineOutline(shape: CustomShapeConfig): { start: Point; end: Point }[] {
+        const points = shape.points as number[];
+
+        if (!points || points.length < 4) {
+            return [];
+        }
+        const x = shape.x ?? 0;
+        const y = shape.y ?? 0;
+
+        const segments: { start: Point; end: Point }[] = [];
+        // 폴리라인의 각 세그먼트를 생성
+        for (let i = 0; i < points.length - 2; i += 2) {
+            segments.push({
+                start: { x: x + points[i], y: y + points[i + 1] },
+                end: { x: x + points[i + 2], y: y + points[i + 3] }
+            });
+        }
+        return segments;
+    }
+    /**
      * Outline 세그먼트 계산 - 기존 로직 유지하되 단순화
      */
     private calculateOutlineSegments(boundary: CustomShapeConfig): { start: Point; end: Point }[] {
@@ -431,10 +455,13 @@ export class PathCalculator {
             segments.push(...this.generateCircleOutline(boundary, outlineOffset, passes, startPoint));
         } else if (boundary.type === 'image') {
             segments.push(...this.generateImageOutline(boundary, outlineOffset, passes, startPoint));
+        }else if(boundary.type==='line'){
+            segments.push(...this.generateLineOutline(boundary));
         }
 
         return segments;
     }
+
 
     // 기존의 헬퍼 메서드들 유지 (getBounds, generateRectangleOutline 등)
     // 하지만 복잡한 분석 메서드들은 제거

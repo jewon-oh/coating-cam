@@ -26,7 +26,7 @@ const GRID_CONSTANTS = {
     BASE_FONT_SIZE: 12, // Increased from 10
     MIN_FONT_SIZE: 10, // Increased from 8
     AXIS_OFFSET: 12,
-    LABEL_OFFSET: 20,
+    LABEL_OFFSET: 25,
     AXIS_LABEL_OFFSET: 24,
 } as const;
 

@@ -8,7 +8,8 @@ import {ScrollArea} from '@/components/ui/scroll-area';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable';
 import {Slider} from '@/components/ui/slider';
 import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause} from 'lucide-react';
-import Preview3D, {PathPoint} from '@/components/preview-3d/preview-3d';
+import Preview3D from '@/components/preview-3d/preview-3d';
+import {PathPoint} from "@/components/preview-3d/path-point";
 import {CustomShapeConfig} from "@/types/custom-konva-config";
 
 /**

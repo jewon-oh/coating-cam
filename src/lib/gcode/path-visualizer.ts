@@ -1,6 +1,6 @@
 import { CustomShapeConfig } from "@/types/custom-konva-config";
-import { CoatingSettings } from "@/types/coating";
-import { Point } from "@/lib/gcode/point";
+import { CoatingSettings } from "../../../common/types/coating";
+import { Point } from "@/types/point";
 import { PathCalculator } from "@/lib/gcode/path-calculator";
 import { MaskingManager } from "@/lib/gcode/mask-manager";
 
@@ -57,8 +57,7 @@ function findPath(
 
 export async function getCoatingSequenceEndpoints(
     shapes: CustomShapeConfig[],
-    settings: CoatingSettings,
-    workArea: { width: number; height: number }
+    settings: CoatingSettings
 ): Promise<{ start: Point; end: Point; order: number }[]> {
     
     const activeShapes = shapes.filter(s => !shouldSkipCoating(s));

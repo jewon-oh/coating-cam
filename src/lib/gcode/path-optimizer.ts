@@ -1,6 +1,6 @@
-import {CoatingSettings} from "@/types/coating";
+import {CoatingSettings} from "../../../common/types/coating";
 import { CustomShapeConfig } from '@/types/custom-konva-config';
-import { Point } from '@/lib/gcode/point';
+import { Point } from '@/types/point';
 import { ProgressCallback } from '@/lib/gcode/progress-callback';
 import { GCodeEmitter } from '@/lib/gcode/gcode-emitter';
 
@@ -99,7 +99,7 @@ export class PathOptimizer {
         // 1. 클러스터링
         const zones = this.clusterSegmentsWithKMeans(segments, 5, 5);
 
-        const shapeTypeLabel = coatingShape.type === 'image' ? 'PCB' : coatingShape.type.toUpperCase();
+        const shapeTypeLabel = coatingShape.type === 'image' ? 'PCB' : coatingShape.type?.toUpperCase();
         emitter.addLine(`; ---- ${shapeTypeLabel} ${coatingShape.name ?? 'unknown'} start ----`);
         const shapeCoatingZ = getCoatingHeight(coatingShape, this.settings);
 

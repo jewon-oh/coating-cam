@@ -25,14 +25,14 @@ export const ShapeComponent = ({ shape, commonProps }: ShapeComponentProps) => {
         if (shape.type === 'rectangle') {
             return createCoatingPatternCanvas(
                 'rectangle',
-                shape.width,
-                shape.height,
+                shape.width || 0,
+                shape.height || 0,
                 shape.lineSpacing || 0,
                 shape.coatingWidth || 0,
                 shape.fillPattern,
             );
         }
-        if (shape.type === 'circle' && shape.radius > 0) {
+        if (shape.type === 'circle' && shape.radius || 0 > 0) {
             const size = shape.radius * 2;
             return createCoatingPatternCanvas(
                 'circle',
@@ -57,9 +57,6 @@ export const ShapeComponent = ({ shape, commonProps }: ShapeComponentProps) => {
         finalProps.fillPatternRepeat = 'no-repeat';
         finalProps.fill = undefined;
 
-        // ✨✨✨ 최종 수정 ✨✨✨
-        // 변형 중에 직접 제어되었던 fillPatternScale 값을
-        // React 렌더링 사이클에서 명시적으로 올바르게 초기화합니다.
         // 변형이 끝난 도형의 스케일은 항상 1이므로, 패턴 스케일도 1로 설정합니다.
         finalProps.fillPatternScale = { x: 1, y: 1 };
 
