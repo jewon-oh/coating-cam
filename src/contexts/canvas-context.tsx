@@ -70,24 +70,29 @@ const CanvasContext = createContext<CanvasContextValue | null>(null);
 
 // === 커스텀 훅: 스테이지 상태 관리 ===
 function useStageState() {
-    const [stage, setStageState] = useState<StageState>(() => {
+    // 1. 항상 기본 상태로 시작합니다.
+    const [stage, setStageState] = useState<StageState>(DEFAULT_STAGE_STATE);
+
+    // 2. 컴포넌트가 마운트된 후 (클라이언트 측에서) localStorage에서 상태를 불러옵니다.
+    useEffect(() => {
         try {
             const savedStateJSON = localStorage.getItem(STAGE_STATE_STORAGE_KEY);
             if (savedStateJSON) {
                 const savedState = JSON.parse(savedStateJSON);
-                return {
-                    ...DEFAULT_STAGE_STATE,
-                    ...savedState,
+                // 불러온 상태로 업데이트합니다.
+                setStageState(prevState => ({
+                    ...prevState, // 기본 상태 유지
+                    ...savedState, // 저장된 상태 덮어쓰기
                     width: 0, // width/height는 항상 컨테이너에 맞춰 재계산
                     height: 0,
-                };
+                }));
             }
         } catch (e) {
             console.error("localStorage에서 캔버스 상태를 불러오지 못했습니다.", e);
         }
-        return DEFAULT_STAGE_STATE;
-    });
+    }, []); // 빈 배열을 전달하여 마운트 시 한 번만 실행되도록 합니다.
 
+    // 3. 상태가 변경될 때마다 localStorage에 저장합니다.
     useEffect(() => {
         try {
             const { ...stateToSave } = stage;

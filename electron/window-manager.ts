@@ -1,8 +1,11 @@
 import { BrowserWindow } from 'electron';
 import path from 'path';
-import url from 'url';
+import serve from 'electron-serve';
+import isDev from 'electron-is-dev';
 
-import isDev from 'electron-is-dev'; // 👈 electron-is-dev를 import 합니다.
+const appServe = serve({
+    directory: path.join(__dirname, '../renderer'),
+});
 
 let win: BrowserWindow | null = null;
 
@@ -24,27 +27,32 @@ export function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
             preload: getPreloadPath(),
-            // webSecurity: false // 이 옵션은 보안상 주의가 필요합니다.
         },
     });
 
-    if (isDev) {
-        // 개발 모드에서는 Next.js 개발 서버 주소를 직접 사용합니다.
-        win.loadURL('http://localhost:3000').catch(err => console.error('loadURL error:', err));
-        win.webContents.openDevTools({ mode: 'detach' });
-    } else {
-        // ✅ loadFile을 loadURL과 url.format을 사용하는 방식으로 변경했습니다.
-        const prodUrl = url.format({
-            pathname: path.join(__dirname, '../renderer/index.html'),
-            protocol: 'file:',
-            slashes: true,
-        });
-        win.loadURL(prodUrl).catch(err => console.error('loadURL error:', err));
-    }
+    console.log('--- DEBUG INFO ---');
+    console.log(`isDev: ${isDev}`);
+    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log('------------------');
 
-    win.webContents.on('did-fail-load', (_e, code, desc, failedUrl) => {
-        console.error('[did-fail-load]', { code, desc, url: failedUrl });
-    });
+    if (process.env.NODE_ENV === 'development' ) {
+        console.log('Running in Development mode. Loading from http://localhost:3000');
+
+        win.loadURL('http://localhost:3000');
+        win.webContents.openDevTools({ mode: 'detach' });
+
+        win.webContents.on('did-fail-load', (_e, code, desc) => {
+            console.error(`Failed to load dev server: ${desc}. Retrying...`);
+            setTimeout(() => {
+                win?.webContents.reloadIgnoringCache();
+            }, 1000);
+        });
+    } else {
+        console.log('Running in Production mode. Loading from app://- via electron-serve');
+        appServe(win).then(() => {
+            win?.loadURL('app://-');
+        });
+    }
 
     win.once('ready-to-show', () => win?.show());
     win.on('closed', () => (win = null));
