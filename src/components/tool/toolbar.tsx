@@ -9,17 +9,13 @@ import {
     Grid as GridIcon,
     Magnet as MagnetIcon,
     Play,
-    SquaresUnite,
-    SquareX,
     Save,
     FolderOpen,
-    MoveHorizontal,
-    MoveVertical,
-     SquareSquare, Slash, GitCommitHorizontal,
+      Slash, GitCommitHorizontal,
 } from "lucide-react";
 import React from "react";
 import {useAppDispatch, useAppSelector} from "@/hooks/redux";
-import {setCoatingType, setCoatingTypeAndFillPattern, setTool} from "@/store/slices/tool-slice";
+import {setCoatingType,  setTool} from "@/store/slices/tool-slice";
 import {useSettings} from '@/contexts/settings-context';
 import {useProjectActions} from "@/hooks/project/use-project-actions";
 import {useInsertImage} from "@/hooks/use-insert-image";
@@ -35,8 +31,8 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
     const dispatch = useAppDispatch();
     const {
         tool,
-        coatingType,
-        fillPattern,
+        // coatingType,
+        // fillPattern,
     } = useAppSelector((state) => state.tool);
     const {past, future} = useAppSelector((state) => state.history);
     const {
@@ -52,8 +48,8 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
 
     const canUndo = past.length > 0;
     const canRedo = future.length > 0;
-    const isLineToolActive = tool === 'line' ;
-    const isSelectToolActive = tool ==='select';
+    // const isLineToolActive = tool === 'line' ;
+    // const isSelectToolActive = tool ==='select';
 
     // 현재 모드에 따른 도구들 렌더링
     const renderShapeTools = () => (
@@ -112,60 +108,60 @@ export const Toolbar = ({onGenerateGCode}: ToolbarProps) => {
                         {renderShapeTools()}
                         {/* 코팅 타입 선택기*/}
                         <Separator orientation="vertical" className="h-8"/>
-                        <div className="flex flex-col items-center">
-                            <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-1">
-                                <ToolButton
-                                    icon={<MoveHorizontal size={16}/>}
-                                    label="수평채우기"
-                                    active={coatingType === 'fill' && fillPattern === 'horizontal'}
-                                    onClick={() => dispatch(setCoatingTypeAndFillPattern({
-                                        coatingType: 'fill',
-                                        fillPattern: 'horizontal'
-                                    }))}
-                                    className={coatingType === 'fill' && fillPattern === 'horizontal' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}
-                                    disabled={isLineToolActive || isSelectToolActive}
-                                />
-                                <ToolButton
-                                    icon={<MoveVertical size={16}/>}
-                                    label="수직채우기"
-                                    active={coatingType === 'fill' && fillPattern === 'vertical'}
-                                    onClick={() => dispatch(setCoatingTypeAndFillPattern({
-                                        coatingType: 'fill',
-                                        fillPattern: 'vertical'
-                                    }))}
-                                    className={coatingType === 'fill' && fillPattern === 'vertical' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}
-                                    disabled={isLineToolActive|| isSelectToolActive}
-                                />
-                                <ToolButton
-                                    icon={<SquareSquare size={16}/>}
-                                    label="동심채우기"
-                                    active={coatingType === 'fill' && fillPattern === 'concentric'}
-                                    onClick={() => dispatch(setCoatingTypeAndFillPattern({
-                                        coatingType: 'fill',
-                                        fillPattern: 'concentric'
-                                    }))}
-                                    className={coatingType === 'fill' && fillPattern === 'concentric' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}
-                                    disabled={isLineToolActive|| isSelectToolActive}
-                                />
-                                <ToolButton
-                                    icon={<SquaresUnite size={16}/>}
-                                    label="윤곽"
-                                    active={coatingType === 'outline'}
-                                    onClick={() => dispatch(setCoatingType('outline'))}
-                                    className={coatingType === 'outline' ? 'bg-yellow-200 border border-yellow-400 hover:bg-yellow-300' : 'hover:bg-yellow-100'}
-                                    disabled={isSelectToolActive}
-                                />
-                                <ToolButton
-                                    icon={<SquareX size={16}/>}
-                                    label="마스킹"
-                                    active={coatingType === 'masking'}
-                                    onClick={() => dispatch(setCoatingType('masking'))}
-                                    className={coatingType === 'masking' ? 'bg-red-200 border border-red-400 hover:bg-red-300' : 'hover:bg-red-100'}
-                                    disabled={isLineToolActive || isSelectToolActive}
-                                />
-                            </div>
-                            <span className="text-xs mt-1 text-muted-foreground">코팅 타입</span>
-                        </div>
+                        {/*<div className="flex flex-col items-center">*/}
+                        {/*    <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-1">*/}
+                        {/*        <ToolButton*/}
+                        {/*            icon={<MoveHorizontal size={16}/>}*/}
+                        {/*            label="수평채우기"*/}
+                        {/*            active={coatingType === 'fill' && fillPattern === 'horizontal'}*/}
+                        {/*            onClick={() => dispatch(setCoatingTypeAndFillPattern({*/}
+                        {/*                coatingType: 'fill',*/}
+                        {/*                fillPattern: 'horizontal'*/}
+                        {/*            }))}*/}
+                        {/*            className={coatingType === 'fill' && fillPattern === 'horizontal' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}*/}
+                        {/*            disabled={isLineToolActive || isSelectToolActive}*/}
+                        {/*        />*/}
+                        {/*        <ToolButton*/}
+                        {/*            icon={<MoveVertical size={16}/>}*/}
+                        {/*            label="수직채우기"*/}
+                        {/*            active={coatingType === 'fill' && fillPattern === 'vertical'}*/}
+                        {/*            onClick={() => dispatch(setCoatingTypeAndFillPattern({*/}
+                        {/*                coatingType: 'fill',*/}
+                        {/*                fillPattern: 'vertical'*/}
+                        {/*            }))}*/}
+                        {/*            className={coatingType === 'fill' && fillPattern === 'vertical' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}*/}
+                        {/*            disabled={isLineToolActive|| isSelectToolActive}*/}
+                        {/*        />*/}
+                        {/*        <ToolButton*/}
+                        {/*            icon={<SquareSquare size={16}/>}*/}
+                        {/*            label="동심채우기"*/}
+                        {/*            active={coatingType === 'fill' && fillPattern === 'concentric'}*/}
+                        {/*            onClick={() => dispatch(setCoatingTypeAndFillPattern({*/}
+                        {/*                coatingType: 'fill',*/}
+                        {/*                fillPattern: 'concentric'*/}
+                        {/*            }))}*/}
+                        {/*            className={coatingType === 'fill' && fillPattern === 'concentric' ? 'bg-sky-200 border border-sky-400 hover:bg-sky-300' : 'hover:bg-sky-100'}*/}
+                        {/*            disabled={isLineToolActive|| isSelectToolActive}*/}
+                        {/*        />*/}
+                        {/*        <ToolButton*/}
+                        {/*            icon={<SquaresUnite size={16}/>}*/}
+                        {/*            label="윤곽"*/}
+                        {/*            active={coatingType === 'outline'}*/}
+                        {/*            onClick={() => dispatch(setCoatingType('outline'))}*/}
+                        {/*            className={coatingType === 'outline' ? 'bg-yellow-200 border border-yellow-400 hover:bg-yellow-300' : 'hover:bg-yellow-100'}*/}
+                        {/*            disabled={isSelectToolActive}*/}
+                        {/*        />*/}
+                        {/*        <ToolButton*/}
+                        {/*            icon={<SquareX size={16}/>}*/}
+                        {/*            label="마스킹"*/}
+                        {/*            active={coatingType === 'masking'}*/}
+                        {/*            onClick={() => dispatch(setCoatingType('masking'))}*/}
+                        {/*            className={coatingType === 'masking' ? 'bg-red-200 border border-red-400 hover:bg-red-300' : 'hover:bg-red-100'}*/}
+                        {/*            disabled={isLineToolActive || isSelectToolActive}*/}
+                        {/*        />*/}
+                        {/*    </div>*/}
+                        {/*    <span className="text-xs mt-1 text-muted-foreground">코팅 타입</span>*/}
+                        {/*</div>*/}
 
                         <Separator orientation="vertical" className="h-8"/>
 

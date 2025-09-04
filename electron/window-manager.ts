@@ -22,7 +22,11 @@ export function createWindow() {
     win = new BrowserWindow({
         width: 1400,
         height: 900,
+        minWidth: 1280,
+        minHeight: 720,
         show: false,
+        frame: false,
+        titleBarStyle: 'hidden',
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,

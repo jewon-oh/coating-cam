@@ -6,6 +6,14 @@ export declare global {
     // 전역 Window 인터페이스를 확장합니다.
     interface Window {
         /**
+         * Electron 창 제어 API
+         */
+        windowApi: {
+            minimize: () => void;
+            maximize: () => void;
+            close: () => void;
+        };
+        /**
          * 앱 설정(settings.json)을 읽고 쓰기 위한 API
          */
         settingsApi: {

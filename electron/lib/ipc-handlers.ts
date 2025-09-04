@@ -1,10 +1,30 @@
-import { ipcMain, dialog } from 'electron';
+import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { loadSettingsFile, saveSettingsFile } from './settings-manager';
 import { promises as fs } from 'fs';
 // electron 환경을 위해 @ 사용 안함
 import {SettingsType} from "../../common/types/settings";
 
 export function setupIpcHandlers() {
+    // Window Actions
+    ipcMain.on('minimize-window', () => {
+        const win = BrowserWindow.getFocusedWindow();
+        win?.minimize();
+    });
+
+    ipcMain.on('maximize-window', () => {
+        const win = BrowserWindow.getFocusedWindow();
+        if (win?.isMaximized()) {
+            win.unmaximize();
+        } else {
+            win?.maximize();
+        }
+    });
+
+    ipcMain.on('close-window', () => {
+        const win = BrowserWindow.getFocusedWindow();
+        win?.close();
+    });
+
     // Settings API
     ipcMain.handle('settings:load', async () => {
         try {

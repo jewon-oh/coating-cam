@@ -5,6 +5,13 @@ contextBridge.exposeInMainWorld('api', {
     ping: () => 'pong',
 });
 
+// Window Control API
+contextBridge.exposeInMainWorld('windowApi', {
+    minimize: () => ipcRenderer.send('minimize-window'),
+    maximize: () => ipcRenderer.send('maximize-window'),
+    close: () => ipcRenderer.send('close-window'),
+});
+
 // settings Api
 contextBridge.exposeInMainWorld('settingsApi', {
     load: () => ipcRenderer.invoke('settings:load'),
