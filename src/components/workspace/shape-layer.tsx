@@ -13,7 +13,7 @@ import {CustomShapeConfig} from '@/types/custom-konva-config';
 import {useCanvas} from '@/contexts/canvas-context';
 import {useShapeEvents} from '@/hooks/use-shape-events';
 import {TransformerConfig} from "konva/lib/shapes/Transformer";
-import {flipImageData} from "@/lib/flip-image-data";
+import {imageUtils} from "@/lib/image-utils";
 import {getCoatingVisualStyle} from "@/lib/shape-style-utils";
 import {useTransformerHandlers} from "@/hooks/shape/use-transformer-handlers";
 import {ShapeComponent} from "@/components/workspace/shape-component";
@@ -213,7 +213,7 @@ export function ShapeLayer({isPanning = false}: ShapeLayerProps) {
             setLoading({isLoading: true, message: '이미지 최적화 중...'});
             for (const shape of imagesToFlip) {
                 try {
-                    const flippedDataUrl = await flipImageData(shape.imageDataUrl!, 'horizontal');
+                    const flippedDataUrl = await imageUtils(shape.imageDataUrl!, 'horizontal');
                     imageCache.current.delete(shape.imageDataUrl!);
                     dispatch(updateShape({id: shape.id!, updatedProps: {imageDataUrl: flippedDataUrl, isFlipped: true}}));
                 } catch (error) {

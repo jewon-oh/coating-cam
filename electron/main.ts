@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { createWindow } from './window-manager';
 import { setupIpcHandlers } from './lib/ipc-handlers';
 import { loadInitialSettings } from './lib/settings-manager';
@@ -10,6 +10,9 @@ setupIpcHandlers();
 app.whenReady().then(async () => {
     await loadInitialSettings();
     createWindow();
+}).catch(e => {
+    // 시작 중 발생한 오류를 로깅합니다.
+    console.error('Failed to start the application:', e);
 });
 
 // 모든 창이 닫혔을 때 앱 종료 (macOS 제외)
@@ -21,5 +24,8 @@ app.on('window-all-closed', () => {
 
 // 앱이 활성화되었을 때 (macOS)
 app.on('activate', () => {
-    createWindow(); // 윈도우가 없으면 새로 생성
+    // macOS에서는 독(dock) 아이콘을 클릭했을 때, 열려 있는 창이 없으면 새로 생성하는 것이 일반적입니다.
+    if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+    }
 });

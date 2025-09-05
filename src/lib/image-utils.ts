@@ -1,6 +1,6 @@
 // lib/utils.ts 또는 적절한 위치에 추가
 
-export function flipImageData(dataUrl: string, direction: 'horizontal' | 'vertical'): Promise<string> {
+export function imageUtils(dataUrl: string, direction: 'horizontal' | 'vertical'): Promise<string> {
     return new Promise((resolve, reject) => {
         const img = new window.Image();
         img.crossOrigin = 'Anonymous';

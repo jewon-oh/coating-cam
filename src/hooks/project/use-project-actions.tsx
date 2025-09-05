@@ -1,8 +1,11 @@
 import { useCallback } from 'react';
-import { useAppSelector } from '@/hooks/redux';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {toast} from "sonner";
 import {ProjectFileType} from "@/types/project";
 import {useSettings} from "@/contexts/settings-context";
+import { setProjectName } from '@/store/slices/shape-slice';
+import { isElectron } from '@/lib/electron-utils';
+import { useRouter } from 'next/router';
 
 type RecentFile = {
     name: string;
@@ -10,10 +13,6 @@ type RecentFile = {
     content?: string;
     timestamp: number;
 };
-
-function isElectron() {
-    return typeof window !== 'undefined' && !! window.projectApi;
-}
 
 function loadRecentFiles(): RecentFile[] {
     try {
@@ -38,6 +37,8 @@ function addRecentFile(file: RecentFile) {
 }
 
 export function useProjectActions() {
+    const dispatch = useAppDispatch();
+    const router = useRouter(); // 클라이언트 사이드 네비게이션을 위해 useRouter 훅을 사용합니다.
     const shapes = useAppSelector((s) => s.shapes.shapes);
     const {gcodeSettings} = useSettings();
 
@@ -55,8 +56,12 @@ export function useProjectActions() {
             try {
                 const res = await window.projectApi.showSaveDialog({ defaultPath: defaultName, filters: [{ name: 'JSON', extensions: ['json'] }] });
                 if (!res?.filePath) return;
+
                 await window.projectApi.writeFile(res.filePath, projectJson, 'utf8');
-                addRecentFile({ name: res.filePath.split(/[\\/]/).pop() || defaultName, filePath: res.filePath, timestamp: Date.now() });
+
+                const filename = res.filePath.split(/[\\/]/).pop() || defaultName;
+                dispatch(setProjectName(filename)); // 저장 후 프로젝트 이름을 업데이트합니다.
+                addRecentFile({ name: filename, filePath: res.filePath, timestamp: Date.now() });
                 toast.success('프로젝트 저장 완료');
             } catch (e) {
                 console.error('save failed:', e);
@@ -71,7 +76,7 @@ export function useProjectActions() {
             URL.revokeObjectURL(url);
             addRecentFile({ name: defaultName, content: projectJson, timestamp: Date.now() });
         }
-    }, [gcodeSettings, shapes]);
+    }, [gcodeSettings, shapes, dispatch]);
 
     const handleLoadProject = useCallback(async () => {
         if (isElectron()) {
@@ -80,9 +85,9 @@ export function useProjectActions() {
                 const filePath: string | undefined = res?.filePaths?.[0];
                 if (!filePath) return;
                 addRecentFile({ name: filePath.split(/[\\/]/).pop() || 'project.json', filePath, timestamp: Date.now() });
-                // 경로만 전달(짧음) → /workspace에서 파일 읽기
+                // window.location.href 대신 router.push를 사용하여 페이지를 새로고침하지 않고 이동합니다.
                 const qp = new URLSearchParams({ filePath: filePath });
-                window.location.href = `/workspace?${qp.toString()}`;
+                await router.push(`/workspace?${qp.toString()}`);
             } catch (e) {
                 console.error('open failed:', e);
                 toast.error('불러오기 실패');
@@ -95,13 +100,13 @@ export function useProjectActions() {
                 if (!file) return;
                 const text = await file.text();
                 addRecentFile({ name: file.name, content: text, timestamp: Date.now() });
-                // URL에 내용 넣지 말고 sessionStorage 이용
+                // sessionStorage에 프로젝트 내용을 저장하고, 페이지 새로고침 없이 /workspace로 이동합니다.
                 sessionStorage.setItem('pendingProject', text);
-                window.location.href = `/workspace`;
+                await router.push(`/workspace`);
             };
             input.click();
         }
-    }, []);
+    }, [router]);
 
     return { handleSaveProject, handleLoadProject };
 }

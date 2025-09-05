@@ -7,6 +7,7 @@ interface ShapesState {
     isGroupSelected: boolean;         // 그룹 선택 여부
     isDragging: boolean;              // 드래그 상태 여부
     draggingShapeIds: string[];       // 드래그 중인 도형 ID들
+    projectName: string | null;       // 현재 프로젝트 파일 이름
     lastUpdateTimestamp: number;      // 성능 최적화용 캐시
 }
 
@@ -16,6 +17,7 @@ const initialState: ShapesState = {
     isGroupSelected: false,
     isDragging: false,
     draggingShapeIds: [],
+    projectName: null,
     lastUpdateTimestamp: Date.now(),
 };
 
@@ -79,6 +81,10 @@ const shapeSlice = createSlice({
     name: 'shape',
     initialState,
     reducers: {
+        setProjectName: (state, action: PayloadAction<string | null>) => {
+            // 프로젝트 이름을 설정하는 액션
+            state.projectName = action.payload;
+        },
         setDragging: (state, action: PayloadAction<boolean>) => {
             state.isDragging = action.payload;
         },
@@ -331,6 +337,7 @@ const shapeSlice = createSlice({
 });
 
 export const {
+    setProjectName,
     addShape,
     addShapeToBack,
     updateShape,

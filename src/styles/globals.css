@@ -78,7 +78,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: root) {
+@media (prefers-color-scheme: light) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
@@ -131,5 +131,17 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    /* 기본적으로 텍스트 선택을 방지합니다. */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
+  /* 사용자가 텍스트를 입력해야 하는 요소에서는 선택을 허용합니다. */
+  input, textarea, [contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
   }
 }

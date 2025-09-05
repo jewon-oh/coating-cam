@@ -25,7 +25,12 @@ import { setTool, setCoatingType, setCoatingTypeAndFillPattern } from "@/store/s
 import { cn } from "@/lib/utils";
 import {CoatingType, FillPattern} from "@common/types/coating";
 
-export function ToolContextPanel() {
+interface ToolContextPanelProps {
+    className?: string;
+}
+
+
+export function ToolContextPanel({className}:ToolContextPanelProps) {
     const dispatch = useAppDispatch();
     const {
         tool,
@@ -226,7 +231,7 @@ export function ToolContextPanel() {
     };
 
     return (
-        <Card className="h-full rounded-none border-0 gap-0">
+        <Card className={cn("h-full rounded-none border-0 gap-0",className)}>
             <CardHeader className="py-3 ">
                 <div className="flex items-center gap-2">
                     {toolMeta.icon}

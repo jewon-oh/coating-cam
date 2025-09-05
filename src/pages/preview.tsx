@@ -1,16 +1,18 @@
 "use client";
 
-import React, {useState, useEffect, useMemo, useRef} from 'react';
+import React, {useState, useEffect, useMemo, useRef, useCallback} from 'react';
 import {useAppSelector} from '@/hooks/redux';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable';
 import {Slider} from '@/components/ui/slider';
-import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause} from 'lucide-react';
+import {Download, FileText, Play, RotateCcw, ChevronLeft, ChevronRight, Pause, Loader2} from 'lucide-react';
 import Preview3D from '@/components/preview-3d/preview-3d';
 import {PathPoint} from "@/components/preview-3d/path-point";
 import {CustomShapeConfig} from "@/types/custom-konva-config";
+import {useRouter} from "next/navigation";
+import { useGCodeGeneration } from '@/hooks/use-gcode-generation'; // ✨ 공통 훅 import
 
 /**
  * G0/G1 라인에서 좌표 추출
@@ -52,15 +54,44 @@ function parseGCodeToPathData(gcodeText: string): PathPoint[] {
     return path;
 }
 
+
 /**
  * G-code 미리보기 및 내보내기 페이지
  * Redux 스토어에서 G-code를 가져와서 3D로 미리보기 제공
  */
 export default function PreviewPage() {
-    // const dispatch = useAppDispatch();
+    const router = useRouter();
     const shapes = useAppSelector((state) => state.shapes.shapes);
+    const shapesLastModified = useAppSelector((state) => state.shapes.lastUpdateTimestamp);
     const {gcode,  lastGenerated} = useAppSelector((state) => state.gcode);
-    // const {workArea} = useSettings();
+
+    const [generationStatus, setGenerationStatus] = useState<'idle' | 'generating' | 'error'>('idle');
+    const [generationError, ] = useState<string | null>(null);
+
+    // ✨ G-Code 생성 로직을 공통 훅으로 대체
+    const { generate } = useGCodeGeneration();
+
+    const handleGenerate = useCallback(async (isRegeneration: boolean) => {
+        if (generationStatus === 'generating') return;
+        setGenerationStatus('generating');
+        await generate({
+            isRegeneration,
+            onSuccess: () => setGenerationStatus('idle'),
+        });
+    }, [generate, generationStatus]);
+
+
+    useEffect(() => {
+        const isStale = gcode && lastGenerated && shapesLastModified && shapesLastModified > lastGenerated;
+
+        if (isStale) {
+            handleGenerate(true);
+        }
+        else if (!gcode && shapes.length > 0 && generationStatus === 'idle') {
+            handleGenerate(false);
+        }
+    }, [gcode, shapes.length, lastGenerated, shapesLastModified, generationStatus, handleGenerate]);
+
 
     // G-code를 파싱하여 경로 데이터 생성
     const localPathData = useMemo(() => parseGCodeToPathData(gcode || ''), [gcode]);
@@ -263,29 +294,38 @@ export default function PreviewPage() {
     }, [highlightedLineIndex]);
 
 
+    const renderLoadingOrError = (title: string, message: string, showSpinner = false) => (
+        <div className="h-full w-full flex items-center justify-center bg-background text-foreground">
+            <Card className="w-96">
+                <CardContent className="text-center p-8">
+                    {showSpinner
+                        ? <Loader2 className="mx-auto h-16 w-16 text-muted-foreground mb-4 animate-spin"/>
+                        : <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4"/>
+                    }
+                    <h3 className="text-xl font-semibold mb-2">{title}</h3>
+                    <p className="text-muted-foreground mb-4">{message}</p>
+                    <Button onClick={() => router.push('/workspace')}>
+                        작업 공간으로 돌아가기
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+    );
 
-    // G-code가 없고 도형도 없는 경우
+    if (generationStatus === 'generating' && !gcode) {
+        return renderLoadingOrError("G-Code 생성 중...", "도형 데이터로부터 G-Code를 생성하고 있습니다. 잠시만 기다려주세요.", true);
+    }
+
+    if (generationStatus === 'error') {
+        return renderLoadingOrError("G-Code 생성 실패", generationError || "알 수 없는 오류가 발생했습니다.");
+    }
+
     if (!gcode && shapes.length === 0) {
-        return (
-            <div className="h-full w-full flex items-center justify-center bg-background text-foreground">
-                <Card className="w-96">
-                    <CardContent className="text-center p-8">
-                        <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4"/>
-                        <h3 className="text-xl font-semibold mb-2">G-Code가 없습니다</h3>
-                        <p className="text-muted-foreground mb-4">
-                            캔버스에서 도형을 생성하고 G-Code를 생성하세요.
-                        </p>
-                        <Button onClick={() => window.history.back()}>
-                            작업 공간으로 돌아가기
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        );
+        return renderLoadingOrError("G-Code가 없습니다", "캔버스에서 도형을 생성하고 G-Code를 생성하세요.");
     }
 
     return (
-        <div className="h-full w-full flex bg-background text-foreground">
+        <div className="h-full w-full flex bg-background text-foreground relative">
             <ResizablePanelGroup direction="horizontal" className="h-full w-full">
                 {/* 좌측 패널: G-code 정보 및 제어 */}
                 <ResizablePanel defaultSize={25} minSize={20}>
@@ -415,7 +455,7 @@ export default function PreviewPage() {
                             </div>
 
                             <div className="flex-1 min-h-0">
-                                {localPathData.length > 0 ? (
+                                {gcode && localPathData.length > 0 ? (
                                     <Preview3D
                                         toolheadPos={toolheadPos}
                                         pathData={localPathData}                 // 전체 경로 그대로 전달
@@ -424,6 +464,7 @@ export default function PreviewPage() {
                                     />
                                 ) : (
                                     <div className="h-full flex items-center justify-center text-muted-foreground">
+                                        <Loader2 className="w-8 h-8 animate-spin mr-2"/>
                                         G-code를 생성하는 중...
                                     </div>
                                 )}
