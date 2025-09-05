@@ -68,10 +68,15 @@ export function useShapeEvents() {
 
     // 캔버스 클릭 핸들러
     const handleCanvasClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
+        // 💡 '클릭-클릭' 그리기 모드의 두 번째 클릭을 처리
+        if (drawing.handleClickForDrawing(e)) {
+            return;
+        }
+
         if (e.target === e.target.getStage()) {
             dispatch(unselectAllShapes());
         }
-    }, [dispatch]);
+    }, [dispatch, drawing]); // 💡 drawing을 의존성 배열에 추가
 
     return {
         handleMouseDown,
