@@ -3,7 +3,7 @@ import type {GroupConfig} from "konva/lib/Group";
 import type {ImageConfig} from "konva/lib/shapes/Image";
 import type {LineConfig} from "konva/lib/shapes/Line";
 import type {RectConfig} from "konva/lib/shapes/Rect";
-import {CoatingType, FillPattern, OutlineType, TravelAvoidanceStrategy} from "../../common/types/coating";
+import {CoatingType, FillPattern, OutlineType, TravelAvoidanceStrategy} from "@common/types/coating";
 
 /**
  * 모든 커스텀 도형에 공통적으로 적용되는 기본 속성입니다.
@@ -78,5 +78,4 @@ export type CustomShapeConfig =
 // 기존 SerializableShapePayload 유지...
 export interface SerializableShapePayload extends Omit<CustomShapeConfig, 'image'> {
     imageDataUrl?: string;
-    fillPatternImageSrc?: string;
 }

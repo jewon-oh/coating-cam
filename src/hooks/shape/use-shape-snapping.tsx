@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useSettings } from '@/contexts/settings-context';
-import {CoatingType, FillPattern} from "../../../common/types/coating";
+import {CoatingType, FillPattern} from "@common/types/coating";
 
 export function useShapeSnapping() {
     const { isSnappingEnabled, pixelsPerMm } = useSettings();
@@ -24,33 +24,40 @@ export function useShapeSnapping() {
                 return size;
             }
 
-            const { lineSpacing } = tool;
+            const lineSpacingPx = tool.lineSpacing * pixelsPerMm;
+            if (lineSpacingPx <= 0) return size;
+
             let { width, height } = size;
 
             switch (tool.fillPattern) {
                 case 'horizontal':
-                    height = Math.round(height / lineSpacing) * lineSpacing;
+                    height = Math.round(height / lineSpacingPx) * lineSpacingPx;
+                    width = snapToGrid(width);
                     break;
                 case 'vertical':
-                    width = Math.round(width / lineSpacing) * lineSpacing;
+                    width = Math.round(width / lineSpacingPx) * lineSpacingPx;
+                    height = snapToGrid(height);
                     break;
                 case 'concentric':
                 default:
-                    width = Math.round(width / lineSpacing) * lineSpacing;
-                    height = Math.round(height / lineSpacing) * lineSpacing;
+                    width = Math.round(width / lineSpacingPx) * lineSpacingPx;
+                    height = Math.round(height / lineSpacingPx) * lineSpacingPx;
                     break;
             }
             return { width, height };
         },
-        []
+        [pixelsPerMm, snapToGrid]
     );
     
     const snapCircleRadius = useCallback((radius: number, tool: { coatingType: CoatingType; lineSpacing?: number }) => {
         if (tool.coatingType !== 'fill' || !tool.lineSpacing) {
             return radius;
         }
-        return Math.round(radius / tool.lineSpacing) * tool.lineSpacing;
-    }, []);
+        const lineSpacingPx = tool.lineSpacing * pixelsPerMm;
+        if (lineSpacingPx <= 0) return radius;
+
+        return Math.round(radius / lineSpacingPx) * lineSpacingPx;
+    }, [pixelsPerMm]);
 
 
     return {

@@ -8,11 +8,13 @@ import type { CustomShapeConfig } from '@/types/custom-konva-config';
 import { DRAWING_TOOLS, ToolType } from "@/types/tool-type";
 import { useShapeSnapping } from './use-shape-snapping';
 import {createCoatingPatternCanvas} from "@/lib/shape-create-utils";
+import {useSettings} from "@/contexts/settings-context";
 
 export function useShapeDrawing() {
     const dispatch = useAppDispatch();
     const toolState = useAppSelector((state) => state.tool);
     const { snapPointToGrid, snapShapeSize, snapCircleRadius } = useShapeSnapping();
+    const { pixelsPerMm } = useSettings();
 
     // 그리기 상태
     const isDrawingRef = useRef(false);
@@ -87,7 +89,14 @@ export function useShapeDrawing() {
                     temp.position({ x, y });
                     temp.size({ width, height });
 
-                    const patternImage = createCoatingPatternCanvas('rectangle', width, height, lineSpacing, coatingWidth, fillPattern);
+                    const patternImage = createCoatingPatternCanvas(
+                        'rectangle',
+                        width,
+                        height,
+                        lineSpacing * pixelsPerMm,
+                        coatingWidth * pixelsPerMm,
+                        fillPattern
+                    );
                     temp.fillPatternImage(patternImage);
                     temp.fillPatternRepeat('no-repeat');
                     temp.fill(undefined);
@@ -100,7 +109,14 @@ export function useShapeDrawing() {
 
                     if (snappedRadius > 0) {
                         const size = snappedRadius * 2;
-                        const patternImage = createCoatingPatternCanvas('circle', size, size, lineSpacing, coatingWidth, fillPattern);
+                        const patternImage = createCoatingPatternCanvas(
+                            'circle',
+                            size,
+                            size,
+                            lineSpacing * pixelsPerMm,
+                            coatingWidth * pixelsPerMm,
+                            fillPattern
+                        );
                         temp.fillPatternImage(patternImage);
                         temp.fillPatternRepeat('no-repeat');
                         temp.fillPatternOffset({ x: snappedRadius, y: snappedRadius });
@@ -127,7 +143,7 @@ export function useShapeDrawing() {
             }
             temp.getLayer()?.batchDraw();
         },
-        [toolState, snapShapeSize, snapCircleRadius]
+        [toolState, snapShapeSize, snapCircleRadius, pixelsPerMm]
     );
 
     const destroyTempShape = useCallback(() => {

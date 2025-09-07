@@ -177,10 +177,9 @@ export function PropertyPanel({className}: PropertyPanelProps) {
 
     const handleDimensionUpdate = (property: 'width' | 'height' | 'x' | 'y', value: string) => {
         const mmValue = parseFloat(value) || 0;
-        const pxValue = mmValue * pixelsPerMm;
 
-        if (!isNaN(pxValue)) {
-            handlePropertyUpdate(property, pxValue);
+        if (!isNaN(mmValue)) {
+            handlePropertyUpdate(property, mmValue);
         }
         setDimensionInputs(prev => ({...prev, [property]: mmValue.toFixed(2)}));
     };

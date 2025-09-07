@@ -16,7 +16,7 @@ export function useTransformerHandlers(
 ) {
     const dispatch = useAppDispatch();
     const shapes = useAppSelector((s) => s.shapes.shapes);
-    const {isSnappingEnabled} = useSettings();
+    const {isSnappingEnabled, pixelsPerMm} = useSettings();
     const {snapCircleRadius, snapShapeSize} = useShapeSnapping();
 
     // 외부에서도 재사용할 수 있도록 이미지 캐시 노출
@@ -103,7 +103,7 @@ export function useTransformerHandlers(
 
                 const {width: snappedWidth, height: snappedHeight} = snapShapeSize(
                     {width: currentWidth, height: currentHeight},
-                    {coatingType: shape.coatingType, lineSpacing: shape.lineSpacing}
+                    {coatingType: shape.coatingType, lineSpacing: shape.lineSpacing, fillPattern: shape.fillPattern}
                 );
 
                 const newScaleX = node.width() > 0 ? snappedWidth / node.width() : 0;
@@ -141,7 +141,7 @@ export function useTransformerHandlers(
                 const currentHeight = node.height() * scaleY;
                 const {width: snappedWidth, height: snappedHeight} = snapShapeSize(
                     {width: currentWidth, height: currentHeight},
-                    {coatingType: shape.coatingType, lineSpacing: shape.lineSpacing}
+                    {coatingType: shape.coatingType, lineSpacing: shape.lineSpacing, fillPattern: shape.fillPattern}
                 );
 
                 if (snappedWidth > 0 && snappedHeight > 0) {
@@ -149,8 +149,8 @@ export function useTransformerHandlers(
                         'rectangle',
                         snappedWidth,   // 스냅된 너비 사용
                         snappedHeight,  // 스냅된 높이 사용
-                        shape.lineSpacing || 0,
-                        shape.coatingWidth || 0,
+                        (shape.lineSpacing || 0) * pixelsPerMm,
+                        (shape.coatingWidth || 0) * pixelsPerMm,
                         shape.fillPattern || 'vertical'
                     );
                     if (pattern) {
@@ -175,8 +175,8 @@ export function useTransformerHandlers(
                         'circle',
                         size, // 스냅된 크기 사용
                         size, // 스냅된 크기 사용
-                        shape.lineSpacing || 0,
-                        shape.coatingWidth || 0,
+                        (shape.lineSpacing || 0) * pixelsPerMm,
+                        (shape.coatingWidth || 0) * pixelsPerMm,
                         shape.fillPattern || 'vertical'
                     );
                     if (pattern) {
@@ -259,7 +259,7 @@ export function useTransformerHandlers(
         }
 
         node.getLayer()?.batchDraw();
-    }, [transformerRef, shapes, snapShapeSize, snapCircleRadius]);
+    }, [transformerRef, shapes, snapShapeSize, snapCircleRadius, pixelsPerMm]);
 
     const handleTransformEnd = useCallback(() => {
         const nodes = transformerRef.current?.nodes() || [];
@@ -287,7 +287,8 @@ export function useTransformerHandlers(
                 if (shape.type === 'rectangle' && shape.coatingType === 'fill' && shape.lineSpacing) {
                     const snapped = snapShapeSize({width: newWidth, height: newHeight}, {
                         coatingType: shape.coatingType,
-                        lineSpacing: shape.lineSpacing
+                        lineSpacing: shape.lineSpacing,
+                        fillPattern: shape.fillPattern
                     });
                     newWidth = snapped.width;
                     newHeight = snapped.height;

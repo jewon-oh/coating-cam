@@ -5,6 +5,7 @@ import { Circle, Line, Rect } from 'react-konva';
 
 import type { CustomShapeConfig } from '@/types/custom-konva-config';
 import {createCoatingPatternCanvas} from "@/lib/shape-create-utils";
+import {useSettings} from "@/contexts/settings-context";
 
 interface ShapeComponentProps {
     shape: CustomShapeConfig;
@@ -17,18 +18,24 @@ interface ShapeComponentProps {
  * fill 패턴 생성 및 실시간 변환 핸들링을 담당합니다.
  */
 export const ShapeComponent = ({ shape, commonProps }: ShapeComponentProps) => {
+    const { pixelsPerMm } = useSettings();
+
     const patternImage = useMemo(() => {
         if (shape.coatingType !== 'fill' || !shape.fillPattern) {
             return undefined;
         }
+
+        // mm를 px로 변환
+        const lineSpacingPx = (shape.lineSpacing || 0) * pixelsPerMm;
+        const coatingWidthPx = (shape.coatingWidth || 0) * pixelsPerMm;
 
         if (shape.type === 'rectangle') {
             return createCoatingPatternCanvas(
                 'rectangle',
                 shape.width || 0,
                 shape.height || 0,
-                shape.lineSpacing || 0,
-                shape.coatingWidth || 0,
+                lineSpacingPx,
+                coatingWidthPx,
                 shape.fillPattern,
             );
         }
@@ -38,8 +45,8 @@ export const ShapeComponent = ({ shape, commonProps }: ShapeComponentProps) => {
                 'circle',
                 size,
                 size,
-                shape.lineSpacing || 0,
-                shape.coatingWidth || 0,
+                lineSpacingPx,
+                coatingWidthPx,
                 shape.fillPattern,
             );
         }
@@ -47,7 +54,7 @@ export const ShapeComponent = ({ shape, commonProps }: ShapeComponentProps) => {
     }, [
         shape.width, shape.height, shape.radius,
         shape.lineSpacing, shape.coatingWidth, shape.fillPattern,
-        shape.coatingType, shape.type
+        shape.coatingType, shape.type, pixelsPerMm
     ]);
 
     const finalProps = { ...commonProps };

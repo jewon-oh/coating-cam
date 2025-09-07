@@ -1,5 +1,5 @@
 import { CustomShapeConfig } from '@/types/custom-konva-config';
-import {CoatingSettings} from "../../../common/types/coating";
+import {CoatingSettings} from "@common/types/coating";
 import { Point } from '@/types/point';
 import { MaskingManager } from "@/lib/gcode/mask-manager";
 
@@ -467,7 +467,8 @@ export class PathCalculator {
     // 하지만 복잡한 분석 메서드들은 제거
 
     private getLineSpacing(shape: CustomShapeConfig): number {
-        return shape.lineSpacing ?? this.settings.lineSpacing;
+        const lineSpacingMm = shape.lineSpacing ?? this.settings.lineSpacing;
+        return lineSpacingMm * this.settings.pixelsPerMm;
     }
 
     private getFillPattern(shape: CustomShapeConfig): 'horizontal' | 'vertical' | 'auto' | 'concentric' {
@@ -475,7 +476,8 @@ export class PathCalculator {
     }
 
     private getCoatingWidth(shape: CustomShapeConfig): number {
-        return shape.coatingWidth ?? this.settings.coatingWidth;
+        const coatingWidthMm = shape.coatingWidth ?? this.settings.coatingWidth;
+        return coatingWidthMm * this.settings.pixelsPerMm;
     }
 
     private getOutlinePasses(shape: CustomShapeConfig): number {
