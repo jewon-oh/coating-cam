@@ -1,28 +1,28 @@
 "use client";
 
-import React, {useRef, useMemo} from 'react';
-import {Stage, Layer, Rect} from 'react-konva';
+import React, { useRef, useMemo } from 'react';
+import { Stage, Layer, Rect } from 'react-konva';
 import type Konva from 'konva';
 
 // Redux 상태 관리
-import {useAppSelector} from '@/hooks/redux';
+import { useAppSelector } from '@/hooks/redux';
 
 // 커스텀 훅들
-import {useTransformerHandlers} from '@/hooks/shape/use-transformer-handlers';
-import {useSettings} from '@/contexts/settings-context';
-import {useCanvas} from '@/contexts/canvas-context';
-import {useStageEvents} from '@/hooks/use-stage-events';
+import { useTransformerHandlers } from '@/hooks/shape/use-transformer-handlers';
+import { useSettings } from '@/contexts/settings-context';
+import { useCanvas } from '@/contexts/canvas-context';
+import { useStageEvents } from '@/hooks/use-stage-events';
 
 // 컴포넌트 및 타입
 import CanvasGrid from '@/components/workspace/canvas-grid';
-import {ShapeLayer} from '@/components/workspace/shape-layer';
-import {useKeyboardShortcuts} from '@/hooks/use-keyboard-shortcuts';
-import {PathVisualization} from "@/components/workspace/path-visualization";
+import { ShapeLayer } from '@/components/workspace/shape-layer';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
+import { PathVisualization } from "@/components/workspace/path-visualization";
 
 // ===== 메인 컴포넌트 =====
 export default function WorkspaceCanvas() {
     // Redux 상태에서 tool과 workspaceMode 모두 가져오기
-    const {tool} = useAppSelector((state) => state.tool);
+    const { tool } = useAppSelector((state) => state.tool);
 
     // Context에서 캔버스 상태 가져오기
     const {
@@ -35,7 +35,7 @@ export default function WorkspaceCanvas() {
     } = useCanvas();
 
     // 설정 가져오기
-    const {isGridVisible, pixelsPerMm, workArea} = useSettings();
+    const { isGridVisible, pixelsPerMm, workArea } = useSettings();
 
     const workAreaPx = useMemo(() => ({
         width: workArea.width * pixelsPerMm,
@@ -46,7 +46,7 @@ export default function WorkspaceCanvas() {
     const transformerRef = useRef<Konva.Transformer>(null);
 
     // 변형 핸들러
-    const {isTransforming} = useTransformerHandlers(transformerRef);
+    const { isTransforming } = useTransformerHandlers(transformerRef);
 
     // 통합된 이벤트 핸들러들 (패닝과 shape 이벤트 모두 포함)
     const {
@@ -54,6 +54,7 @@ export default function WorkspaceCanvas() {
         handleStageMouseMove,
         handleStageMouseUp,
         handleStageMouseLeave,
+        handleStageDragStart,
         handleStageDragMove,
         handleStageDragEnd,
         handleWheel,
@@ -88,7 +89,7 @@ export default function WorkspaceCanvas() {
         if (isTransforming) return "move";
         const modeKey = `shape/${tool}`;
         return cursorMapping[modeKey] || "default";
-    }, [ tool, isPanning, isTransforming, cursorMapping]);
+    }, [tool, isPanning, isTransforming, cursorMapping]);
 
     // 전역 키보드 이벤트 등록
     useKeyboardShortcuts({
@@ -133,6 +134,7 @@ export default function WorkspaceCanvas() {
                 onMouseMove={handleStageMouseMove}
                 onMouseUp={handleStageMouseUp}
                 onMouseLeave={handleStageMouseLeave}
+                onDragStart={handleStageDragStart}
                 onDragMove={handleStageDragMove}
                 onDragEnd={handleStageDragEnd}
                 onWheel={handleWheel}
@@ -196,7 +198,7 @@ export default function WorkspaceCanvas() {
                     />
                 </Layer>
 
-                <ShapeLayer isPanning={isPanning}/>
+                <ShapeLayer isPanning={isPanning} />
 
                 <Layer>
                     <PathVisualization />

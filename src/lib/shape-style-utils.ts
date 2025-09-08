@@ -15,7 +15,6 @@ export const getCoatingVisualStyle = (shape: Partial<CustomShapeConfig>): Konva.
             stroke: shape.stroke,
             strokeWidth: shape.strokeWidth,
             dash: [4, 4],
-            opacity: 0.6
         };
     }
 
@@ -25,7 +24,6 @@ export const getCoatingVisualStyle = (shape: Partial<CustomShapeConfig>): Konva.
             stroke: '#6c757d',
             strokeWidth: 1,
             dash: [8, 4],
-            opacity: 0.5
         };
     }
 

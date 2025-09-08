@@ -5,6 +5,7 @@ import {selectMultipleShapes, selectShape, unselectAllShapes} from '@/store/slic
 import { useSelectionRect } from '@/hooks/use-selection-rect';
 import Konva from "konva";
 import {CustomShapeConfig} from "@/types/custom-konva-config";
+import { toast } from 'sonner';
 
 export function useShapeSelection() {
     const dispatch = useAppDispatch();
@@ -120,6 +121,12 @@ export function useShapeSelection() {
         const shapeId = e.target.id(); // 클릭한 도형의 ID 가져오기
         if (!shapeId) return;
 
+        const shape = shapes.find(s => s.id === shapeId);
+        if (shape?.isLocked) {
+            toast.info('이 도형은 잠겨 있어 선택할 수 없습니다.');
+            return;
+        }
+
         const meta = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
         const isSelected = selectedShapeIds.includes(shapeId);
 
@@ -136,7 +143,7 @@ export function useShapeSelection() {
             dispatch(selectMultipleShapes([...selectedShapeIds, shapeId]));
         }
 
-    }, [dispatch, selectedShapeIds]);
+    }, [dispatch, selectedShapeIds, shapes]);
 
 
     const handleSelectAll = useCallback(() => {

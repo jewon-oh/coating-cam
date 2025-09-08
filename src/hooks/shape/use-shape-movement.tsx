@@ -7,13 +7,13 @@ import { batchUpdateShapes, setDragging, setDraggingShapeIds } from '@/store/sli
 import { setPresent } from '@/store/slices/shape-history-slice';
 import type { CustomShapeConfig } from '@/types/custom-konva-config';
 import { useSettings } from '@/contexts/settings-context';
-import {useShapeSnapping} from "@/hooks/shape/use-shape-snapping";
+import { useShapeSnapping } from "@/hooks/shape/use-shape-snapping";
 
 export function useShapeMovement() {
     const dispatch = useAppDispatch();
     const { shapes, selectedShapeIds } = useAppSelector((state) => state.shapes);
-    const { isSnappingEnabled  } = useSettings();
-    const {snapToGrid} = useShapeSnapping();
+    const { isSnappingEnabled } = useSettings();
+    const { snapToGrid } = useShapeSnapping();
 
     const shapesRef = useRef(shapes);
     useEffect(() => {
@@ -59,7 +59,7 @@ export function useShapeMovement() {
     }, [dispatch, selectedShapeIds]);
 
     const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
-        console.log('handleDragMove');
+        // console.log('handleDragMove');
         const node = e.target as Konva.Node & {
             x: () => number;
             y: () => number;
