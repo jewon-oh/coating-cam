@@ -196,15 +196,15 @@ export class PathCalculator {
 
         // Concentric 패턴 처리
         if (pattern === 'concentric') {
-            return this.calculateConcentricFillSegments(boundary, lineSpacing);
+            return await this.calculateConcentricFillSegments(boundary, lineSpacing);
         }
 
         // Auto 패턴 단순화: 마스킹 유무에 따른 간단한 분기
         const effectivePattern = pattern === 'auto' ?
             await this.determineSimpleOptimalPattern(boundary, bounds) :
             pattern; // 이 시점에서 'horizontal' 또는 'vertical'
-
-        return this.generateStreamingFillSegments(boundary, bounds, effectivePattern, lineSpacing);
+        
+        return await this.generateStreamingFillSegments(boundary, bounds, effectivePattern, lineSpacing);
     }
 
     /**
@@ -287,10 +287,10 @@ export class PathCalculator {
     /**
      * Concentric Fill 세그먼트 계산
      */
-    private calculateConcentricFillSegments(
+    private async calculateConcentricFillSegments(
         boundary: CustomShapeConfig,
         lineSpacing: number
-    ): { start: Point; end: Point }[] {
+    ):Promise<{ start: Point; end: Point }[]> {
         const segments: { start: Point; end: Point }[] = [];
         const coatingWidth = this.getCoatingWidth(boundary);
 
@@ -356,11 +356,12 @@ export class PathCalculator {
         coatingWidth: number,
         segments: { start: Point; end: Point }[]
     ): Promise<void> {
+        if (lineSpacing <= 0) return; // 무한 루프 방지
         const halfWidth = coatingWidth / 2;
         const startY = bounds.y + halfWidth; // 첫 코팅 라인의 중심 Y좌표
         const endY = bounds.y + bounds.height - halfWidth; // 마지막 코팅 라인의 중심 Y좌표
 
-        if (startY > endY || lineSpacing <= 0) return;
+        if (startY > endY) return;
 
         let direction = 1; // 1: LTR, -1: RTL
 
@@ -392,11 +393,14 @@ export class PathCalculator {
         coatingWidth: number,
         segments: { start: Point; end: Point }[]
     ): Promise<void> {
+        if (lineSpacing <= 0) return; // 무한 루프 방지
+        console.log(lineSpacing);
         const halfWidth = coatingWidth / 2;
         const startX = bounds.x + halfWidth; // 첫 코팅 라인의 중심 X좌표
         const endX = bounds.x + bounds.width - halfWidth; // 마지막 코팅 라인의 중심 X좌표
 
-        if (startX > endX || lineSpacing <= 0) return;
+        console.log(startX, endX);
+        if (startX > endX) return;
 
         let direction = 1; // 1: TTB, -1: BTT
 
