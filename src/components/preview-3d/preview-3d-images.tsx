@@ -1,7 +1,8 @@
-import {useEffect, useState} from "react";
-import {ImageShapeConfig} from "@/types/custom-konva-config";
-import { Text} from "@react-three/drei";
+import { useEffect, useState } from "react";
+import { ImageShapeConfig } from "@/types/custom-konva-config";
+import { Text } from "@react-three/drei";
 import * as THREE from "three";
+import { useSettings } from "@/contexts/settings-context";
 
 /**
  * 이미지 데이터 URL과 crop 정보를 받아, 잘라낸 새 이미지 데이터 URL을 반환합니다.
@@ -44,14 +45,16 @@ function cropImageData(dataUrl: string, crop: { x: number, y: number, width: num
 
 // 실제 imageShape 구조에 맞춰 다중 이미지를 렌더링하는 컴포넌트
 export default function Preview3DImages({
-                                  imageShapes,
-                                  scaleFactor,
-                              }: {
+    imageShapes,
+    scaleFactor,
+}: {
     imageShapes: ImageShapeConfig[];
     scaleFactor: number;
 }) {
     const [textures, setTextures] = useState<Map<string, THREE.Texture>>(new Map());
     const [loadingStates, setLoadingStates] = useState<Map<string, boolean>>(new Map());
+    const { pixelsPerMm } = useSettings();
+
 
     useEffect(() => {
         const loadTextures = async () => {
@@ -133,7 +136,7 @@ export default function Preview3DImages({
         // 의존성 변경/언마운트 시 기존 텍스처 자원 해제
         return () => {
             textures.forEach((tex) => {
-                try { tex.dispose(); } catch {}
+                try { tex.dispose(); } catch { }
             });
         };
     }, [imageShapes, textures]);
@@ -149,7 +152,6 @@ export default function Preview3DImages({
                 const texture = textures.get(imageShape.id ?? "");
                 const isLoading = loadingStates.get(imageShape.id ?? "") ?? false;
 
-                // ✅ crop된 영역의 실제 크기와 위치 계산
                 const baseX = imageShape.x ?? 0;
                 const baseY = imageShape.y ?? 0;
                 const scaleX = imageShape.scaleX ?? 1;
@@ -157,10 +159,10 @@ export default function Preview3DImages({
                 const rotation = imageShape.rotation ?? 0;
                 const visible = imageShape.visible ?? true;
 
-                const effectiveX = baseX;
-                const effectiveY = baseY;
-                const effectiveWidth = (imageShape.width ?? 0) * scaleX;
-                const effectiveHeight = (imageShape.height ?? 0) * scaleY;
+                const effectiveX = baseX / pixelsPerMm;
+                const effectiveY = baseY / pixelsPerMm;
+                const effectiveWidth = (imageShape.width ?? 0) * scaleX / pixelsPerMm;
+                const effectiveHeight = (imageShape.height ?? 0) * scaleY / pixelsPerMm;
 
                 // 3D 공간에서의 실제 크기 (X,Y 바뀐 상태)
                 const actualWidth = effectiveHeight / scaleFactor;
@@ -182,7 +184,7 @@ export default function Preview3DImages({
                             position={[posX, 0.005, posZ]}
                             rotation={[-Math.PI / 2, 0, (rotation * Math.PI) / 180]}
                         >
-                            <planeGeometry args={[actualWidth, actualHeight]}/>
+                            <planeGeometry args={[actualWidth, actualHeight]} />
                             <meshBasicMaterial
                                 color="#666666"
                                 transparent
@@ -220,7 +222,7 @@ export default function Preview3DImages({
                             }
                         }}
                     >
-                        <planeGeometry args={[actualWidth, actualHeight]}/>
+                        <planeGeometry args={[actualWidth, actualHeight]} />
                         <meshBasicMaterial
                             map={texture}
                             transparent

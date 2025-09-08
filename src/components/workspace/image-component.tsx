@@ -1,14 +1,13 @@
 "use client";
 
-import React, {useEffect, useRef} from 'react';
-import {Image, Rect} from 'react-konva';
+import React, { useEffect, useRef } from 'react';
+import { Image, Rect } from 'react-konva';
 import type Konva from 'konva';
 
-import type {CustomShapeConfig} from '@/types/custom-konva-config';
-import {getCoatingVisualStyle} from "@/lib/shape-style-utils";
+import type { CustomShapeConfig } from '@/types/custom-konva-config';
+import { getCoatingVisualStyle } from "@/lib/shape-style-utils";
 
-import {KonvaEventObject} from "konva/lib/Node";
-import {useSettings} from "@/contexts/settings-context";
+import { KonvaEventObject } from "konva/lib/Node";
 
 interface ImageComponentProps {
     shape: CustomShapeConfig;
@@ -23,21 +22,14 @@ interface ImageComponentProps {
 /**
  * Konva Image 도형을 렌더링하는 컴포넌트입니다.
  */
-export const ImageComponent = ({shape, imageElement, commonProps}: ImageComponentProps) => {
+export const ImageComponent = ({ shape, imageElement, commonProps }: ImageComponentProps) => {
     const imageRef = useRef<Konva.Image>(null);
-    const { pixelsPerMm } = useSettings();
 
     useEffect(() => {
         if (imageRef.current && commonProps.filters) {
             imageRef.current.cache();
         }
     }, [commonProps.filters, imageElement]);
-
-    // mm 단위를 px로 변환
-    const x_px = (shape.x || 0) * pixelsPerMm;
-    const y_px = (shape.y || 0) * pixelsPerMm;
-    const width_px = (shape.width || 0) * pixelsPerMm;
-    const height_px = (shape.height || 0) * pixelsPerMm;
 
     if (!imageElement) {
         const style = getCoatingVisualStyle(shape);
@@ -46,10 +38,10 @@ export const ImageComponent = ({shape, imageElement, commonProps}: ImageComponen
                 key={`${shape.id}-loading`}
                 id={shape.id}
                 name="shape"
-                x={x_px}
-                y={y_px}
-                width={width_px}
-                height={height_px}
+                x={shape.x}
+                y={shape.y}
+                width={shape.width}
+                height={shape.height}
                 fill={style.fill || "#f8f9fa"}
                 stroke={style.stroke || "#dee2e6"}
                 strokeWidth={style.strokeWidth || 1}
@@ -74,10 +66,10 @@ export const ImageComponent = ({shape, imageElement, commonProps}: ImageComponen
             id={shape.id}
             alt={shape.name}
             name="shape"
-            x={x_px}
-            y={y_px}
-            width={width_px}
-            height={height_px}
+            x={shape.x}
+            y={shape.y}
+            width={shape.width}
+            height={shape.height}
             image={imageElement}
             rotation={shape.rotation || 0}
             scaleX={shape.scaleX || 1}
