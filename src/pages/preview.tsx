@@ -334,7 +334,7 @@ export default function PreviewPage() {
                         <div>
                             <h1 className="text-xl font-bold mb-2">G-code 미리보기</h1>
                             <p className="text-sm text-muted-foreground">
-                                3D로 경로를 미리보기하고 다운로드
+                                3D로 경로 미리보기 및 다운로드
                             </p>
                             {lastGenerated && (
                                 <p className="text-xs text-muted-foreground mt-1">

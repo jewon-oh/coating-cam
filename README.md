@@ -9,6 +9,31 @@
 
 > Konva 캔버스 기반 PCB 코팅 경로 생성 소프트웨어
 
+## 👀 미리보기
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <strong>메인 화면</strong><br>
+      <img src="./images/1.png" alt="Coating CAM 메인 화면" width="100%">
+    </td>
+    <td align="center" width="50%">
+      <strong>작업 예시</strong><br>
+      <img src="./images/2.png" alt="작업 예시" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <strong>그리기 도구 </strong><br>
+      <img src="./images/3.png" alt="그리기 도구" width="100%">
+    </td>
+    <td align="center" width="50%">
+      <strong>G-Code</strong><br>
+      <img src="./images/4.png" alt="G-Code" width="100%">
+    </td>
+  </tr>
+</table>
+
 ## 🎯 프로젝트 개요
 
 **Coating CAM**은 참조 이미지를 업로드하고 캔버스에서 직관적으로 마스킹/ 코팅 영역을 설계하여 CNC 라우터에 사용할 수 있는 정밀한 G-Code를 생성하는 하이브리드 데스크톱/웹 애플리케이션입니다.
