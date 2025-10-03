@@ -35,6 +35,10 @@ interface CanvasContextValue {
     handleCanvasFocus: () => void;
     handleCanvasBlur: () => void;
 
+    // 상호작용 상태
+    isHoveringShape: boolean;
+    setIsHoveringShape: (isHovering: boolean) => void;
+
     // 유틸리티 메서드
     resetStage: () => void;
     updateStageSize: (width: number, height: number) => void;
@@ -247,6 +251,7 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
     const { stage, setStage, resetStage, updateStageSize } = useStageState();
     const { loading, setLoading } = useLoadingState();
     const { isCanvasFocused, handleCanvasFocus, handleCanvasBlur } = useCanvasFocusState();
+    const [isHoveringShape, setIsHoveringShape] = useState(false);
 
     useCanvasResize(canvasContainerRef, stageRef, updateStageSize);
 
@@ -260,9 +265,11 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
         isCanvasFocused,
         handleCanvasFocus,
         handleCanvasBlur,
+        isHoveringShape,
+        setIsHoveringShape,
         resetStage,
         updateStageSize,
-    }), [stage, setStage, loading, setLoading, isCanvasFocused, handleCanvasFocus, handleCanvasBlur, resetStage, updateStageSize]);
+    }), [stage, setStage, loading, setLoading, isCanvasFocused, handleCanvasFocus, handleCanvasBlur, isHoveringShape, setIsHoveringShape, resetStage, updateStageSize]);
 
     return (
         <CanvasContext.Provider value={contextValue}>

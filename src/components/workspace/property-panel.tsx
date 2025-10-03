@@ -161,17 +161,40 @@ export function PropertyPanel({className}: PropertyPanelProps) {
     const handlePropertyUpdate = (property: string, value: string | number | boolean | undefined) => {
         if (selectedShapeIds.length === 0) return;
 
-        if (selectedShapeIds.length === 1) {
-            dispatch(updateShape({
-                id: selectedShapeIds[0],
-                updatedProps: {[property]: value}
-            }));
-        } else {
-            const updates = selectedShapeIds.map(id => ({
-                id,
-                props: {[property]: value}
-            }));
-            dispatch(batchUpdateShapes(updates));
+        if (property === 'rotation' && singleSelectedShape) {
+            const shape = singleSelectedShape;
+            const newRotation = value as number;
+
+            const width = shape.width || 0;
+            const height = shape.height || 0;
+
+            const updatedProps: Partial<CustomShapeConfig> = {
+                rotation: newRotation,
+            };
+
+            // 오프셋이 설정되지 않았거나, 0,0 이면 중심으로 설정
+            if (!shape.offsetX || !shape.offsetY) {
+                updatedProps.offsetX = width / 2;
+                updatedProps.offsetY = height / 2;
+                updatedProps.x = (shape.x || 0) + width / 2;
+                updatedProps.y = (shape.y || 0) + height / 2;
+            }
+
+            dispatch(updateShape({ id: shape.id!, updatedProps }));
+
+        } else { // Original logic for other properties and multi-select
+            if (selectedShapeIds.length === 1) {
+                dispatch(updateShape({
+                    id: selectedShapeIds[0],
+                    updatedProps: {[property]: value}
+                }));
+            } else {
+                const updates = selectedShapeIds.map(id => ({
+                    id,
+                    props: {[property]: value}
+                }));
+                dispatch(batchUpdateShapes(updates));
+            }
         }
     };
 

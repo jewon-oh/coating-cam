@@ -13,8 +13,8 @@ import { TransformerConfig } from "konva/lib/shapes/Transformer";
 import { imageUtils } from "@/lib/image-utils";
 import { getCoatingVisualStyle } from "@/lib/shape-style-utils";
 import { useTransformerHandlers } from "@/hooks/shape/use-transformer-handlers";
-// import { ShapeComponent } from "@/components/workspace/shape-component";
 import { ImageComponent } from "@/components/workspace/image-component";
+import { ShapeSizeIndicator } from "./shape-size-indicator";
 
 // ===== 라인 핸들 추가 START =====
 import { LineHandles } from '@/components/workspace/line-handles';
@@ -27,29 +27,25 @@ interface ShapeLayerProps {
 }
 
 export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
-    // Redux 상태
     const dispatch = useAppDispatch();
     const { shapes, selectedShapeIds } = useAppSelector((state) => state.shapes);
     const { tool } = useAppSelector((state) => state.tool);
-
-    // Context 및 훅
-    const { setLoading } = useCanvas();
-
-    // 로컬 상태
-    const [isHoveringShape, setIsHoveringShape] = useState<string | null>(null);
-
-    // 참조들
+    const { setLoading, setIsHoveringShape } = useCanvas();
+    const [hoveringShapeId, setHoveringShapeId] = useState<string | null>(null);
     const layerRef = useRef<Konva.Layer>(null);
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
     const transformerRef = useRef<Konva.Transformer>(null);
 
-    // Transformer 핸들러
     const {
         isTransforming,
         handleTransformStart,
         handleTransform,
-        handleTransformEnd
-    } = useTransformerHandlers(transformerRef);
+        handleTransformEnd,
+        boundBoundFunc,
+        indicatorPosition,
+        indicatorText,
+        indicatorScale
+    } = useTransformerHandlers(transformerRef,imageCache);
 
     const { imageShapes, otherShapes } = useMemo(() => {
         const visibleShapes = shapes.filter(s => s.visible !== false);
@@ -76,18 +72,14 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
         )
         , [shapes, selectedShapeIds]);
 
-    // ===== 라인 핸들 추가 START =====
-    // 선택된 라인의 설정(config)을 찾습니다.
     const selectedLineConfig = useMemo(() => {
         if (selectedShapeIds.length !== 1) return null;
         const selectedShape = shapes.find(s => s.id === selectedShapeIds[0]);
         return selectedShape?.type === 'line' ? selectedShape : null;
     }, [shapes, selectedShapeIds]);
 
-    // 선택된 라인의 실제 Konva 노드를 state로 관리합니다.
     const [selectedLineNode, setSelectedLineNode] = useState<Konva.Line | null>(null);
 
-    // 선택된 라인이 변경될 때마다 layer에서 해당 노드를 찾아 state를 업데이트합니다.
     useEffect(() => {
         if (selectedLineConfig && layerRef.current) {
             const node = layerRef.current.findOne<Konva.Line>(`#${selectedLineConfig.id}`);
@@ -96,8 +88,10 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
             setSelectedLineNode(null);
         }
     }, [selectedLineConfig]);
-    // ===== 라인 핸들 추가 END =====
 
+    const isSingleCircleSelected = useMemo(() =>
+        transformableShapes.length === 1 && transformableShapes[0].type === 'circle'
+    , [transformableShapes]);
 
     const hasImages = useMemo(() =>
         transformableShapes.some(shape => shape.type === 'image')
@@ -116,7 +110,6 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
                 anchor.width(14).offsetX(8).height(14).offsetY(8);
             }
         },
-        keepRatio: false,
         centeredScaling: false,
         flipEnabled: false,
         ignoreStroke: true,
@@ -161,33 +154,21 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
 
         const baseProps = {
             draggable: tool === 'select' && !isPanning && !isLocked,
-            onMouseEnter: (e: Konva.KonvaEventObject<MouseEvent>) => {
-                const container = e.target.getStage()?.container();
-                if (!container) return;
-
-                if (isLocked) {
-                    container.style.cursor = 'not-allowed';
-                } else {
-                    container.style.cursor = 'pointer';
-                    if (!isInteractionBlocked) {
-                        setIsHoveringShape(shape.id!); // 마우스 오버 시 하이라이트
-                    }
+            onMouseEnter: () => {
+                if (!isInteractionBlocked) {
+                    setIsHoveringShape(true);
+                    setHoveringShapeId(shape.id!);
                 }
             },
-            onMouseLeave: (e: Konva.KonvaEventObject<MouseEvent>) => {
-                const container = e.target.getStage()?.container();
-                if (container) {
-                    container.style.cursor = 'default';
-                }
-                setIsHoveringShape(null);
+            onMouseLeave: () => {
+                setIsHoveringShape(false);
+                setHoveringShapeId(null);
             },
             perfectDrawEnabled: false,
-            // isLocked일 때도 listening은 true여야 커서 변경을 위한 mouseenter/leave 이벤트가 발생합니다.
-            // 실제 상호작용(드래그, 클릭 등)은 다른 로직에서 차단됩니다.
             listening: tool === 'select' && !isPanning,
         };
 
-        const hoverEffect = (isHoveringShape === shape.id && !isInteractionBlocked) ? {
+        const hoverEffect = (hoveringShapeId === shape.id && !isInteractionBlocked) ? {
             shadowColor: 'rgba(59, 130, 246, 0.6)',
             shadowBlur: 12,
             shadowOpacity: 1
@@ -202,12 +183,12 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
                 ...finalProps,
                 stroke: '#9ca3af', // tailwind gray-400
                 dash: [10, 5],
-                shadowOpacity: 0, // 잠겼을 때는 호버 효과(그림자) 제거
+                shadowOpacity: 0,
             };
         }
 
         return finalProps;
-    }, [isPanning, tool, isHoveringShape]);
+    }, [isPanning, tool, hoveringShapeId, setIsHoveringShape]);
 
     const makeImageProps = useCallback((shape: CustomShapeConfig): Partial<Konva.ImageConfig> => {
         const isLocked = shape.isLocked;
@@ -263,7 +244,7 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
                     key={shape.id}
                     shape={shape}
                     imageElement={shape.imageDataUrl ? loadImage(shape.imageDataUrl, shape.id) : null}
-                    commonProps={makeImageProps(shape)} // makeImageProps에서 onMouseEnter, onMouseLeave 제거
+                    commonProps={makeImageProps(shape)}
                 />
             ))}
             {otherShapes.map((shape) => (
@@ -280,22 +261,32 @@ export function ShapeLayer({ isPanning = false }: ShapeLayerProps) {
                 onTransformStart={handleTransformStart}
                 onTransform={handleTransform}
                 onTransformEnd={handleTransformEnd}
+                boundBoxFunc={boundBoundFunc}
                 rotateEnabled={true}
+                keepRatio={isSingleCircleSelected}
                 anchorSize={10}
                 anchorStroke="#3b82f6"
                 anchorFill="#fff"
                 borderStroke="#3b82f6"
-                enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'middle-right', 'bottom-center', 'middle-left']}
-                visible={transformableShapes.length > 0 && !isTransforming}
+                enabledAnchors={
+                    isSingleCircleSelected
+                        ? ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+                        : ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'middle-right', 'bottom-center', 'middle-left']
+                }
+                visible={transformableShapes.length > 0}
                 {...transformerConfig}
             />
 
-            {/* ===== 라인 핸들 추가 START ===== */}
-            {/* 선택된 도형이 'line'일 경우에만 LineHandles 컴포넌트를 렌더링합니다. */}
             <LineHandles
                 lineNode={selectedLineNode}
             />
-            {/* ===== 라인 핸들 추가 END ===== */}
+
+            <ShapeSizeIndicator
+                isVisible={isTransforming}
+                position={indicatorPosition}
+                sizeText={indicatorText}
+                scale={indicatorScale}
+            />
         </Layer>
     );
 }

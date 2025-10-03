@@ -32,6 +32,7 @@ export default function WorkspaceCanvas() {
         isCanvasFocused,
         handleCanvasFocus,
         handleCanvasBlur,
+        isHoveringShape,
     } = useCanvas();
 
     // 설정 가져오기
@@ -75,10 +76,10 @@ export default function WorkspaceCanvas() {
     // 커서 스타일 매핑 테이블
     const cursorMapping: Record<string, string> = useMemo(
         () => ({
-            "shape/select": "default",
-            "shape/line": "crosshair",
-            "shape/rectangle": "crosshair",
-            "shape/circle": "crosshair",
+            "select": "default",
+            "line": "crosshair",
+            "rectangle": "crosshair",
+            "circle": "crosshair",
         }),
         []
     );
@@ -87,9 +88,10 @@ export default function WorkspaceCanvas() {
     const cursorStyle = useMemo(() => {
         if (isPanning) return "grabbing";
         if (isTransforming) return "move";
-        const modeKey = `shape/${tool}`;
-        return cursorMapping[modeKey] || "default";
-    }, [tool, isPanning, isTransforming, cursorMapping]);
+
+        if (tool === 'select' && isHoveringShape) return "pointer";
+        return cursorMapping[tool] || "default";
+    }, [tool, isPanning, isTransforming, isHoveringShape, cursorMapping]);
 
     // 전역 키보드 이벤트 등록
     useKeyboardShortcuts({
